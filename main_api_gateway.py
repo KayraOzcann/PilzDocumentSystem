@@ -1120,21 +1120,8 @@ def health_check():
 
 @app.route('/', methods=['GET'])
 def index():
-    """Main page with API info"""
-    return jsonify({
-        'status': 'ok',
-        'service': 'Nuvotek API Gateway',
-        'version': '2.0.0',
-        'message': 'API is running successfully!',
-        'endpoints': {
-            'documentation': '/api/info',
-            'health_check': '/health',
-            'services': '/api/services',
-            'analyze': '/api/analyze'
-        }
-    })
-"""def index():
-    return render_template('index.html')"""
+    """Main page with web interface"""
+    return render_template('index.html')
 
 @app.route('/api/info', methods=['GET'])
 def api_info():
