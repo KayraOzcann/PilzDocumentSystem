@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PILZ Report Checker - Modern</title>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet" />
+    <link href="/static/style.css" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="/static/logo.png" />
+
+<body class="dark">
+    <div class="container">
+        <header class="site-header animate__animated animate__fadeInDown">
+            <div class="brand">
+                <img src="/static/logo.png" alt="PILZ" />
+                <div>
+                      <h1>PILZ Report Checker</h1>
+                    <div class="tagline">Gelişmiş Rapor Analiz Sistemi</div>
+                </div>
+            </div>
+            <div class="header-nav">
+                <button id="analysisBtn" class="nav-btn selected" type="button">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <span>Rapor Analizi</span>
+                </button>
+                <button id="evaluationBtn" class="nav-btn" type="button">
+                    <i class="fa-solid fa-chart-bar"></i>
+                    <span>Rapor Değerlendirme</span>
+                </button>
+                <button id="ticketsBtn" class="nav-btn" type="button">
+                    <i class="fa-solid fa-ticket"></i>
+                    <span>Tickets</span>
+                </button>
+                <button id="themeToggle" class="theme-toggle" type="button" aria-label="Tema Değiştir">
+                    <i class="fa-solid fa-moon"></i>
+                    <span>Tema</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="grid animate__animated animate__fadeInUp">
+            <!-- Analysis View (Default) -->
+            <div id="analysisView" class="view-content">
+                <section class="panel" style="grid-column:1/-1;">
+                    <form id="analysisForm" enctype="multipart/form-data" novalidate>
+                        <div id="uploadSection" class="upload-zone">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                            <h3>Dosyanızı Yükleyin</h3>
+                            <p class="meta">Sürükleyip bırak veya tıkla</p>
+                            <p class="meta">PDF, JPG, JPEG, PNG (Max 32MB)</p>
+                            <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" hidden />
+                            <button type="button" class="btn-primary" onclick="document.getElementById('fileInput').click()"><i class="fa-solid fa-plus"></i> Dosya Seç</button>
+                        </div>
+
+                        <div class="file-info" id="fileInfo">
+                            <span id="fileName"></span>
+                            <span id="fileSize"></span>
+                        </div>
+
+                            <div class="select-wrap" style="margin-top:1.3rem;">
+                                <select id="documentType" name="document_type" required>
+                                    <option value="">-- Rapor türünü seçiniz --</option>
+                                    <option value="electric_circuit">🔌 Elektrik Devre Şeması Analizi</option>
+                                    <option value="espe_report">📋 ESPE Raporu Analizi</option>
+                                    <option value="noise_report">🔊 Gürültü Ölçüm Raporu Analizi</option>
+                                    <option value="manuel_report">📖 Manuel/Kullanım Kılavuzu Analizi</option>
+                                    <option value="loto_report">🔒 LOTO Raporu Analizi</option>
+                                    <option value="lvd_report">⚡ LVD Raporu Analizi</option>
+                                    <option value="at_type_inspection">🔍 AT Tip Muayene Analizi</option>
+                                    <option value="isg_periyodik_kontrol">🛡️ İSG Periyodik Kontrol Analizi</option>
+                                    <option value="pneumatic_circuit">💨 Pnömatik Devre Şeması Analizi</option>
+                                    <option value="hydraulic_circuit">🔧 Hidrolik Devre Şeması Analizi</option>
+                                    <option value="assembly_instructions">🔨 Montaj Talimatları Analizi</option>
+                                    <option value="grounding_report">⚡ EN 60204-1 Topraklama Raporu Analizi</option>
+                                    <option value="hrc_report">🤖 HRC Kuvvet-Basınç Raporu Analizi</option>
+                                    <option value="maintenance_instructions">🔧 Bakım Talimatları Analizi</option>
+                                    <option value="vibration_report">📳 Mekanik Titreşim Raporu Analizi</option>
+                                    <option value="lighting_report">💡 Aydınlatma Raporu Analizi</option>
+                                    <option value="at_certificate">📜 AT Tip İnceleme Sertifikası Analizi</option>
+                                </select>
+                                <i class="fa-solid fa-angle-down"></i>
+                            </div>
+
+                        <div class="actions">
+                            <button id="analyzeBtn" class="btn-primary" type="submit" disabled><i class="fa-solid fa-magnifying-glass"></i> Analiz Et</button>
+                        </div>
+                    </form>
+                    <div id="loading" class="loading">
+                        <div class="spinner"></div>
+                        <h3 style="font-size:.9rem; letter-spacing:.5px; font-weight:500;">Analiz Ediliyor...</h3>
+                        <p style="font-size:.65rem; letter-spacing:.75px; color:var(--text-dim);">Lütfen bekleyin</p>
+                    </div>
+                    <div id="errorMessage" class="error"></div>
+                </section>
+
+                <section id="resultsSection" class="results" style="grid-column:1/-1;">
+                    <div class="result-head">
+                        <h2><i class="fa-solid fa-chart-line"></i> Analiz Sonuçları</h2>
+                        <button id="toggleJsonBtn" class="toggle-json" onclick="toggleJsonView()">JSON</button>
+                    </div>
+                    <div class="result-body">
+                        <div id="visualResults"></div>
+                        <pre id="resultsJson" class="json-view"></pre>
+                         <div id="issueReportSection" class="issue-report-section" style="display: none;">
+                            <div class="issue-report-header">
+                                <i class="fa-solid fa-comment-dots"></i>
+                                <h3>Yorum</h3>
+                            </div>
+                            <input type="text" id="inspectorName" class="inspector-name-input" placeholder="İsminiz..." />
+                            <textarea id="inspectorComment" class="inspector-comment" placeholder="Analiz ile ilgili görüş, eksiklik veya sorunları detaylı olarak yazınız..."></textarea>
+                            <div class="issue-report-actions">
+                                <button type="button" class="btn-report-issue" onclick="reportIssue()">
+                                    <i class="fa-solid fa-flag"></i> Sorun Bildir
+                                </button>
+                            </div>
+                        </div>
+                        <div class="result-actions">
+                            <button type="button" class="btn-secondary" onclick="showEvaluationSection()"><i class="fa-solid fa-pen-to-square"></i> Değerlendir</button>
+                            <button type="button" class="btn-secondary" onclick="resetForm()"><i class="fa-solid fa-plus"></i> Yeni Analiz</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="evaluationSection" class="evaluation panel" style="grid-column:1/-1;">
+                    <div class="eval-head">
+                        <i class="fa-solid fa-pen"></i>
+                        <h2 style="font-size:1rem; font-weight:600; letter-spacing:.5px;">Analiz Değerlendirmesi</h2>
+                    </div>
+                    <div class="eval-grid">
+                        <div><input id="evalDocumentName" readonly placeholder="Belge Adı" /></div>
+                        <div><input id="evalDocumentSize" readonly placeholder="Dosya Boyutu" /></div>
+                            <div><input id="evalDocumentType" readonly placeholder="Rapor Tipi" /></div>
+                        <div><input id="evalAnalysisDate" readonly placeholder="Analiz Tarihi" /></div>
+                    </div>
+                    <div class="eval-notes">
+                        <textarea id="evaluationNotes" placeholder="Notlar...&#10;Örnek: Sonuçlar doğru mu? Eksikler? Öneriler..."></textarea>
+                    </div>
+                    <div class="eval-actions">
+                        <button class="btn-outline" type="button" onclick="hideEvaluationSection()"><i class="fa-solid fa-xmark"></i> İptal</button>
+                        <button class="btn-save" type="button" onclick="saveEvaluation()"><i class="fa-solid fa-floppy-disk"></i> Kaydet</button>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Evaluation View (Hidden by default) -->
+            <div id="evaluationView" class="view-content" style="display: none;">
+                <section class="panel" style="grid-column:1/-1;">
+                    <div class="eval-header">
+                        <h2><i class="fa-solid fa-chart-bar"></i> Analiz Tarihi:</h2>
+                    </div>
+                    <div id="evaluationGrid" class="evaluation-grid">
+                        <!-- Evaluation widgets will be loaded here -->
+                    </div>
+                </section>
+            </div>
+            <!-- Tickets View (Hidden by default) -->
+            <div id="ticketsView" class="view-content" style="display: none;">
+                <section class="panel" style="grid-column:1/-1;">
+                    <div class="tickets-header">
+                        <div class="search-container">
+                            <div class="filter-group">
+                                <label class="filter-label">Durum</label>
+                                <select id="statusFilter" class="filter-select">
+                                    <option value="">Hepsi</option>
+                                    <option value="İnceleniyor">İnceleniyor</option>
+                                    <option value="Onaylanmadı">Onaylanmadı</option>
+                                    <option value="Sorunlu">Sorunlu</option>
+                                    <option value="Kapalı">Kapalı</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label class="filter-label">Başlangıç Tarihi</label>
+                                <input type="date" id="dateFrom" class="date-input" />
+                            </div>
+                            <div class="filter-group">
+                                <label class="filter-label">Bitiş Tarihi</label>
+                                <input type="date" id="dateTo" class="date-input" />
+                            </div>
+                            <div class="filter-group">
+                                <label class="filter-label">Sorumlu</label>
+                                <input type="text" id="responsibleFilter" class="filter-input" placeholder="Sorumlu ara..." />
+                            </div>
+                            <button type="button" class="btn-search" onclick="searchTickets()">
+                                <i class="fa-solid fa-search"></i> Arama
+                            </button>
+                        </div>
+                    </div>
+                    <div id="ticketsContent" class="tickets-content">
+                        <div class="placeholder-content">
+                            <i class="fa-solid fa-ticket" style="font-size: 3rem; color: var(--accent); margin-bottom: 1rem;"></i>
+                            <h3>Henüz ticket bulunmuyor</h3>
+                            <p style="color: var(--text-dim);">Buraya tickets içeriği eklenecek</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+                    <div class="result-actions">
+                        <button type="button" class="btn-secondary" onclick="showEvaluationSection()"><i class="fa-solid fa-pen-to-square"></i> Değerlendir</button>
+                        <button type="button" class="btn-secondary" onclick="resetForm()"><i class="fa-solid fa-plus"></i> Yeni Analiz</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="evaluationSection" class="evaluation panel" style="grid-column:1/-1;">
+                <div class="eval-head">
+                    <i class="fa-solid fa-pen"></i>
+                    <h2 style="font-size:1rem; font-weight:600; letter-spacing:.5px;">Analiz Değerlendirmesi</h2>
+                </div>
+                <div class="eval-grid">
+                    <div><input id="evalDocumentName" readonly placeholder="Belge Adı" /></div>
+                    <div><input id="evalDocumentSize" readonly placeholder="Dosya Boyutu" /></div>
+                        <div><input id="evalDocumentType" readonly placeholder="Rapor Tipi" /></div>
+                    <div><input id="evalAnalysisDate" readonly placeholder="Analiz Tarihi" /></div>
+                </div>
+                <div class="eval-notes">
+                    <textarea id="evaluationNotes" placeholder="Notlar...&#10;Örnek: Sonuçlar doğru mu? Eksikler? Öneriler..."></textarea>
+                </div>
+                <div class="eval-actions">
+                    <button class="btn-outline" type="button" onclick="hideEvaluationSection()"><i class="fa-solid fa-xmark"></i> İptal</button>
+                    <button class="btn-save" type="button" onclick="saveEvaluation()"><i class="fa-solid fa-floppy-disk"></i> Kaydet</button>
+                </div>
+            </section>
+        </main>
+    </div>
+    <footer>© 2025 PILZ Report Checker • <a href="/api/services" target="_blank">Servisler</a></footer>
+
+    <script>
+        let selectedFile = null;
+
+        // DOM Elements
+        const fileInput = document.getElementById('fileInput');
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const documentType = document.getElementById('documentType');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const analysisForm = document.getElementById('analysisForm');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('errorMessage');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsJson = document.getElementById('resultsJson');
+        const analysisInfo = document.getElementById('analysisInfo');
+
+        // File input change event
+        fileInput.addEventListener('change', handleFileSelect);
+
+        // Drag and drop events
+        uploadSection.addEventListener('dragover', handleDragOver);
+        uploadSection.addEventListener('dragleave', handleDragLeave);
+        uploadSection.addEventListener('drop', handleDrop);
+
+        // Document type change event
+        documentType.addEventListener('change', checkFormValidity);
+        documentType.addEventListener('change', hideError);
+
+        // Form submit event
+        analysisForm.addEventListener('submit', handleFormSubmit);
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                processFile(file);
+            }
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            uploadSection.classList.add('dragover');
+        }
+
+        function handleDragLeave() {
+            uploadSection.classList.remove('dragover');
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            uploadSection.classList.remove('dragover');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                processFile(files[0]);
+            }
+        }
+
+        function processFile(file) {
+            // Check file type
+            const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+            if (!allowedTypes.includes(file.type)) {
+                showError('Desteklenmeyen dosya türü. Lütfen PDF, JPG, JPEG veya PNG dosyası seçin.');
+                return;
+            }
+
+            // Check file size (32MB = 32 * 1024 * 1024 bytes)
+            const maxSize = 32 * 1024 * 1024;
+            if (file.size > maxSize) {
+                showError('Dosya boyutu çok büyük. Maksimum 32MB dosya yükleyebilirsiniz.');
+                return;
+            }
+
+            selectedFile = file;
+            
+            // Show file info
+            fileName.textContent = `📄 ${file.name}`;
+            fileSize.textContent = `💾 ${formatFileSize(file.size)}`;
+            fileInfo.classList.add('show');
+            
+            // Update file input
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            fileInput.files = dataTransfer.files;
+            
+            checkFormValidity();
+            hideError();  // Yeni dosya seçildiğinde hata mesajını gizle
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function checkFormValidity() {
+            const isValid = selectedFile && documentType.value;
+            analyzeBtn.disabled = !isValid;
+        }
+
+        async function handleFormSubmit(event) {
+            event.preventDefault();
+            
+            if (!selectedFile || !documentType.value) {
+                showError('Lütfen dosya seçin ve rapor türünü belirtin.');
+                return;
+            }
+
+            showLoading();
+            hideError();  // Analiz başlamadan önceki hataları gizle
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('document_type', documentType.value);
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showResults(result);
+                } else {
+                    // Detaylı hata mesajı oluştur - HTTP status code'ını gösterme
+                    let errorMessage = '';
+                    
+                    // Service response varsa ekle
+                    if (result.service_response) {
+                        try {
+                            // JSON parse etmeye çalış
+                            const serviceError = JSON.parse(result.service_response);
+                            if (serviceError.message) {
+                                errorMessage = serviceError.message;
+                            } else if (serviceError.error) {
+                                errorMessage = serviceError.error;
+                            } else {
+                                errorMessage = result.service_response;
+                            }
+                        } catch (e) {
+                            // JSON parse edilemezse direkt metin olarak kullan
+                            errorMessage = result.service_response;
+                        }
+                    } else {
+                        // Fallback olarak result.message kullan ama status code'ını çıkar
+                        errorMessage = result.message ? result.message.replace(/The analysis service returned an error: \d+/, '').trim() : 'Analiz sırasında bir hata oluştu.';
+                    }
+                    
+                    showError(errorMessage);
+                }
+            } catch (error) {
+                showError('Bağlantı hatası. Lütfen tekrar deneyin.');
+                console.error('Error:', error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function showLoading() {
+            loading.classList.add('show');
+            analyzeBtn.disabled = true;
+        }
+
+        function hideLoading() {
+            loading.classList.remove('show');
+            checkFormValidity();
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add('show');
+            // Otomatik gizleme kaldırıldı - yeni rapor yüklenene kadar kalacak
+        }
+
+        function hideError() {
+            errorMessage.classList.remove('show');
+        }
+
+        function showResults(result) {
+            console.log('showResults called with:', result); // Debug log
+            
+            // Analiz verisini sakla değerlendirme için
+            currentAnalysisData = result.data || result;
+            
+            const visualResults = document.getElementById('visualResults');
+            const serviceName = documentType.options[documentType.selectedIndex].text;
+            
+            // Extract data based on new standardized format
+            const data = result.data || result;
+            const isSuccess = result.success !== false;
+            
+            console.log('Extracted data:', data); // Debug log
+            console.log('Is success:', isSuccess); // Debug log
+            
+            if (!isSuccess) {
+                showError(result.message || 'Analiz başarısız oldu.');
+                return;
+            }
+
+            // Create visual results HTML
+            let html = `
+                <div class="result-header">
+                    <div class="result-title">
+                        <i class="fas fa-chart-line"></i>
+                        ${serviceName}
+                    </div>
+                    <div class="result-badge ${getStatusBadgeClass(data.overall_score?.status)}">
+                        ${getStatusText(data.overall_score?.status)}
+                    </div>
+                </div>
+
+                <div class="score-section">
+                    <div class="score-card">
+                        <div class="score-value score-percentage">${data.overall_score?.percentage || 0}%</div>
+                        <div class="score-label">Başarı Oranı</div>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <div class="info-title">
+                        <i class="fas fa-info-circle"></i> Analiz Bilgileri
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">📄 Dosya Adı:</span>
+                            <span class="info-value">${data.filename || selectedFile.name}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">📅 Analiz Tarihi:</span>
+                            <span class="info-value">${data.analysis_date || new Date().toLocaleString('tr-TR')}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">🔍 Analiz ID:</span>
+                            <span class="info-value">${data.analysis_id || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">📋 Dosya Türü:</span>
+                            <span class="info-value">${data.file_type || 'N/A'}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Add category scores if available
+            if (data.category_scores && Object.keys(data.category_scores).length > 0) {
+                html += `
+                    <div class="info-section">
+                        <div class="info-title">
+                            <i class="fas fa-tasks"></i> Kategori Puanları
+                        </div>
+                        <div class="category-scores">
+                `;
+                
+                for (const [category, score] of Object.entries(data.category_scores)) {
+                    const percentage = score.percentage || score.percentage || 0;
+                    html += `
+                        <div class="category-card">
+                            <div class="category-name">${category}</div>
+                            <div class="category-score">
+                                <span class="category-percentage">${percentage}%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${percentage}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Add extracted values if available
+            if (data.extracted_values && Object.keys(data.extracted_values).length > 0) {
+                html += `
+                    <div class="info-section">
+                        <div class="info-title">
+                            <i class="fas fa-search"></i> Çıkarılan Değerler
+                        </div>
+                        <div class="info-grid">
+                `;
+                
+                for (const [key, value] of Object.entries(data.extracted_values)) {
+                    if (value && value !== 'N/A' && value !== 'Bulunamadı') {
+                        html += `
+                            <div class="info-item">
+                                <span class="info-label">${formatLabel(key)}:</span>
+                                <span class="info-value">${value}</span>
+                            </div>
+                        `;
+                    }
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Add recommendations if available
+            if (data.recommendations && data.recommendations.length > 0) {
+                html += `
+                    <div class="recommendations-section">
+                        <div class="info-title">
+                            <i class="fas fa-lightbulb"></i> Öneriler
+                        </div>
+                `;
+                
+                data.recommendations.slice(0, 5).forEach(recommendation => {
+                    html += `<div class="recommendation-item">${recommendation}</div>`;
+                });
+                
+                html += `</div>`;
+            }
+
+            // Add summary if available
+            if (data.summary) {
+                html += `
+                    <div class="info-section">
+                        <div class="info-title">
+                            <i class="fas fa-clipboard-check"></i> Özet
+                        </div>
+                        <p style="color: #4a5568; line-height: 1.6;">${data.summary}</p>
+                    </div>
+                `;
+            }
+
+            visualResults.innerHTML = html;
+            
+            // Show JSON result (hidden by default)
+            resultsJson.textContent = JSON.stringify(result, null, 2);
+            
+            // Show results section
+            resultsSection.classList.add('show');
+
+            // Show issue report section
+            document.getElementById('issueReportSection').style.display = 'block';
+            autoCreateTicket();
+            // Scroll to results
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function getStatusBadgeClass(status) {
+            if (!status) return 'badge-warning';
+            const statusLower = status.toLowerCase();
+            if (statusLower.includes('pass') || statusLower.includes('başarılı')) return 'badge-success';
+            if (statusLower.includes('fail') || statusLower.includes('başarısız')) return 'badge-error';
+            return 'badge-warning';
+        }
+
+        function getStatusText(status) {
+            if (!status) return 'SONUÇ YOK';
+            const statusLower = status.toLowerCase();
+            if (statusLower.includes('pass')) return 'BAŞARILI';
+            if (statusLower.includes('fail')) return 'BAŞARISIZ';
+            return status.toUpperCase();
+        }
+
+        function formatLabel(key) {
+            const labelMap = {
+                'firma_adi': '🏢 Firma Adı',
+                'rapor_no': '📋 Rapor No',
+                'rapor_numarasi': '📋 Rapor Numarası',
+                'olcum_tarihi': '📅 Ölçüm Tarihi',
+                'makine_adi': '⚙️ Makine Adı',
+                'cihaz_marka': '🔧 Cihaz Marka',
+                'olcum_yapan': '👤 Ölçüm Yapan',
+                'laboratuvar': '🔬 Laboratuvar',
+                'adres': '📍 Adres',
+                'gurultu_seviye': '🔊 Gürültü Seviyesi',
+                'aydinlatma_seviye': '💡 Aydınlatma Seviyesi',
+                'manufacturer_name': '🏭 Üretici Adı',
+                'machine_description': '📝 Makine Açıklaması',
+                'serial_number': '🔢 Seri Numarası',
+                'production_year': '📅 Üretim Yılı'
+            };
+            return labelMap[key] || key.replace(/_/g, ' ').toUpperCase();
+        }
+
+                function toggleJsonView() {
+                    const jsonDiv = document.getElementById('resultsJson');
+                    const toggleBtn = document.getElementById('toggleJsonBtn');
+                    const parent = document.getElementById('resultsSection');
+                    parent.classList.toggle('json-open');
+                    if (jsonDiv.style.display === 'block') {
+                        jsonDiv.style.display = 'none';
+                        toggleBtn.textContent = 'JSON';
+                    } else {
+                        jsonDiv.style.display = 'block';
+                        toggleBtn.textContent = 'Görsel';
+                    }
+                }
+
+        function resetForm() {
+            selectedFile = null;
+            fileInput.value = '';
+            documentType.value = '';
+            fileInfo.classList.remove('show');
+            resultsSection.classList.remove('show');
+            checkFormValidity();
+            hideError();
+            
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Load document types dynamically
+        async function loadDocumentTypes() {
+            try {
+                const response = await fetch('/api/services');
+                const data = await response.json();
+                
+                if (data.success && data.services) {
+                    // Document types are already hardcoded with emojis
+                    // but we could update them dynamically if needed
+                    console.log('Available services:', data.services);
+                }
+            } catch (error) {
+                console.error('Error loading services:', error);
+            }
+        }
+
+        // Değerlendirme bölümü fonksiyonları
+        let currentAnalysisData = null;
+
+        function showEvaluationSection() {
+            if (!currentAnalysisData) {
+                alert('Önce bir analiz yapmalısınız!');
+                return;
+            }
+
+            // Değerlendirme formunu doldur
+            document.getElementById('evalDocumentName').value = currentAnalysisData.filename || 'Bilinmiyor';
+            document.getElementById('evalDocumentSize').value = formatFileSize(selectedFile?.size || 0);
+            document.getElementById('evalDocumentType').value = getDocumentTypeText(currentAnalysisData.file_type);
+            document.getElementById('evalAnalysisDate').value = currentAnalysisData.analysis_date || new Date().toLocaleString('tr-TR');
+            
+            // Değerlendirme bölümünü göster
+            document.getElementById('evaluationSection').style.display = 'block';
+            document.getElementById('evaluationSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function hideEvaluationSection() {
+            document.getElementById('evaluationSection').style.display = 'none';
+            document.getElementById('evaluationNotes').value = '';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function getDocumentTypeText(fileType) {
+            const typeMap = {
+                'electric_circuit': '🔌 Elektrik Devre Şeması',
+                'espe_report': '📋 ESPE Raporu',
+                'hydraulic_report': '💧 Hidrolik Devre Şeması',
+                'noise_report': '🔊 Gürültü Ölçüm Raporu',
+                'manuel_report': '📖 Manuel/Kullanım Kılavuzu',
+                'loto_report': '🔒 LOTO Raporu',
+                'lvd_report': '⚡ LVD Raporu',
+                'at_type_inspection': '🔍 AT Tip Muayene',
+                'isg_periyodik_kontrol': '🛡️ İSG Periyodik Kontrol',
+                'pneumatic_circuit': '💨 Pnömatik Devre Şeması',
+                'hydraulic_circuit': '🔧 Hidrolik Devre Şeması',
+                'assembly_instructions': '🔨 Montaj Talimatları',
+                'grounding_report': '⚡ EN 60204-1 Topraklama Raporu',
+                'hrc_report': '🤖 HRC Kuvvet-Basınç Raporu',
+                'maintenance_instructions': '🔧 Bakım Talimatları',
+                'vibration_report': '📳 Mekanik Titreşim Raporu',
+                'lighting_report': '💡 Aydınlatma Raporu',
+                'at_certificate': '📜 AT Tip İnceleme Sertifikası'
+            };
+            return typeMap[fileType] || fileType || 'Bilinmiyor';
+        }
+
+        async function saveEvaluation() {
+            const evaluationNotes = document.getElementById('evaluationNotes').value.trim();
+            
+            if (!evaluationNotes) {
+                alert('Lütfen değerlendirme notlarını giriniz!');
+                return;
+            }
+
+            if (!currentAnalysisData) {
+                alert('Analiz verisi bulunamadı!');
+                return;
+            }
+
+            // Değerlendirme verisini hazırla
+            const evaluationData = {
+                timestamp: new Date().toISOString(),
+                analysis_date: currentAnalysisData.analysis_date,
+                document_name: currentAnalysisData.filename,
+                document_extension: currentAnalysisData.filename ? currentAnalysisData.filename.split('.').pop() : 'unknown',
+                document_size: formatFileSize(selectedFile?.size || 0),
+                document_size_bytes: selectedFile?.size || 0,
+                report_type: currentAnalysisData.file_type,
+                report_type_display: getDocumentTypeText(currentAnalysisData.file_type),
+                analysis_id: currentAnalysisData.analysis_id,
+                overall_score: currentAnalysisData.overall_score,
+                evaluation_notes: evaluationNotes,
+                analysis_data: currentAnalysisData
+            };
+
+            try {
+                // API'ye değerlendirmeyi gönder
+                const response = await fetch('/api/save-evaluation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(evaluationData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    alert('Değerlendirme başarıyla kaydedildi!');
+                    hideEvaluationSection();
+                } else {
+                    throw new Error(result.message || 'Değerlendirme kaydedilemedi');
+                }
+            } catch (error) {
+                console.error('Değerlendirme kaydetme hatası:', error);
+                alert('Değerlendirme kaydedilirken bir hata oluştu: ' + error.message);
+            }
+        }
+
+        async function reportIssue() {
+            const inspectorComment = document.getElementById('inspectorComment').value.trim();
+            const inspectorName = document.getElementById('inspectorName').value.trim() || 'Kullanıcı';
+            
+            if (!inspectorComment) {
+                alert('Lütfen yorumunuzu giriniz!');
+                return;
+            }
+
+            if (!currentAnalysisData) {
+                alert('Analiz verisi bulunamadı!');
+                return;
+            }
+
+            try {
+                // Bu ticket_id için ticket var mı bul
+                const ticketsResponse = await fetch('/api/tickets');
+                const tickets = await ticketsResponse.json();
+                
+                const existingTicket = tickets.find(t => 
+                    t.ticket_id === currentAnalysisData.analysis_id
+                );
+                
+                if (existingTicket) {
+                    // Ticket varsa yorum ekle
+                    const commentResponse = await fetch('/api/add-comment', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            ticket_no: existingTicket.ticket_no,
+                            author: inspectorName,
+                            text: inspectorComment
+                        })
+                    });
+                    
+                    const commentResult = await commentResponse.json();
+                    
+                    if (commentResponse.ok && commentResult.success) {
+                        // Yorum eklendikten sonra status'ü güncelle
+                        const statusResponse = await fetch('/api/update-ticket', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ticket_no: existingTicket.ticket_no,
+                                status: 'İnceleniyor'
+                            })
+                        });
+                        
+                        if (statusResponse.ok) {
+                            alert(`✓ Ticket güncellendi!\n\nTicket No: ${existingTicket.ticket_no}\nYeni yorum eklendi.`);
+                            document.getElementById('inspectorName').value = '';
+                            document.getElementById('inspectorComment').value = '';
+                            document.getElementById('issueReportSection').style.display = 'none';
+                        }
+                    } else {
+                        throw new Error(commentResult.message || 'Yorum eklenemedi');
+                    }
+                } else {
+                    // Ticket yoksa yeni oluştur
+                    const issueData = {
+                        inspector_name: inspectorName,
+                        inspector_comment: inspectorComment,
+                        document_name: currentAnalysisData.filename || selectedFile.name,
+                        analysis_data: currentAnalysisData
+                    };
+                    
+                    const response = await fetch('/api/report-issue', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(issueData)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.success) {
+                        alert(`✓ Ticket oluşturuldu!\n\nTicket No: ${result.ticket_no}`);
+                        document.getElementById('inspectorName').value = '';
+                        document.getElementById('inspectorComment').value = '';
+                        document.getElementById('issueReportSection').style.display = 'none';
+                    } else {
+                        throw new Error(result.message || 'Ticket oluşturulamadı');
+                    }
+                }
+            } catch (error) {
+                console.error('Hata:', error);
+                alert('İşlem başarısız: ' + error.message);
+            }
+        }
+
+        async function autoCreateTicket() {
+            if (!currentAnalysisData) return;
+
+            try {
+                // Önce bu ticket_id için ticket var mı kontrol et
+                const ticketsResponse = await fetch('/api/tickets');
+                const tickets = await ticketsResponse.json();
+                
+                const existingTicket = tickets.find(t => 
+                    t.ticket_id === currentAnalysisData.analysis_id
+                );
+                
+                if (existingTicket) {
+                    console.log('Bu analiz için ticket zaten var:', existingTicket.ticket_no);
+                    return; // Zaten var, yeni oluşturma
+                }
+
+                // Yoksa oluştur
+                const issueData = {
+                    inspector_name: '',  // BOŞ
+                    inspector_comment: '',  // BOŞ
+                    document_name: currentAnalysisData.filename || selectedFile.name,
+                    analysis_data: currentAnalysisData
+                };
+
+                await fetch('/api/report-issue', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(issueData)
+                });
+
+                console.log('Otomatik ticket oluşturuldu (Kapalı)');
+            } catch (error) {
+                console.error('Otomatik ticket hatası:', error);
+            }
+        }
+
+        // Initialize
+        // View switching functionality
+        const analysisBtn = document.getElementById('analysisBtn');
+        const evaluationBtn = document.getElementById('evaluationBtn');
+        const analysisView = document.getElementById('analysisView');
+        const evaluationView = document.getElementById('evaluationView');
+
+        analysisBtn.addEventListener('click', () => {
+            showAnalysisView();
+        });
+
+        evaluationBtn.addEventListener('click', () => {
+            showEvaluationView();
+        });
+
+        const ticketsBtn = document.getElementById('ticketsBtn');
+        const ticketsView = document.getElementById('ticketsView');
+
+        ticketsBtn.addEventListener('click', () => {
+            showTicketsView();
+        });
+
+        function showAnalysisView() {
+            analysisView.style.display = 'block';
+            evaluationView.style.display = 'none';
+            ticketsView.style.display = 'none'; 
+            analysisBtn.classList.add('selected');
+            evaluationBtn.classList.remove('selected');
+            ticketsBtn.classList.remove('selected');
+        }
+
+        function showEvaluationView() {
+            analysisView.style.display = 'none';
+            evaluationView.style.display = 'block';
+            ticketsView.style.display = 'none';
+            analysisBtn.classList.remove('selected');
+            evaluationBtn.classList.add('selected');
+            ticketsBtn.classList.remove('selected');
+            loadEvaluations();
+        }
+
+        function showTicketsView() {
+            analysisView.style.display = 'none';
+            evaluationView.style.display = 'none';
+            ticketsView.style.display = 'block';
+            analysisBtn.classList.remove('selected');
+            evaluationBtn.classList.remove('selected');
+            ticketsBtn.classList.add('selected');
+
+            // Tickets'ları yükle
+            loadTickets();
+        }
+
+        async function loadTickets() {
+            try {
+                // Show loading
+                document.getElementById('ticketsContent').innerHTML = `
+                    <div style="text-align: center; padding: 2rem;">
+                        <div class="spinner" style="margin: 0 auto 1rem;"></div>
+                        <p>Tickets yükleniyor...</p>
+                    </div>
+                `;
+
+                const response = await fetch('/api/tickets');
+                if (!response.ok) {
+                    throw new Error('Tickets yüklenemedi');
+                }
+
+                const tickets = await response.json();
+                displayTickets(tickets);
+
+            } catch (error) {
+                console.error('Tickets loading error:', error);
+                document.getElementById('ticketsContent').innerHTML = `
+                    <div style="text-align: center; padding: 3rem; color: var(--danger);">
+                        <i class="fa-solid fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <h3>Tickets yüklenemedi</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function searchTickets() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+            const responsibleFilter = document.getElementById('responsibleFilter').value;
+            // Query string oluştur
+            const params = new URLSearchParams();
+            if (statusFilter) params.append('status', statusFilter);
+            if (dateFrom) params.append('date_from', dateFrom);
+            if (dateTo) params.append('date_to', dateTo);
+            if (responsibleFilter) params.append('responsible', responsibleFilter);
+
+            // Backend'e filtreli istek at
+            const url = params.toString() ? `/api/tickets?${params.toString()}` : '/api/tickets';
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(tickets => {
+                    displayTickets(tickets);
+                })
+                .catch(error => {
+                    console.error('Arama hatası:', error);
+                });
+        }
+
+        function displayTickets(tickets) {
+            const ticketsContent = document.getElementById('ticketsContent');
+            
+            if (!tickets || tickets.length === 0) {
+                ticketsContent.innerHTML = `
+                    <div class="placeholder-content">
+                        <i class="fa-solid fa-ticket" style="font-size: 3rem; color: var(--accent); margin-bottom: 1rem;"></i>
+                        <h3>Henüz ticket bulunmuyor</h3>
+                        <p style="color: var(--text-dim);">Analiz sonrası "Sorun Bildir" butonunu kullanarak ticket oluşturabilirsiniz</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const ticketsHtml = tickets.map((ticket, index) => {
+                const openingDate = new Date(ticket.opening_date).toLocaleDateString('tr-TR');
+                const scorePercentage = ticket.analysis_result?.overall_score?.percentage || 0;
+                const status = ticket.status || 'İnceleniyor';
+                
+                // Status rengi
+                let statusClass = 'unknown';
+                if (status === 'Kapalı') statusClass = 'success';
+                else if (status === 'Sorunlu') statusClass = 'fail';
+                
+                return `
+                    <div class="ticket-row" onclick="openTicketDetail('${ticket.ticket_no}')">
+                        <div class="ticket-main">
+                            <div class="ticket-icon">
+                                <i class="fa-solid fa-ticket"></i>
+                            </div>
+                            <div class="ticket-info">
+                                <div class="ticket-header-row">
+                                    <span class="ticket-number">#${ticket.ticket_no}</span>
+                                    <span class="ticket-filename">${ticket.document_name}</span>
+                                </div>
+                                <div class="ticket-meta-row">
+                                    <span><i class="fa-solid fa-calendar"></i> ${openingDate}</span>
+                                    <span><i class="fa-solid fa-user"></i> ${ticket.responsible}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ticket-status ${statusClass}">
+                            <span class="status-badge">${status}</span>
+                            <span class="score-value">${scorePercentage}%</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            ticketsContent.innerHTML = `
+                <div class="evaluation-grid">
+                    ${ticketsHtml}
+                </div>
+            `;
+        }
+
+        async function openTicketDetail(ticketNo) {
+            try {
+                const response = await fetch('/api/tickets');
+                const tickets = await response.json();
+
+                // ticket_no'ya göre doğru ticket'ı bul
+                const ticket = tickets.find(t => t.ticket_no === ticketNo);
+
+                if (!ticket) {
+                    alert('Ticket bulunamadı');
+                    return;
+                }
+
+                showTicketDetailModal(ticket);
+            } catch (error) {
+                console.error('Ticket detay yüklenirken hata:', error);
+                alert('Ticket detayları yüklenemedi');
+            }
+        }
+
+        function showTicketDetailModal(ticket) {
+            const scorePercentage = ticket.analysis_result?.overall_score?.percentage || 0;
+            const status = ticket.status || 'İnceleniyor';
+            const openingDate = new Date(ticket.opening_date).toLocaleString('tr-TR');
+            const closingDate = ticket.closing_date ? new Date(ticket.closing_date).toLocaleString('tr-TR') : 'Devam ediyor';
+            
+            let statusClass = 'unknown';
+            if (status === 'Kapalı') statusClass = 'success';
+            else if (status === 'Sorunlu') statusClass = 'fail';
+            
+            let categoryScoresHtml = '';
+            if (ticket.analysis_result?.category_scores) {
+                categoryScoresHtml = `
+                    <div class="detail-section">
+                        <h4>Kategori Puanları</h4>
+                        <div class="category-list">
+                            ${Object.entries(ticket.analysis_result.category_scores).map(([category, score]) => `
+                                <div class="category-item">
+                                    <span class="category-name">${category}</span>
+                                    <span class="category-score">${score.percentage || 0}%</span>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: ${score.percentage || 0}%"></div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            let extractedValuesHtml = '';
+            if (ticket.analysis_result?.extracted_values && Object.keys(ticket.analysis_result.extracted_values).length > 0) {
+                extractedValuesHtml = `
+                    <div class="detail-section">
+                        <h4>Çıkarılan Değerler</h4>
+                        <div class="detail-grid">
+                            ${Object.entries(ticket.analysis_result.extracted_values).map(([key, value]) => {
+                                if (value && value !== 'N/A' && value !== 'Bulunamadı') {
+                                    return `
+                                        <div class="detail-item">
+                                            <span class="detail-label">${formatLabel(key)}:</span>
+                                            <span class="detail-value">${value}</span>
+                                        </div>
+                                    `;
+                                }
+                                return '';
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            let recommendationsHtml = '';
+            if (ticket.analysis_result?.recommendations && ticket.analysis_result.recommendations.length > 0) {
+                recommendationsHtml = `
+                    <div class="detail-section">
+                        <h4>Öneriler</h4>
+                        <div style="display: grid; gap: 0.6rem;">
+                            ${ticket.analysis_result.recommendations.slice(0, 10).map(rec => `
+                                <div class="recommendation-item">${rec}</div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            const modalHtml = `
+                <div id="ticketModal" class="modal-overlay" onclick="closeTicketModal()">
+                    <div class="modal-content" onclick="event.stopPropagation()">
+                        <div class="modal-header">
+                            <h3><i class="fa-solid fa-ticket"></i> ${ticket.ticket_no} - ${ticket.document_name}</h3>
+                            <div class="modal-header-actions">
+                                <button class="btn-delete-ticket" onclick="deleteTicket('${ticket.ticket_no}')" title="Ticket'ı Sil">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                                <button onclick="closeTicketModal()" class="modal-close">
+                                    <i class="fa-solid fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="modal-body">
+                            <div class="detail-section">
+                                <h4>Ticket Bilgileri</h4>
+                                <div class="detail-grid">
+                                    <div class="detail-item">
+                                        <span class="detail-label">Ticket No:</span>
+                                        <span class="detail-value">${ticket.ticket_no}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Ticket ID:</span>
+                                        <span class="detail-value">${ticket.ticket_id || 'N/A'}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Durum:</span>
+                                        <select id="statusSelect" class="status-select ${statusClass}">
+                                            <option value="İnceleniyor" ${status === 'İnceleniyor' ? 'selected' : ''}>İnceleniyor</option>
+                                            <option value="Onaylanmadı" ${status === 'Onaylanmadı' ? 'selected' : ''}>Onaylanmadı</option>
+                                            <option value="Sorunlu" ${status === 'Sorunlu' ? 'selected' : ''}>Sorunlu</option>
+                                            <option value="Kapalı" ${status === 'Kapalı' ? 'selected' : ''}>Kapalı</option>
+                                        </select>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Sorumlu:</span>
+                                        <input type="text" id="ticketResponsible" class="responsible-input" value="${ticket.responsible}" />
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Açılma Tarihi:</span>
+                                        <span class="detail-value">${openingDate}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Son Güncelleme:</span>
+                                        <span class="detail-value">${ticket.last_updated && ticket.last_updated !== null ? new Date(ticket.last_updated).toLocaleString('tr-TR') : '-'}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Kapanma Tarihi:</span>
+                                        <span class="detail-value">${ticket.closing_date ? new Date(ticket.closing_date).toLocaleString('tr-TR') : '-'}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Dosya İndir:</span>
+                                        <span class="detail-value">
+                                            <a href="${ticket.document_url}" target="_blank" class="download-link">
+                                                <i class="fa-solid fa-download"></i> ${ticket.document_name}
+                                            </a>
+                                        </span>
+                                    </div>
+                                    <div class="detail-item detail-item-full">
+                                        <button class="btn-save-ticket" onclick="saveTicketChanges('${ticket.ticket_no}')">
+                                            <i class="fa-solid fa-save"></i> Değişiklikleri Kaydet
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>      
+                            <div class="detail-section">
+                                <h4>Analiz Sonucu</h4>
+                                <div class="detail-grid">
+                                    <div class="detail-item">
+                                        <span class="detail-label">Toplam Puan:</span>
+                                        <span class="detail-value ${statusClass}">${scorePercentage}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            ${categoryScoresHtml}
+
+                            ${extractedValuesHtml}
+                            
+                            ${recommendationsHtml}
+                            
+                            <div class="detail-section">
+                                <h4>Yorumlar</h4>
+                                <div class="comments-container" id="commentsContainer">
+                                    ${ticket.comments && ticket.comments.length > 0 ? 
+                                        ticket.comments.map(comment => `
+                                            <div class="comment-item">
+                                                <div class="comment-header">
+                                                    <span class="comment-author">${comment.author}</span>
+                                                    <span class="comment-time">${new Date(comment.timestamp).toLocaleString('tr-TR')}</span>
+                                                </div>
+                                                <div class="comment-text">${comment.text}</div>
+                                            </div>
+                                        `).join('') 
+                                        : 
+                                        '<p class="no-comments">Henüz yorum yok</p>'
+                                    }
+                                </div>
+                                
+                                <div class="add-comment-section">
+                                    <input type="text" id="commentAuthor" class="comment-input-name" placeholder="İsminiz..." />
+                                    <textarea id="commentText" class="comment-input-text" placeholder="Yorumunuzu yazın..." rows="3"></textarea>
+                                    <button class="btn-add-comment" onclick="addComment('${ticket.ticket_no}')">
+                                        <i class="fa-solid fa-paper-plane"></i> Yorum Ekle
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        async function saveTicketChanges(ticketNo) {
+           
+            console.log('Kaydet butonu çalıştı:', ticketNo); // Test için
+
+            const newStatus = document.getElementById('statusSelect').value;
+            const newResponsible = document.getElementById('ticketResponsible').value.trim();
+            
+            console.log('Status:', newStatus, 'Responsible:', newResponsible); // Test için
+
+            if (!newResponsible) {
+                alert('Sorumlu kişi boş olamaz!');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/update-ticket', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ticket_no: ticketNo,
+                        status: newStatus,
+                        responsible: newResponsible
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    alert('✓ Değişiklikler kaydedildi!');
+                    loadTickets(); // Listeyi yenile
+                    closeTicketModal();
+                } else {
+                    alert('Güncelleme başarısız: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Güncelleme hatası:', error);
+                alert('Güncellenirken hata oluştu');
+            }
+        }
+
+        async function deleteTicket(ticketNo) {
+            // Onay dialogu
+            const confirmed = confirm(`${ticketNo} numaralı ticket'ı silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz!`);
+            
+            if (!confirmed) return;
+            
+            try {
+                const response = await fetch('/api/delete-ticket', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticket_no: ticketNo })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    alert('✓ Ticket başarıyla silindi!');
+                    closeTicketModal();
+                    loadTickets(); // Listeyi yenile
+                } else {
+                    alert('Ticket silinemedi: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Silme hatası:', error);
+                alert('Ticket silinirken hata oluştu');
+            }
+        }
+
+        async function addComment(ticketNo) {
+            const author = document.getElementById('commentAuthor').value.trim();
+            const text = document.getElementById('commentText').value.trim();
+            
+            if (!author) {
+                alert('Lütfen isminizi girin');
+                return;
+            }
+            
+            if (!text) {
+                alert('Lütfen yorum yazın');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/add-comment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ticket_no: ticketNo,
+                        author: author,
+                        text: text
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    // Form'u temizle
+                    document.getElementById('commentAuthor').value = '';
+                    document.getElementById('commentText').value = '';
+                    
+                    // Tickets'ı yenile
+                    await loadTickets();
+                    
+                    // Modal'ı yeniden aç (güncel yorumlarla)
+                    const ticketsResponse = await fetch('/api/tickets');
+                    const tickets = await ticketsResponse.json();
+                    const updatedTicket = tickets.find(t => t.ticket_no === ticketNo);
+                    
+                    if (updatedTicket) {
+                        // Modal içeriğini güncelle
+                        const commentsContainer = document.getElementById('commentsContainer');
+                        if (updatedTicket.comments && updatedTicket.comments.length > 0) {
+                            commentsContainer.innerHTML = updatedTicket.comments.map(comment => `
+                                <div class="comment-item">
+                                    <div class="comment-header">
+                                        <span class="comment-author">${comment.author}</span>
+                                        <span class="comment-time">${new Date(comment.timestamp).toLocaleString('tr-TR')}</span>
+                                    </div>
+                                    <div class="comment-text">${comment.text}</div>
+                                </div>
+                            `).join('');
+                        } else {
+                            commentsContainer.innerHTML = '<p class="no-comments">Henüz yorum yok</p>';
+                        }
+                    }
+                } else {
+                    alert('Yorum eklenemedi: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Yorum ekleme hatası:', error);
+                alert('Yorum eklenirken hata oluştu');
+            }
+        }
+
+        function closeTicketModal() {
+            const modal = document.getElementById('ticketModal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        // Load evaluations from JSON file
+        function getReportTypeFromAnalysisId(analysisId) {
+            if (!analysisId) return 'Bilinmeyen';
+            
+            // analysis_id formatı: "pneumatic_1757931642" şeklinde
+            const reportTypeMap = {
+                'electric_circuit': 'Elektrik Devre Şeması',
+                'espe_report': 'ESPE Raporu',
+                'hydraulic_report': 'Hidrolik Devre Şeması',
+                'noise_report': 'Gürültü Ölçüm Raporu',
+                'manuel_report': 'Manuel Raporu',
+                'loto_report': 'LOTO Raporu',
+                'lvd_report': 'LVD Raporu',
+                'at_type_inspection': 'AT Tip Muayene',
+                'isg_periyodik_kontrol': 'İSG Periyodik Kontrol',
+                'pneumatic_circuit': 'Pnömatik Devre Şeması',
+                'pneumatic': 'Pnömatik Devre Şeması',
+                'hydraulic_circuit': 'Hidrolik Devre Şeması',
+                'assembly_instructions': 'Montaj Talimatları',
+                'grounding_report': 'Topraklama Raporu',
+                'hrc_report': 'HRC Kuvvet-Basınç Raporu',
+                'maintenance_instructions': 'Bakım Talimatları',
+                'vibration_report': 'Titreşim Raporu',
+                'lighting_report': 'Aydınlatma Raporu',
+                'at_certificate': 'AT Tip İnceleme Sertifikası'
+            };
+            
+            // analysis_id'den ilk kısmı al (örn: "pneumatic_1757931642" -> "pneumatic")
+            const reportType = analysisId.split('_')[0];
+            return reportTypeMap[reportType] || reportType || 'Bilinmeyen';
+        }
+        async function loadEvaluations() {
+            try {
+                // Show loading in evaluation grid
+                document.getElementById('evaluationGrid').innerHTML = `
+                    <div style="text-align: center; padding: 2rem; grid-column: 1/-1;">
+                        <div class="spinner" style="margin: 0 auto 1rem;"></div>
+                        <p>Değerlendirmeler yükleniyor...</p>
+                    </div>
+                `;
+
+                const response = await fetch('/api/evaluations');
+                if (!response.ok) {
+                    throw new Error('Değerlendirmeler yüklenemedi');
+                }
+
+                const evaluations = await response.json();
+                displayEvaluations(evaluations);
+
+            } catch (error) {
+                console.error('Evaluation loading error:', error);
+                document.getElementById('evaluationGrid').innerHTML = `
+                    <div style="text-align: center; padding: 3rem; color: var(--danger); grid-column: 1/-1;">
+                        <i class="fa-solid fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <h3>Değerlendirmeler yüklenemedi</h3>
+                        <p>API bağlantı hatası: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function displayEvaluations(evaluations) {
+            const evaluationGrid = document.getElementById('evaluationGrid');
+            
+            if (!evaluations || evaluations.length === 0) {
+                evaluationGrid.innerHTML = `
+                    <div style="text-align: center; padding: 3rem; color: var(--text-dim); grid-column: 1/-1;">
+                        <i class="fa-solid fa-chart-bar" style="font-size: 3rem; color: var(--accent); margin-bottom: 1rem;"></i>
+                        <h3>Henüz değerlendirme bulunmuyor</h3>
+                        <p>Rapor analizlerini değerlendirmeye başlayın</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const evaluationCards = evaluations.map(evaluation => {
+                const scorePercentage = evaluation.overall_score?.percentage || 0;
+                const status = evaluation.overall_score?.status || 'UNKNOWN';
+                
+                // Status kontrolünü genişlet - GEÇERLİ, PASS, ve puan kontrolü
+                let statusClass, statusIcon, statusText;
+                if (status === 'PASS' || status === 'GEÇERLİ' || (scorePercentage >= 70 && (status === 'GEÇERLİ' || status === 'PASS'))) {
+                    statusClass = 'success';
+                    statusIcon = 'fa-check-circle';
+                    statusText = 'BAŞARILI';
+                } else if (status === 'FAIL' || status === 'GEÇERSİZ' || (scorePercentage < 70)) {
+                    statusClass = 'fail';
+                    statusIcon = 'fa-times-circle';
+                    statusText = 'BAŞARISIZ';
+                } else {
+                    statusClass = 'unknown';
+                    statusIcon = 'fa-question-circle';
+                    statusText = 'BİLİNMİYOR';
+                }
+                
+                const date = new Date(evaluation.timestamp).toLocaleDateString('tr-TR');
+                const reportTypeText = getReportTypeFromAnalysisId(evaluation.analysis_id);
+                
+                return `
+                    <div class="evaluation-card" onclick="openEvaluationDetail('${evaluation.analysis_id}', ${evaluations.indexOf(evaluation)})">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i class="fa-solid fa-file-text"></i>
+                                <span class="document-name">${evaluation.document_name}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="card-meta">
+                            <div class="meta-item">
+                                <i class="fa-solid fa-calendar"></i>
+                                <span>${date}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fa-solid fa-tag"></i>
+                                <span>${reportTypeText}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fa-solid fa-hdd"></i>
+                                <span>${evaluation.document_size}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="card-notes">
+                            <p>${evaluation.evaluation_notes?.substring(0, 80)}${evaluation.evaluation_notes?.length > 80 ? '...' : ''}</p>
+                        </div>
+                        
+                        <div class="card-score ${statusClass}">
+                            <i class="fa-solid ${statusIcon}"></i>
+                            <span class="score-text">${scorePercentage}% - ${statusText}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            evaluationGrid.innerHTML = evaluationCards;
+        }
+
+        function openEvaluationDetail(analysisId, index) {
+            fetch('/api/evaluations')
+                .then(response => response.json())
+                .then(evaluations => {
+                    const evaluation = evaluations[index];
+                    if (evaluation) {
+                        showEvaluationDetailModal(evaluation);
+                    }
+                })
+                .catch(error => {
+                    console.error('Detail loading error:', error);
+                    alert('Detay bilgileri yüklenemedi');
+                });
+        }
+
+        function showEvaluationDetailModal(evaluation) {
+            const scorePercentage = evaluation.overall_score?.percentage || 0;
+            const status = evaluation.overall_score?.status || 'UNKNOWN';
+            
+            // Status kontrolünü genişlet - GEÇERLİ, PASS, ve puan kontrolü
+            let statusClass, statusText;
+            if (status === 'PASS' || status === 'GEÇERLİ' || (scorePercentage >= 70 && (status === 'GEÇERLİ' || status === 'PASS'))) {
+                statusClass = 'success';
+                statusText = 'BAŞARILI';
+            } else if (status === 'FAIL' || status === 'GEÇERSİZ' || (scorePercentage < 70)) {
+                statusClass = 'fail';
+                statusText = 'BAŞARISIZ';
+            } else {
+                statusClass = 'unknown';
+                statusText = 'BİLİNMİYOR';
+            }
+            
+            const reportTypeText = getReportTypeFromAnalysisId(evaluation.analysis_id);
+            
+            let categoryScoresHtml = '';
+            if (evaluation.analysis_data?.category_scores) {
+                categoryScoresHtml = `
+                    <div class="detail-section">
+                        <h4>Kategori Puanları</h4>
+                        <div class="category-list">
+                            ${Object.entries(evaluation.analysis_data.category_scores).map(([category, score]) => `
+                                <div class="category-item">
+                                    <span class="category-name">${category}</span>
+                                    <span class="category-score">${score.percentage || 0}%</span>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: ${score.percentage || 0}%"></div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            const modalHtml = `
+                <div id="evaluationModal" class="modal-overlay" onclick="closeEvaluationModal()">
+                    <div class="modal-content" onclick="event.stopPropagation()">
+                        <div class="modal-header">
+                            <h3><i class="fa-solid fa-chart-line"></i> ${evaluation.document_name}</h3>
+                            <button onclick="closeEvaluationModal()" class="modal-close">
+                                <i class="fa-solid fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="detail-section">
+                                <h4>Genel Bilgiler</h4>
+                                <div class="detail-grid">
+                                    <div class="detail-item">
+                                        <span class="detail-label">Rapor Türü:</span>
+                                        <span class="detail-value">${reportTypeText}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Analiz Tarihi:</span>
+                                        <span class="detail-value">${new Date(evaluation.timestamp).toLocaleString('tr-TR')}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Dosya Boyutu:</span>
+                                        <span class="detail-value">${evaluation.document_size}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Toplam Puan:</span>
+                                        <span class="detail-value ${statusClass}">
+                                            ${scorePercentage}% (${status})
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            ${categoryScoresHtml}
+                            
+                            <div class="detail-section">
+                                <h4>Değerlendirme Notları</h4>
+                                <div class="notes-section">
+                                    <div id="notesDisplay" class="notes-detail">
+                                        ${evaluation.evaluation_notes || 'Not bulunmuyor'}
+                                    </div>
+                                    <textarea id="notesEditor" class="notes-editor" style="display: none;" placeholder="Değerlendirme notlarınızı yazın...">${evaluation.evaluation_notes || ''}</textarea>
+                                    <div class="notes-actions">
+                                        <button id="editNotesBtn" class="btn-secondary" onclick="toggleNotesEdit()">
+                                            <i class="fa-solid fa-edit"></i> Düzenle
+                                        </button>
+                                        <button id="saveNotesBtn" class="btn-primary" style="display: none;" onclick="saveNotes('${evaluation.analysis_id}')">
+                                            <i class="fa-solid fa-save"></i> Kaydet
+                                        </button>
+                                        <button id="cancelNotesBtn" class="btn-secondary" style="display: none;" onclick="cancelNotesEdit()">
+                                            <i class="fa-solid fa-times"></i> İptal
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <div class="evaluation-actions">
+                                    <button class="btn-danger" onclick="deleteEvaluation('${evaluation.analysis_id}')">
+                                        <i class="fa-solid fa-trash"></i> Değerlendirmeyi Sil
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        function closeEvaluationModal() {
+            const modal = document.getElementById('evaluationModal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        // Notes editing functions
+        function toggleNotesEdit() {
+            const notesDisplay = document.getElementById('notesDisplay');
+            const notesEditor = document.getElementById('notesEditor');
+            const editBtn = document.getElementById('editNotesBtn');
+            const saveBtn = document.getElementById('saveNotesBtn');
+            const cancelBtn = document.getElementById('cancelNotesBtn');
+
+            notesDisplay.style.display = 'none';
+            notesEditor.style.display = 'block';
+            editBtn.style.display = 'none';
+            saveBtn.style.display = 'inline-flex';
+            cancelBtn.style.display = 'inline-flex';
+            
+            notesEditor.focus();
+        }
+
+        function cancelNotesEdit() {
+            const notesDisplay = document.getElementById('notesDisplay');
+            const notesEditor = document.getElementById('notesEditor');
+            const editBtn = document.getElementById('editNotesBtn');
+            const saveBtn = document.getElementById('saveNotesBtn');
+            const cancelBtn = document.getElementById('cancelNotesBtn');
+
+            notesDisplay.style.display = 'block';
+            notesEditor.style.display = 'none';
+            editBtn.style.display = 'inline-flex';
+            saveBtn.style.display = 'none';
+            cancelBtn.style.display = 'none';
+        }
+
+        async function saveNotes(analysisId) {
+            const notesEditor = document.getElementById('notesEditor');
+            const newNotes = notesEditor.value;
+
+            try {
+                const response = await fetch('/api/update-evaluation-notes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        analysis_id: analysisId,
+                        evaluation_notes: newNotes
+                    })
+                });
+
+                if (response.ok) {
+                    const notesDisplay = document.getElementById('notesDisplay');
+                    notesDisplay.textContent = newNotes || 'Not bulunmuyor';
+                    cancelNotesEdit();
+                    
+                    // Refresh evaluations list
+                    loadEvaluations();
+                    
+                    alert('Notlar başarıyla güncellendi!');
+                } else {
+                    throw new Error('Güncelleme başarısız');
+                }
+            } catch (error) {
+                console.error('Notes update error:', error);
+                alert('Notlar güncellenirken hata oluştu: ' + error.message);
+            }
+        }
+
+        async function deleteEvaluation(analysisId) {
+            if (!confirm('Bu değerlendirmeyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/delete-evaluation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        analysis_id: analysisId
+                    })
+                });
+
+                if (response.ok) {
+                    closeEvaluationModal();
+                    loadEvaluations();
+                    alert('Değerlendirme başarıyla silindi!');
+                } else {
+                    throw new Error('Silme işlemi başarısız');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('Değerlendirme silinirken hata oluştu: ' + error.message);
+            }
+        }
+
+        // Tema toggle
+        const themeToggle = document.getElementById('themeToggle');
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('light');
+            if(document.body.classList.contains('light')) {
+                themeToggle.innerHTML = '<i class="fa-solid fa-sun"></i><span>Açık</span>';
+            } else {
+                themeToggle.innerHTML = '<i class="fa-solid fa-moon"></i><span>Koyu</span>';
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDocumentTypes();
+        });
+    </script>
+</body>
+</html>
