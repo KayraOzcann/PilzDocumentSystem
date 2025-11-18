@@ -1120,7 +1120,7 @@ def health_check():
 
 @app.route('/', methods=['GET'])
 def index():
-    """Main page with web interface"""
+    """Main page with web interfaces"""
     return render_template('index.html')
 
 @app.route('/api/info', methods=['GET'])
