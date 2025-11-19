@@ -53,6 +53,24 @@ from at_declaration_service import app as at_declaration_app
 # LVD servisi
 from lvd_service import app as lvd_app
 
+# Aydınlatma servisi
+from aydinlatma_service import app as aydinlatma_app
+
+# İSG Periyodik Kontrol servisi
+from isg_service import app as isg_app
+
+# Pnömatik Devre Şeması servisi
+from pnomatic_service import app as pnomatic_app
+
+# Hidrolik servisi
+from hidrolik_service import app as hidrolik_app
+
+# Montaj servisi
+from montaj_service import app as montaj_app
+
+# HRC servisi
+from hrc_service import app as hrc_app
+
 # ============================================
 # FLASK APP CONFIGURATION
 # ============================================
@@ -124,10 +142,53 @@ DOCUMENT_HANDLERS = {
         'description': 'AT Declaration Belgesi Analizi'
     },
 
+    # LVD
     'lvd_report': {
         'app': lvd_app,
         'endpoint': '/api/lvd-report',
         'description': 'LVD Topraklama Süreklilik Raporu Analizi'
+    },
+
+    # Aydınlatma
+    'lighting_report': {
+        'app': aydinlatma_app,
+        'endpoint': '/api/aydinlatma-report',
+        'description': 'Aydınlatma Ölçüm Raporu Analizi'
+    },
+
+    # İSG Periyodik Kontrol
+    'isg_periodic_control': {
+        'app': isg_app,
+        'endpoint': '/api/isg-control',
+        'description': 'İSG Periyodik Kontrol Raporu Analizi'
+    },
+
+    # Pnömatik Devre Şeması
+    'pneumatic_circuit': {
+        'app': pnomatic_app,
+        'endpoint': '/api/pnomatic-control',
+        'description': 'Pnömatik Devre Şeması Analizi'
+    },
+
+    # Hidrolik Devre Şeması
+    'hydraulic_circuit': {
+        'app': hidrolik_app,
+        'endpoint': '/api/hidrolik-control',
+        'description': 'Hidrolik Devre Şeması Analizi'
+    },
+
+    # Montaj Talimatları
+    'assembly_instructions': {
+        'app': montaj_app,
+        'endpoint': '/api/assembly-instructions',
+        'description': 'Montaj Talimatları Analizi'
+    },
+
+    # HRC Kuvvet-Basınç 
+    'hrc_report': {
+        'app': hrc_app,
+        'endpoint': '/api/hrc-report',
+        'description': 'HRC Kuvvet-Basınç Raporu Analizi'
     },
 
     # ... DİĞER 14 SERVİS BURAYA EKLENECEK

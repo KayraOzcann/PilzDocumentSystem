@@ -859,3 +859,74 @@ def analyze_aydinlatma_report():
             'error': 'Server error',
             'message': f'Sunucu hatası: {str(e)}'
         }), 500
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint - Aydınlatma için"""
+    return jsonify({
+        'status': 'healthy',
+        'service': 'Lighting Report Analyzer API',
+        'version': '1.0.0',
+        'tesseract_available': tesseract_available,
+        'upload_folder': UPLOAD_FOLDER,
+        'max_file_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024),
+        'supported_formats': list(ALLOWED_EXTENSIONS),
+        'report_type': 'AYDINLATMA_OLCUM_RAPORU',
+        'standard': 'TS EN 12464-1'
+    })
+
+
+@app.route('/', methods=['GET'])
+def index():
+    """Ana sayfa - API bilgileri - Aydınlatma için"""
+    return jsonify({
+        'service': 'Lighting Report Analyzer API',
+        'version': '1.0.0',
+        'description': 'Aydınlatma Ölçüm Raporlarını analiz eden REST API servisi',
+        'endpoints': {
+            'POST /api/aydinlatma-report': 'Aydınlatma raporu analizi',
+            'GET /api/health': 'Servis sağlık kontrolü',
+            'GET /': 'Bu bilgi sayfası'
+        },
+        'usage': {
+            'upload_format': 'multipart/form-data',
+            'file_field': 'file',
+            'supported_types': list(ALLOWED_EXTENSIONS),
+            'max_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
+        },
+        'scoring': {
+            'PASS': '≥70% - TS EN 12464-1 standardına uygun',
+            'CONDITIONAL': '50-69% - Kabul edilebilir',
+            'FAIL': '<50% - Standarda uygun değil'
+        }
+    })
+
+
+# ============================================
+# APPLICATION ENTRY POINT (Azure-Friendly)
+# ============================================
+if __name__ == '__main__':
+    logger.info("=" * 60)
+    logger.info("Aydınlatma Ölçüm Raporu Analiz Servisi")
+    logger.info("=" * 60)
+    logger.info(f"📁 Upload klasörü: {UPLOAD_FOLDER}")
+    logger.info(f"📊 Desteklenen formatlar: {', '.join(ALLOWED_EXTENSIONS)}")
+    logger.info(f"📏 Maksimum dosya boyutu: {app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB")
+    logger.info(f"🔍 Tesseract OCR: {'Kurulu' if tesseract_available else 'Kurulu değil'}")
+    logger.info("")
+    logger.info("🔗 API Endpoints:")
+    logger.info("  POST /api/aydinlatma-report - Aydınlatma raporu analizi")
+    logger.info("  GET /api/health - Servis sağlık kontrolü")
+    logger.info("  GET / - API bilgileri")
+    logger.info("=" * 60)
+    
+    port = int(os.environ.get('PORT', 8008))
+    
+    logger.info(f"🚀 Servis başlatılıyor - Port: {port}")
+    logger.info("=" * 60)
+    
+    app.run(
+        host='0.0.0.0',
+        port=port,
+        debug=False
+    )
