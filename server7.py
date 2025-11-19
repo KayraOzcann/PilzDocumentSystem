@@ -12,9 +12,6 @@ from werkzeug.utils import secure_filename
 from lvd_report import GroundingContinuityReportAnalyzer
 import logging
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-poppler_path = r"C:\Users\nuvo_teknik_2\Desktop\poppler-24.08.0\Library\bin"
-os.environ["PATH"] += os.pathsep + poppler_path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
