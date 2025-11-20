@@ -450,7 +450,36 @@ def analyze_document():
             'message': str(e)
         }), 500
 
-
+# ============================================
+# SERVICE INFORMATION ENDPOINT
+# ============================================
+@app.route('/api/services', methods=['GET'])
+def get_services():
+    """Mevcut tüm analiz servislerini listele"""
+    try:
+        services = []
+        
+        for service_name, config in DOCUMENT_HANDLERS.items():
+            services.append({
+                'service_name': service_name,
+                'description': config['description'],
+                'endpoint': config['endpoint'],
+                'status': 'available'
+            })
+        
+        return jsonify({
+            'success': True,
+            'services': services,
+            'total_services': len(services)
+        })
+        
+    except Exception as e:
+        logger.error(f"Servisler listelenirken hata: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+    
 # ============================================
 # TICKET MANAGEMENT ENDPOINTS
 # ============================================
@@ -500,15 +529,15 @@ def get_tickets():
         return jsonify([])
 
 
-@app.route('/api/update-ticket-status', methods=['POST'])
-def update_ticket_status():
-    """Ticket statusünü güncelle (HYBRID: ticket_id veya ticket_no)"""
+@app.route('/api/update-ticket', methods=['POST'])
+def update_ticket():
+    """Ticket bilgilerini güncelle (status, responsible, vb.)"""
     try:
         data = request.get_json()
         
+        # HYBRID: ticket_id veya ticket_no kabul et
         ticket_id = data.get('ticket_id')
         ticket_no = data.get('ticket_no')
-        new_status = data.get('status')
         
         if not ticket_id and not ticket_no:
             return jsonify({
@@ -516,10 +545,14 @@ def update_ticket_status():
                 'message': 'ticket_id veya ticket_no gerekli'
             }), 400
         
-        if not new_status:
+        # Güncellenebilir alanlar (opsiyonel)
+        new_status = data.get('status')
+        new_responsible = data.get('responsible')
+        
+        if not new_status and not new_responsible:
             return jsonify({
                 'success': False, 
-                'message': 'status parametresi gerekli'
+                'message': 'Güncellenecek alan belirtilmedi'
             }), 400
         
         tickets_file = os.path.join('tickets', 'tickets.json')
@@ -530,7 +563,7 @@ def update_ticket_status():
         with open(tickets_file, 'r', encoding='utf-8') as f:
             tickets = json.load(f)
         
-        # HYBRID ARAMA
+        # HYBRID ARAMA: Önce ticket_id, sonra ticket_no
         ticket = None
         if ticket_id:
             ticket = next((t for t in tickets if t.get('ticket_id') == ticket_id), None)
@@ -542,27 +575,35 @@ def update_ticket_status():
             return jsonify({'success': False, 'message': 'Ticket bulunamadı'}), 404
         
         old_status = ticket.get('status')
-        ticket['status'] = new_status
         
-        # Kapalı statüsüne ÇEVRİLDİYSE
-        if new_status == 'Kapalı' and old_status != 'Kapalı':
-            ticket['closing_date'] = datetime.now().isoformat()
+        # Status güncelleme
+        if new_status:
+            ticket['status'] = new_status
+            
+            # Kapalı statüsüne ÇEVRİLDİYSE kapanma tarihini ekle
+            if new_status == 'Kapalı' and old_status != 'Kapalı':
+                ticket['closing_date'] = datetime.now().isoformat()
+            
+            # Kapalı'dan başka bir statüye GEÇİLDİYSE kapanma tarihini sil
+            elif new_status != 'Kapalı' and old_status == 'Kapalı':
+                ticket['closing_date'] = None
         
-        # Kapalı'dan başka statüye GEÇİLDİYSE
-        elif new_status != 'Kapalı' and old_status == 'Kapalı':
-            ticket['closing_date'] = None
+        # Sorumlu güncelleme
+        if new_responsible:
+            ticket['responsible'] = new_responsible
         
+        # Son güncelleme tarihini ekle
         ticket['last_updated'] = datetime.now().isoformat()
         
         with open(tickets_file, 'w', encoding='utf-8') as f:
             json.dump(tickets, f, ensure_ascii=False, indent=2)
         
-        logger.info(f"Ticket status güncellendi: {ticket.get('ticket_no')} -> {new_status}")
+        logger.info(f"Ticket güncellendi: {ticket.get('ticket_no')} (ID: {ticket.get('ticket_id')})")
         
-        return jsonify({'success': True, 'message': 'Status başarıyla güncellendi'})
+        return jsonify({'success': True, 'message': 'Ticket başarıyla güncellendi'})
         
     except Exception as e:
-        logger.error(f"Status güncelleme hatası: {str(e)}")
+        logger.error(f"Ticket güncelleme hatası: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
