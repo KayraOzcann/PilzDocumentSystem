@@ -399,11 +399,20 @@ class AdvancedCircuitAnalyzer:
 def validate_document_server(text):
     """Server document validation"""
     critical_terms = [
-        ["hidrolik", "hydraulic", "devre", "circuit", "şema", "diagram"],
-        ["pompa", "pump", "valf", "valve", "silindir", "cylinder", "motor"],
-        ["basınç", "pressure", "bar", "psi", "debi", "flow"],
-        ["yağ", "oil", "hidrolik yağ", "hydraulic oil", "tank"],
-        ["iso 1219", "sembol", "symbol", "bağlantı", "connection"]
+        # Hidrolik temel terimleri
+        ["hidrolik", "hydraulic", "devre", "circuit", "şema", "diagram", "schema"],
+        
+        # Hidrolik bileşenleri ve semboller
+        ["pompa", "pump", "valf", "valve", "silindir", "cylinder", "motor", "actuator", "piston"],
+        
+        # Hidrolik basınç ve akış terimleri
+        ["basınç", "pressure", "bar", "psi", "debi", "flow", "l/min", "gpm", "mpa"],
+        
+        # Hidrolik sıvı ve sistem terimleri
+        ["yağ", "oil", "hidrolik yağ", "hydraulic oil", "tank", "rezervuar", "filtre", "filter"],
+        
+        # ISO standartları ve teknik terimler
+        ["iso 1219", "1219", "sembol", "symbol", "bağlantı", "connection", "hat", "line"]
     ]
     
     category_found = [
@@ -420,7 +429,13 @@ def validate_document_server(text):
 def check_strong_keywords_first_pages(filepath):
     """Check strong keywords in first pages"""
     strong_keywords = [
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219"
+        "hidrolik",
+        "HİDROLİK",
+        "hydraulic",
+        "hidrolik yağ",
+        "hydraulic oil",
+        "iso 1219",
+        "1219",
     ]
     
     try:
@@ -447,9 +462,54 @@ def check_strong_keywords_first_pages(filepath):
 def check_excluded_keywords_first_pages(filepath):
     """Check excluded keywords in first pages"""
     excluded_keywords = [
-        "aydınlatma", "lighting", "hrc", "cobot", "elektrik", "espe", "gürültü",
-        "kullanma", "kılavuz", "loto", "lvd", "isg", "periyodik", "pnömatik",
-        "montaj", "bakım", "titreşim", "certificate"
+        # Aydınlatma raporu (eski strong_keywords aydınlatmadan)
+
+        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık","ışık şiddeti",
+        
+        # HRC raporu
+        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
+        
+        # Elektrik devre şeması
+        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
+        
+        # Espe raporu  
+        "espe",
+        
+        # Gürültü ölçüm raporu
+        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
+        
+        # Manuel/kullanma kılavuzu
+        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
+        
+        # LOTO raporu
+        "loto",
+        
+        # LVD raporu
+        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
+        
+        # AT tip muayene
+        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
+        
+        # İSG periyodik kontrol
+        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
+        
+        # Pnömatik devre şeması
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", 
+        
+        # Montaj talimatları
+        "montaj", "assembly",
+        
+        # EN 60204-1 topraklama raporu
+        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
+        
+        # Bakım talimatları
+        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
+        
+        # Mekanik titreşim raporu
+        "titreşim", "vibration", "mekanik",
+        
+        # AT tip inceleme sertifikası
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
     ]
     
     try:

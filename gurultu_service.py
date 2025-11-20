@@ -306,11 +306,20 @@ class NoiseReportAnalyzer:
 def validate_document_server(text):
     """Gürültü doküman validasyonu"""
     critical_terms = [
+        # Gürültü temel terimleri
         ["gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic"],
-        ["ölçüm", "measurement", "test", "analiz", "analysis"],
-        ["dba", "dbc", "leq", "lmax", "lmin"],
-        ["iso 11201", "iso 9612", "iso 3744"],
-        ["maruziyet", "exposure", "yasal sınır", "limit"]
+        
+        # Ölçüm ve test terimleri
+        ["ölçüm", "measurement", "test", "analiz", "analysis", "ses basıncı", "sound pressure"],
+        
+        # Ses seviyeleri ve parametreler
+        ["dba", "dbc", "leq", "lmax", "lmin", "lcpeak", "lpeak", "ses seviyesi", "sound level"],
+        
+        # Standart ve referanslar
+        ["iso 11201", "iso 9612", "iso 3744", "en iso", "standart", "standard"],
+        
+        # Çevre ve iş sağlığı terimleri
+        ["maruziyet", "exposure", "yasal sınır", "limit", "iş sağlığı", "occupational", "çevresel", "environmental"]
     ]
     
     category_found = [any(re.search(rf"\b{term}\b", text, re.IGNORECASE) for term in category) for category in critical_terms]
@@ -321,7 +330,15 @@ def validate_document_server(text):
 
 def check_strong_keywords_first_pages(filepath):
     """İlk sayfada gürültü özgü kelime kontrolü - OCR"""
-    strong_keywords = ["gürültü", "noise", "ses", "sound", "decibel", "akustik", "acoustic"]
+    strong_keywords = [
+        "gürültü",
+        "noise",
+        "ses",
+        "sound",
+        "decibel",
+        "akustik",
+        "acoustic"
+    ]
     
     try:
         Image.MAX_IMAGE_PIXELS = None
@@ -347,9 +364,55 @@ def check_strong_keywords_first_pages(filepath):
 
 def check_excluded_keywords_first_pages(filepath):
     """İlk sayfada excluded keyword kontrolü - OCR"""
-    excluded = ["aydınlatma", "hidrolik", "pnömatik", "isg", "uygunluk", "lvd", "loto", 
-                "kullanma", "hrc", "elektrik", "espe", "montaj", "bakım", "titreşim", 
-                "at tip", "topraklama"]
+    excluded = [
+        # Aydınlatma raporu
+        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
+        
+        # Hidrolik devre şeması
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
+        
+        # Pnömatik devre şeması
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
+        
+        # İSG periyodik kontrol
+        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
+        
+        # AT Uygunluk Beyanı
+        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
+        
+        # LVD raporu
+        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
+        
+        # LOTO raporu
+        "loto",
+        
+        # Manuel/kullanım kılavuzu
+        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
+        
+        # HRC raporu
+        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
+        
+        # Elektrik devre şeması
+        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
+        
+        # Espe raporu  
+        "espe",
+        
+        # Montaj talimatları
+        "montaj", "assembly",
+        
+        # Bakım talimatları
+        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
+        
+        # Mekanik titreşim raporu
+        "titreşim", "vibration", "mekanik",
+        
+        # AT tip inceleme sertifikası
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
+        
+        # EN 60204-1 topraklama raporu
+        "topraklama direnci", "grounding", "earthing", "60204","topraklama",
+    ]
     
     try:
         Image.MAX_IMAGE_PIXELS = None

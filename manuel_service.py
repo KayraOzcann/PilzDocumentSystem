@@ -247,11 +247,20 @@ class ManualReportAnalyzer:
 # ============================================
 def validate_document_server(text):
     critical_terms = [
-        ["kullanma", "kılavuz", "manual", "instruction", "talimat", "guide"],
-        ["güvenlik", "safety", "uyarı", "warning", "dikkat"],
-        ["kurulum", "installation", "montaj", "assembly"],
-        ["kullanım", "operation", "işletim", "çalıştırma"],
-        ["bakım", "maintenance", "temizlik", "arıza"]
+        # Manuel/kılavuz temel terimleri
+        ["kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu", "user manual"],
+        
+        # Güvenlik ve uyarı terimleri
+        ["güvenlik", "safety", "uyarı", "warning", "dikkat", "attention", "tehlike", "danger"],
+        
+        # Kurulum ve montaj terimleri
+        ["kurulum", "installation", "montaj", "assembly", "setup", "kurma", "takma", "yerleştirme"],
+        
+        # Kullanım ve işletim terimleri
+        ["kullanım", "operation", "işletim", "çalıştırma", "kullanma", "nasıl kullanılır", "how to use"],
+        
+        # Bakım ve arıza terimleri
+        ["bakım", "maintenance", "temizlik", "cleaning", "arıza", "troubleshooting", "onarım", "repair"]
     ]
     
     category_found = [any(re.search(rf"\b{term}\b", text, re.IGNORECASE) for term in category) for category in critical_terms]
@@ -260,7 +269,15 @@ def validate_document_server(text):
     return valid >= 4
 
 def check_strong_keywords_first_pages(filepath):
-    strong_keywords = ["kullanma", "kılavuz", "manual", "instruction", "talimat", "guide"]
+    strong_keywords = [
+        "kullanma",
+        "kılavuz",
+        "manual",
+        "instruction",
+        "talimat",
+        "guide",
+        "kılavuzu"
+    ]
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=1)
         all_text = ""
@@ -278,9 +295,55 @@ def check_strong_keywords_first_pages(filepath):
         return False
 
 def check_excluded_keywords_first_pages(filepath):
-    excluded = ["aydınlatma", "hidrolik", "pnömatik", "isg", "uygunluk", "lvd", "loto", 
-                "hrc", "elektrik", "espe", "gürültü", "montaj", "bakım", "titreşim", 
-                "at tip", "topraklama"]
+    excluded = [
+        # Aydınlatma raporu
+        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
+        
+        # Hidrolik devre şeması
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219",
+        
+        # Pnömatik devre şeması
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
+        
+        # İSG periyodik kontrol
+        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
+        
+        # AT Uygunluk Beyanı
+        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
+        
+        # LVD raporu
+        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
+        
+        # LOTO raporu (eski strong_keywords LOTO'dan)
+        "loto",
+        
+        # HRC raporu
+        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
+        
+        # Elektrik devre şeması
+        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
+        
+        # Espe raporu  
+        "espe",
+        
+        # Gürültü ölçüm raporu
+        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
+        
+        # Montaj talimatları
+        "montaj", "assembly",
+        
+        # Bakım talimatları
+        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
+        
+        # Mekanik titreşim raporu
+        "titreşim", "vibration", "mekanik",
+        
+        # AT tip inceleme sertifikası
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
+        
+        # EN 60204-1 topraklama raporu
+        "topraklama direnci", "grounding", "earthing", "60204","topraklama", "TOPRAKLAMA DİRENCİ",
+    ]
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=1)
         all_text = ""

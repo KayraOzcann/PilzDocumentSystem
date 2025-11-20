@@ -553,12 +553,22 @@ def validate_document_server(text):
     """Server kodunda doküman validasyonu - İSG Periyodik Kontrol için"""
     
     critical_terms = [
+        # İSG temel terimleri
         ["isg", "iş sağlığı", "güvenlik", "periyodik", "kontrol", "periodic", "inspection", "denetim"],
+        
+        # Ölçüm türleri ve parametreler
         ["gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic", "aydınlatma", "lux"],
+        
+        # Laboratuvar ve rapor bilgileri
         ["laboratuvar", "laboratory", "ölçüm", "measurement", "rapor", "report", "analiz", "analysis"],
+        
+        # Yasal ve standart referanslar
         ["yönetmelik", "regulation", "standart", "standard", "limit", "sınır", "değer", "value"],
+        
+        # Çevre ve iş hijyeni terimleri
         ["çevre", "environment", "iş hijyeni", "occupational hygiene", "sağlık", "health", "risk", "assessment"]
     ]
+    
     
     category_found = []
     
@@ -580,9 +590,19 @@ def validate_document_server(text):
 def check_strong_keywords_first_pages(filepath):
     """İlk 1-2 sayfada özgü kelimeleri OCR ile ara - İSG Periyodik Kontrol için"""
     strong_keywords = [
-        "isg", "periyodik", "periodic", "inspection", "denetim",
-        "çevre laboratuvarı", "iş hijyeni ölçüm", "tetratest",
-        "turkak", "türkak", "akredite", "yeterlilik bölge"
+        "isg",
+        "periyodik",
+        "periodic",
+        "inspection",
+        "denetim",
+        "çevre laboratuvarı",
+        "iş hi̇jyeni̇ olçum, test ve analiz", "iş hi̇jyeni̇ ölçüm, test ve analiz",
+        "is güvenliği", "iş güvenligi",
+        "tetratest",
+        "turkak", "türkak", 
+        "akredite", "akredıte",
+        "accreditation agency",
+        "yeterlilik bölge",
     ]
     
     try:
@@ -609,11 +629,53 @@ def check_strong_keywords_first_pages(filepath):
 def check_excluded_keywords_first_pages(filepath):
     """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara"""
     excluded_keywords = [
-        "aydınlatma", "lighting", "hidrolik", "hydraulic", "pnömatik", "pneumatic",
-        "hrc", "cobot", "robot", "elektrik", "devre", "şema", "circuit",
-        "espe", "kullanma", "kılavuz", "manual", "loto", "lvd", "topraklama",
-        "uygunluk", "beyan", "conformity", "montaj", "assembly",
-        "bakım", "maintenance", "titreşim", "vibration", "AT TİP", "certificate"
+        # Aydınlatma raporu
+        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
+        
+        # Hidrolik devre şeması
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
+        
+        # Pnömatik devre şeması
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve",
+        
+        # HRC raporu
+        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
+        
+        # Elektrik devre şeması
+        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
+        
+        # Espe raporu  
+        "espe",
+
+        # Gürültü ölçüm raporu
+        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
+        
+        # Manuel/kullanma kılavuzu
+        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
+        
+        # LOTO raporu
+        "loto",
+        
+        # LVD raporu
+        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
+        
+        # AT tip muayene
+        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
+        
+        # Montaj talimatları
+        "montaj", "assembly",
+        
+        # EN 60204-1 topraklama raporu
+        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
+        
+        # Bakım talimatları
+        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
+        
+        # Mekanik titreşim raporu
+        "titreşim", "vibration", "mekanik",
+        
+        # AT tip inceleme sertifikası
+        "AT TİP", "at tip", "ec type",
     ]
     
     try:

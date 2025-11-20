@@ -602,10 +602,19 @@ def validate_document_server(text):
     """Server kodunda doküman validasyonu - LVD için"""
     
     critical_terms = [
+        # Topraklama süreklilik temel terimleri
         ["süreklilik", "continuity", "iletkenler", "conductors", "bağlantı", "connection", "devamlılık"],
+        
+        # Kesit uygunluk terimleri
         ["kesit", "cross section", "iletken kesiti", "conductor cross section", "mm2", "mm²", "kesit uygunluğu"],
+        
+        # LVD ve standart terimleri
         ["lvd", "en 60204-1", "60204-1", "60204", "makine güvenliği", "machine safety"],
+        
+        # Ölçüm ve test terimleri
         ["ölçüm", "measurement", "test", "ohm", "direnç", "resistance", "milliohm", "mΩ"],
+        
+        # Elektrik güvenlik terimleri
         ["elektrik güvenliği", "electrical safety", "koruyucu iletken", "protective conductor", "pe", "protective earth"]
     ]
     
@@ -629,10 +638,13 @@ def validate_document_server(text):
 def check_strong_keywords_first_pages(filepath):
     """İlk 1-2 sayfada özgü kelimeleri OCR ile ara - LVD için"""
     strong_keywords = [
-        "lvd", "TOPRAKLAMA SÜREKLİLİK", "topraklama süreklilik",
+        "lvd",
+        "TOPRAKLAMA SÜREKLİLİK", 
+        "topraklama süreklilik",
         "TOPRAKLAMA İLETKENLERİ", "TOPRAKLAMA ILETKENLERI",
-        "topraklama iletkenleri", "topraklama sureklilik",
-        "KESİT UYGUNLUĞU", "kesit uygunlugu", "kesit uygunluğu"
+        "topraklama iletkenleri",
+        "topraklama sureklilik",
+        "KESİT UYGUNLUĞU", "kesit uygunlugu", "kesit uygunluğu", "kesıt uygunluğu",
     ]
     
     try:
@@ -659,20 +671,53 @@ def check_strong_keywords_first_pages(filepath):
 def check_excluded_keywords_first_pages(filepath):
     """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara"""
     excluded_keywords = [
-        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen",
-        "hidrolik", "HİDROLİK", "hydraulic",
-        "pnömatik", "pnomatik", "pneumatic",
-        "isg", "periyodik", "kontrol",
-        "uygunluk", "beyan", "conformity", "declaration",
-        "hrc", "cobot", "robot",
-        "elektrik", "devre", "şema", "circuit",
-        "espe", "gürültü", "noise", "ses",
-        "kullanma", "kılavuz", "manual",
-        "loto", "montaj", "assembly",
-        "topraklama direnci", "grounding", "earthing",
-        "bakım", "maintenance", "bakim",
-        "titreşim", "vibration",
-        "AT TİP", "at tip", "certificate"
+        # Aydınlatma raporu
+        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
+        
+        # Hidrolik devre şeması
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
+        
+        # Pnömatik devre şeması
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve",
+        
+        # İSG periyodik kontrol
+        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
+        
+        # AT Uygunluk Beyanı (eski strong_keywords AT'den)
+        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
+        
+        # HRC raporu
+        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
+        
+        # Elektrik devre şeması
+        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
+        
+        # Espe raporu  
+        "espe",
+        
+        # Gürültü ölçüm raporu
+        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
+        
+        # Manuel/kullanma kılavuzu
+        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
+        
+        # LOTO raporu
+        "loto",
+        
+        # Montaj talimatları
+        "montaj", "assembly",
+        
+        # Bakım talimatları
+        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
+        
+        # Mekanik titreşim raporu
+        "titreşim", "vibration", "mekanik",
+        
+        # AT tip inceleme sertifikası
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
+
+        # EN 60204-1 topraklama raporu
+        "topraklama direnci", "grounding", "earthing", "TOPRAKLAMA DİRENCİ",
     ]
     
     try:

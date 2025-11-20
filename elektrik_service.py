@@ -414,7 +414,19 @@ def validate_document_server(text):
 
 def check_strong_keywords_first_pages(filepath):
     """İlk sayfada elektrik özgü kelime kontrolü - OCR"""
-    strong_keywords = ["elektrik", "circuit", "electrical", "voltage", "amper", "ohm", "enclosure", "wrp-", "light curtain", "contactors", "controller"]
+    strong_keywords = [
+        "elektrik", 
+        "circuit", 
+        "electrical", 
+        "voltage", 
+        "amper", 
+        "ohm",
+        "enclosure",
+        "wrp-",
+        "light curtain",
+        "contactors",
+        "controller",
+    ]
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=2)
@@ -436,8 +448,55 @@ def check_strong_keywords_first_pages(filepath):
 
 def check_excluded_keywords_first_pages(filepath):
     """İlk sayfada excluded keyword kontrolü - OCR"""
-    excluded = ["topraklama direnci", "aydınlatma", "hrc", "espe", "hidrolik", "gürültü", "kullanma", "loto", "lvd", 
-                "uygunluk", "isg", "pnömatik", "montaj", "bakım", "titreşim", "at tip", "sertifika"]
+    excluded = [
+        # Topraklama raporu (eski strong_keywords)
+        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
+        
+        # Aydınlatma raporu
+        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
+        
+        # HRC raporu
+        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
+        
+        # Espe raporu  
+        "espe",
+        
+        # Hidrolik devre şeması
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
+        
+        # Gürültü ölçüm raporu
+        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
+        
+        # Manuel/kullanma kılavuzu
+        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
+        
+        # LOTO raporu
+        "loto",
+        
+        # LVD raporu
+        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
+        
+        # AT tip muayene (AT uygunluk beyanı)
+        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
+        
+        # İSG periyodik kontrol
+        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
+        
+        # Pnömatik devre şeması
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
+        
+        # Montaj talimatları
+        "montaj", "assembly",
+        
+        # Bakım talimatları
+        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
+        
+        # Mekanik titreşim raporu
+        "titreşim", "vibration", "mekanik",
+        
+        # AT tip inceleme sertifikası
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
+    ]
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=2)

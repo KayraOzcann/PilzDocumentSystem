@@ -486,7 +486,7 @@ def check_excluded_keywords_first_pages(filepath):
         "bakım", "maintenance", "servis", "service", "bakim", "MAINTENCE",
         "titreşim", "vibration", "mekanik",
         "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate"
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
     ]
     
     try:

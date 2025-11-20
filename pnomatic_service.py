@@ -626,10 +626,19 @@ def validate_document_server(text):
     """Server kodunda doküman validasyonu - Pnömatik Devre Şeması için"""
     
     critical_terms = [
+        # Pnömatik temel terimleri
         ["pnömatik", "pnomatik", "pneumatic", "hava", "air", "basınçlı hava", "compressed air"],
+        
+        # Pnömatik bileşenleri ve semboller
         ["silindir", "cylinder", "valf", "valve", "vana", "frl", "lubricator", "regulator", "filter"],
+        
+        # Pnömatik basınç ve akış terimleri
         ["basınç", "pressure", "psi", "bar", "debi", "flow", "cfm", "l/min"],
+        
+        # Pnömatik kontrol elemanları
         ["kontrol", "control", "yön kontrol", "directional control", "hız kontrol", "speed control"],
+        
+        # ISO standartları ve teknik terimler
         ["iso 5599", "5599", "iso 1219", "sembol", "symbol", "bağlantı", "connection", "port"]
     ]
     
@@ -653,8 +662,17 @@ def validate_document_server(text):
 def check_strong_keywords_first_pages(filepath):
     """İlk 1-2 sayfada özgü kelimeleri OCR ile ara - Pnömatik Devre Şeması için"""
     strong_keywords = [
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate",
-        "psi", "bar", "regis", "r102", "regulator", "dump valve"
+        "pnömatik",
+        "pnomatik", 
+        "pneumatic",
+        "lubricator",
+        "inflate",
+        "psi",
+        "bar",
+        "regis",
+        "r102",
+        "regulator",
+        "dump valve"
     ]
     
     try:
@@ -681,11 +699,53 @@ def check_strong_keywords_first_pages(filepath):
 def check_excluded_keywords_first_pages(filepath):
     """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara"""
     excluded_keywords = [
-        "aydınlatma", "lighting", "hidrolik", "hydraulic", "hrc", "cobot", "robot",
-        "elektrik", "devre", "circuit", "espe", "gürültü", "noise",
-        "kullanma", "kılavuz", "manual", "loto", "lvd", "topraklama",
-        "uygunluk", "beyan", "conformity", "isg", "periyodik", "montaj",
-        "bakım", "maintenance", "titreşim", "vibration", "AT TİP", "certificate"
+        # Aydınlatma raporu
+        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
+        
+        # Hidrolik devre şeması (eski strong_keywords hidrolikten)
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
+        
+        # HRC raporu
+        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
+        
+        # Elektrik devre şeması
+        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
+        
+        # Espe raporu  
+        "espe",
+        
+        # Gürültü ölçüm raporu
+        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
+        
+        # Manuel/kullanma kılavuzu
+        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
+        
+        # LOTO raporu
+        "loto",
+        
+        # LVD raporu
+        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
+        
+        # AT tip muayene
+        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
+        
+        # İSG periyodik kontrol
+        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
+        
+        # Montaj talimatları
+        "montaj", "assembly",
+        
+        # EN 60204-1 topraklama raporu
+        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
+        
+        # Bakım talimatları
+        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
+        
+        # Mekanik titreşim raporu
+        "titreşim", "vibration","TİTREŞİM",
+        
+        # AT tip inceleme sertifikası
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
     ]
     
     try:

@@ -273,11 +273,20 @@ class LOTOReportAnalyzer:
 # ============================================
 def validate_document_server(text):
     critical_terms = [
-        ["loto", "lockout", "tagout", "kilitleme", "etiketleme"],
-        ["enerji", "energy", "izolasyon", "isolation"],
-        ["prosedür", "procedure", "güvenlik", "safety"],
-        ["makine", "machine", "ekipman", "equipment"],
-        ["kontrol", "control", "değerlendirme", "evaluation"]
+        # LOTO temel terimleri
+        ["loto", "lockout", "tagout", "kilitleme", "etiketleme", "lockout tagout"],
+        
+        # Enerji kaynakları ve izolasyon terimleri
+        ["enerji", "energy", "izolasyon", "isolation", "kaynaklar", "sources", "elektrik", "mekanik"],
+        
+        # Güvenlik prosedürü terimleri
+        ["prosedür", "procedure", "güvenlik", "safety", "iş güvenliği", "work safety", "önlem", "precaution"],
+        
+        # Makine ve ekipman terimleri
+        ["makine", "machine", "ekipman", "equipment", "sistem", "system", "tesis", "facility"],
+        
+        # Kontrol ve değerlendirme terimleri
+        ["kontrol", "control", "değerlendirme", "evaluation", "analiz", "analysis", "risk", "hazard"]
     ]
     
     category_found = [any(re.search(rf"\b{term}\b", text, re.IGNORECASE) for term in category) for category in critical_terms]
@@ -304,9 +313,55 @@ def check_strong_keywords_first_pages(filepath):
         return False
 
 def check_excluded_keywords_first_pages(filepath):
-    excluded = ["aydınlatma", "hidrolik", "pnömatik", "isg", "uygunluk", "lvd", 
-                "hrc", "elektrik", "espe", "gürültü", "kullanma", "montaj", "bakım", 
-                "titreşim", "at tip", "topraklama"]
+    excluded = [
+        # Aydınlatma raporu
+        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
+        
+        # Hidrolik devre şeması
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
+        
+        # Pnömatik devre şeması
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
+        
+        # İSG periyodik kontrol
+        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
+        
+        # AT Uygunluk Beyanı
+        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
+        
+        # LVD raporu (eski strong_keywords LVD'den)
+        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri"
+        
+        # HRC raporu
+        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
+        
+        # Elektrik devre şeması
+        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
+        
+        # Espe raporu  
+        "espe",
+        
+        # Gürültü ölçüm raporu
+        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
+        
+        # Manuel/kullanma kılavuzu
+        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
+        
+        # Montaj talimatları
+        "montaj", "assembly",
+        
+        # Bakım talimatları
+        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
+        
+        # Mekanik titreşim raporu
+        "titreşim", "vibration", "mekanik",
+        
+        # AT tip inceleme sertifikası
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
+        
+        # EN 60204-1 topraklama raporu
+        "topraklama direnci", "grounding", "earthing", "60204", "topraklama", "TOPRAKLAMA DİRENCİ",
+    ]
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=2)
         all_text = ""

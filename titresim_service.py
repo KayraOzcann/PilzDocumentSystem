@@ -760,9 +760,16 @@ def validate_document_server(text):
     """Server kodunda doküman validasyonu - Titreşim için"""
     
     critical_terms = [
+        # Titreşim temel terimleri (en az 1 tane olmalı)
         ["titreşim", "vibration", "oscillation", "salınım", "mechanical vibration", "mekanik titreşim"],
+        
+        # Ölçüm/Frekans terimleri (en az 1 tane olmalı)  
         ["frekans", "frequency", "hz", "amplitude", "genlik", "rms", "acceleration", "ivme"],
+        
+        # Titreşim standartları (mutlaka olmalı)
         ["iso 2631", "iso 5349", "ts en iso 5349", "ts iso 2631", "en iso 5349"],
+        
+        # Maruziyet/Sağlık terimleri (en az 1 tane olmalı)
         ["maruziyet", "exposure", "a(8)", "günlük", "daily", "sağlık", "health", "risk"]
     ]
     

@@ -392,10 +392,17 @@ class ManualReportAnalyzer:
 def validate_document_server(text):
     """Server document validation"""
     critical_terms = [
+        # Montaj temel terimleri (en az 1 tane olmalı)
         ["montaj", "assembly", "kurulum", "installation", "talimat", "instruction", "kılavuz", "manual"],
+        
+        # Adımlar/Prosedür terimleri (en az 1 tane olmalı)  
         ["adım", "step", "prosedür", "procedure", "sıralama", "sequence", "önce", "before", "sonra", "after"],
+        
+        # Araçlar/Malzemeler terimleri (mutlaka olmalı)
         ["araç", "tool", "malzeme", "material", "gerekli", "required", "parça", "part", "bileşen", "component"],
-        ["güvenlik", "safety", "uyarı", "warning", "dikkat", "caution", "tehlike", "danger"]
+        
+        # Güvenlik/Uyarı terimleri (en az 1 tane olmalı)
+        ["güvenlik", "safety", "uyarı", "warning", "dikkat", "caution", "tehlike", "danger", "önlem", "precaution"]
     ]
     
     category_found = [
@@ -412,7 +419,17 @@ def validate_document_server(text):
 def check_strong_keywords_first_pages(filepath):
     """Check strong keywords"""
     strong_keywords = [
-        "montaj", "assembly", "kurulum", "installation", "talimat", "instruction", "kılavuz", "manual"
+        "montaj",
+        "assembly",
+        "kurulum",
+        "installation",
+        "talimat",
+        "instruction",
+        "kılavuz",
+        "manual",
+        "kılavuzu",
+        "kılavuzun",
+        "kullanma,"
     ]
     
     try:
@@ -439,8 +456,50 @@ def check_strong_keywords_first_pages(filepath):
 def check_excluded_keywords_first_pages(filepath):
     """Check excluded keywords"""
     excluded_keywords = [
-        "hrc", "cobot", "elektrik", "espe", "hidrolik", "gürültü", "loto", "lvd",
-        "isg", "periyodik", "pnömatik", "bakım", "maintenance", "titreşim", "certificate"
+        # HRC raporu
+        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
+        
+        # Elektrik devre şeması
+        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
+        
+        # Espe raporu  
+        "espe",
+        
+        # Hidrolik devre şeması
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
+        
+        # Gürültü ölçüm raporu
+        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
+        
+        # LOTO raporu
+        "loto",
+        
+        # LVD raporu
+        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
+        
+        # AT tip muayene (AT uygunluk beyanı)
+        "uygunluk", "beyan", "muayene", "conformity", "declaration",
+        
+        # İSG periyodik kontrol
+        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
+        
+        # Pnömatik devre şeması
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
+        
+        # EN 60204-1 topraklama raporu
+        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
+        
+        # Bakım talimatları
+        "bakım", "maintenance", "servis", "service", "bakim", "MAINTENCE",
+        
+        # Mekanik titreşim raporu
+        "titreşim", "vibration", "mekanik",
+        
+        # AT tip inceleme sertifikası
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
+
+        # Aydınlatma
+        "aydınlatma", "lighting",  "illumination",  "lux",  "lümen",  "lumen",  "ts en 12464",  "en 12464", "ışık",  "ışık şiddeti",
     ]
     
     try:

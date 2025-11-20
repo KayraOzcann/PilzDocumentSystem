@@ -210,11 +210,20 @@ class ATTypeInspectionAnalyzer:
 
 def validate_document_server(text):
     critical_terms = [
-        ["AT TİP", "at tip", "ec type", "uygunluk", "beyan"],
-        ["SERTİFİKA", "sertifika", "certificate"],
-        ["2006/42/EC", "direktif", "directive"],
-        ["üretici", "manufacturer"],
-        ["muayene", "inspection"]
+        # AT/EC temel terimleri
+        ["AT TİP", "at tip", "ec type", "uygunluk", "beyan", "muayene", "conformity", "declaration"],
+        
+        # Sertifika ve belgelendirme terimleri
+        ["SERTİFİKA", "sertifika", "certificate", "belge", "document", "onay", "approval"],
+        
+        # Makine direktifi ve standart terimleri
+        ["2006/42/EC", "direktif", "directive", "makine", "machine", "standart", "standard"],
+        
+        # Üretici ve yetkili terimleri
+        ["üretici", "manufacturer", "yetkili", "authorized", "imza", "signature", "sorumlu", "responsible"],
+        
+        # Muayene ve kontrol terimleri
+        ["muayene", "inspection", "kontrol", "control", "test", "değerlendirme", "assessment", "onaylanmış kuruluş"]
     ]
     category_found = [any(re.search(rf"\b{term}\b", text, re.IGNORECASE) for term in category) for category in critical_terms]
     return sum(category_found) >= 4
@@ -229,13 +238,62 @@ def check_strong_keywords_first_pages(filepath):
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
             text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
             all_text += text.lower() + " "
-        found = [kw for kw in ["uygunluk", "beyan", "declaration"] if re.search(rf"\b{kw}\b", all_text)]
+        found = [kw for kw in ["uygunluk", "beyan", "declaration","muayene","declare"] if re.search(rf"\b{kw}\b", all_text)]
         return len(found) >= 1
     except:
         return False
 
 def check_excluded_keywords_first_pages(filepath):
-    excluded = ["aydınlatma", "hidrolik", "pnömatik", "gürültü", "isg", "hrc", "elektrik", "espe", "kullanma", "loto", "lvd", "montaj", "topraklama", "bakım", "titreşim"]
+    excluded = [
+        # Aydınlatma raporu
+        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
+        
+        # Hidrolik devre şeması
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
+        
+        # Pnömatik devre şeması
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
+
+        # Gürültü ölçüm raporu
+        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
+        
+        # İSG periyodik kontrol (eski strong_keywords İSG'den)
+        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
+        
+        # HRC raporu
+        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
+        
+        # Elektrik devre şeması
+        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
+        
+        # Espe raporu  
+        "espe",
+        
+        # Manuel/kullanma kılavuzu
+        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
+        
+        # LOTO raporu
+        "loto",
+        
+        # LVD raporu
+        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
+        
+        # Montaj talimatları
+        "montaj", "assembly",
+        
+        # EN 60204-1 topraklama raporu
+        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
+        
+        # Bakım talimatları
+        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
+        
+        # Mekanik titreşim raporu
+        "titreşim", "vibration", "mekanik",
+        
+        # AT tip inceleme sertifikası
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
+    ]
+    
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=2)
         all_text = ""
