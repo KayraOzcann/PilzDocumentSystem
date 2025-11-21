@@ -8,7 +8,6 @@ import os
 import json
 from datetime import datetime
 import logging
-from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 import time
 
@@ -182,7 +181,7 @@ DOCUMENT_HANDLERS = {
     # Hidrolik Devre Şeması
     'hydraulic_circuit': {
         'app': hidrolik_app,
-        'endpoint': '/api/hidrolik-control',
+        'endpoint': '/api/hydraulic-control',
         'description': 'Hidrolik Devre Şeması Analizi'
     },
 
@@ -210,7 +209,7 @@ DOCUMENT_HANDLERS = {
     # AT Type
     'at_type_report': {
         'app': at_tip_app,
-        'endpoint': '/api/at-tip-report',
+        'endpoint': '/api/at-type-cert-report',
         'description': 'AT Tip Belgesi Analizi'
     },
     
@@ -229,41 +228,6 @@ DOCUMENT_HANDLERS = {
 def allowed_file(filename):
     """Dosya uzantısı kontrolü"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-def cleanup_old_temp_files():
-    """1 saatten eski temp dosyalarını sil"""
-    try:
-        temp_folder = UPLOAD_FOLDER
-        current_time = time.time()
-        max_age = 60 * 60  # 1 saat (production)
-        # max_age = 2 * 60  # 2 dakika (test)
-        
-        if not os.path.exists(temp_folder):
-            return
-        
-        deleted_count = 0
-        for filename in os.listdir(temp_folder):
-            filepath = os.path.join(temp_folder, filename)
-            
-            if os.path.isfile(filepath):
-                try:
-                    file_modified_time = os.path.getmtime(filepath)
-                    file_age = current_time - file_modified_time
-                    
-                    if file_age > max_age:
-                        os.remove(filepath)
-                        deleted_count += 1
-                        logger.info(f"✓ Eski temp dosyası silindi: {filename}")
-                        
-                except Exception as e:
-                    logger.error(f"Dosya işlenirken hata {filename}: {e}")
-        
-        if deleted_count > 0:
-            logger.info(f"Toplam {deleted_count} eski temp dosyası temizlendi")
-            
-    except Exception as e:
-        logger.error(f"Temp dosyaları temizlenirken hata: {e}")
 
 
 # ============================================
@@ -333,10 +297,9 @@ def analyze_document():
         if initial_comment:
             logger.info(f"İlk yorum var - Yazar: {comment_author if comment_author else 'Anonim'}")
 
-        # 4. DOSYAYI KAYDET
+        # 4. DOSYAYI KAYDETME - Direkt servise forward et
         filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
+        file.seek(0)  # Reset file pointer
         
         # 5. İLGİLİ SERVİS APP'İNE YÖNLENDİR
         handler_info = DOCUMENT_HANDLERS[document_type]
@@ -348,15 +311,14 @@ def analyze_document():
         # Service app'in test client'ını kullan (internal routing)
         with service_app.test_client() as client:
             # Dosyayı ve diğer parametreleri servis'e gönder
-            with open(filepath, 'rb') as f:
-                response = client.post(
-                    service_endpoint,
-                    data={
-                        'file': (f, filename),
-                        **{key: value for key, value in request.form.items() if key != 'document_type'}
-                    },
-                    content_type='multipart/form-data'
-                )
+            response = client.post(
+                service_endpoint,
+                data={
+                    'file': (file, filename),
+                    **{key: value for key, value in request.form.items() if key != 'document_type'}
+                },
+                content_type='multipart/form-data'
+            )
         
         # Servis'ten gelen cevabı al
         result = response.get_json()
@@ -862,19 +824,6 @@ def api_info():
 def index():
     """Main page with web interface"""
     return render_template('index.html')
-
-
-# ============================================
-# BACKGROUND SCHEDULER
-# ============================================
-scheduler = BackgroundScheduler()
-scheduler.add_job(func=cleanup_old_temp_files, trigger="interval", minutes=20)
-scheduler.start()
-
-# Shutdown scheduler on exit
-atexit.register(lambda: scheduler.shutdown())
-
-logger.info("Background cleanup scheduler başlatıldı (20 dakikada bir çalışacak)")
 
 
 # ============================================

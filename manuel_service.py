@@ -421,7 +421,7 @@ def analyze_manuel_report():
             
             # 3 AŞAMALI KONTROL
             if file_ext == '.pdf':
-                logger.info("Aşama 1: Manuel özgü kelime kontrolü...")
+                logger.info("Aşama 1: Kullanım Kılavuzu özgü kelime kontrolü...")
                 if check_strong_keywords_first_pages(filepath):
                     logger.info("✅ Aşama 1 geçti")
                 else:
@@ -460,6 +460,40 @@ def analyze_manuel_report():
                             except:
                                 pass
                             return jsonify({'error': 'Analysis failed'}), 500
+
+            elif file_ext in ['.docx', '.doc', '.txt']:
+                # DOCX/TXT için sadece tam doküman kontrolü
+                logger.info(f"DOCX/TXT dosyası için tam doküman kontrolü: {file_ext}")
+                text = ""
+                if file_ext in ['.docx', '.doc']:
+                    text = analyzer.extract_text_from_docx(filepath)
+                elif file_ext == '.txt':
+                    text = analyzer.extract_text_from_txt(filepath)
+                
+                if not text or len(text.strip()) == 0:
+                    try:
+                        os.remove(filepath)
+                    except:
+                        pass
+                    return jsonify({
+                        'error': 'Text extraction failed',
+                        'message': 'Dosyadan yeterli metin çıkarılamadı'
+                    }), 400
+                
+                if not validate_document_server(text):
+                    try:
+                        os.remove(filepath)
+                    except:
+                        pass
+                    return jsonify({
+                        'error': 'Invalid document type',
+                        'message': 'Yüklediğiniz dosya kullanım kılavuzu değil! Lütfen geçerli bir kullanım kılavuzu dosyası yükleyiniz.',
+                        'details': {
+                            'filename': filename,
+                            'document_type': 'NOT_kullanım_kılavuzu',
+                            'required_type': 'KULLANIM_KILAVUZU'
+                        }
+                    }), 400
 
             # Analizi yap
             logger.info(f"Manuel analizi yapılıyor: {filename}")

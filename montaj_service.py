@@ -586,6 +586,84 @@ def analyze_manual():
         file.save(filepath)
         
         analyzer = ManualReportAnalyzer()
+        file_ext = os.path.splitext(filepath)[1].lower()
+        # 3 AŞAMALI KONTROL
+        if file_ext == '.pdf':
+            logger.info("Aşama 1: Montaj özgü kelime kontrolü...")
+            if check_strong_keywords_first_pages(filepath):
+                logger.info("✅ Aşama 1 geçti")
+            else:
+                logger.info("Aşama 2: Excluded kelime kontrolü...")
+                if check_excluded_keywords_first_pages(filepath):
+                    logger.info("❌ Excluded kelimeler bulundu")
+                    try:
+                        os.remove(filepath)
+                    except:
+                        pass
+                    return jsonify({
+                        'error': 'Invalid document type',
+                        'message': 'Bu dosya montaj talimatları değil'
+                    }), 400
+                else:
+                    # AŞAMA 3
+                    logger.info("Aşama 3: Tam doküman kontrolü...")
+                    try:
+                        with open(filepath, 'rb') as f:
+                            pdf_reader = PyPDF2.PdfReader(f)
+                            text = "".join(page.extract_text() + "\n" for page in pdf_reader.pages)
+                        
+                        if not text or len(text.strip()) < 50 or not validate_document_server(text):
+                            try:
+                                os.remove(filepath)
+                            except:
+                                pass
+                            return jsonify({
+                                'error': 'Invalid document type',
+                                'message': 'Yüklediğiniz dosya montaj talimatları değil!'
+                            }), 400
+                    except Exception as e:
+                        logger.error(f"Aşama 3 hatası: {e}")
+                        try:
+                            os.remove(filepath)
+                        except:
+                            pass
+                        return jsonify({'error': 'Analysis failed'}), 500
+
+        elif file_ext in ['.docx', '.doc', '.txt']:
+            # DOCX/TXT için sadece tam doküman kontrolü
+            logger.info(f"DOCX/TXT dosyası için tam doküman kontrolü: {file_ext}")
+            text = ""
+            if file_ext in ['.docx', '.doc']:
+                text = analyzer.extract_text_from_docx(filepath)
+            elif file_ext == '.txt':
+                text = analyzer.extract_text_from_txt(filepath)
+            
+            if not text or len(text.strip()) == 0:
+                try:
+                    os.remove(filepath)
+                except:
+                    pass
+                return jsonify({
+                    'error': 'Text extraction failed',
+                    'message': 'Dosyadan yeterli metin çıkarılamadı'
+                }), 400
+            
+            if not validate_document_server(text):
+                try:
+                    os.remove(filepath)
+                except:
+                    pass
+                return jsonify({
+                    'error': 'Invalid document type',
+                    'message': 'Yüklediğiniz dosya montaj talimatları değil! Lütfen geçerli bir montaj talimatları dosyası yükleyiniz.',
+                    'details': {
+                        'filename': filename,
+                        'document_type': 'NOT_MONTAJ_TALIMATLARI',
+                        'required_type': 'MONTAJ_TALIMATLARI'
+                    }
+                }), 400
+
+        logger.info(f"Montaj analizi yapılıyor: {filename}")
         analysis_result = analyzer.analyze_manual(filepath)
         
         try:

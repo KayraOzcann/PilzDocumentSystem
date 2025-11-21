@@ -572,8 +572,117 @@ def analyze_hrc_report():
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
-        
+        logger.info(f"HRC Kuvvet-Basınç Raporu kontrol ediliyor: {filename}")
         analyzer = HRCReportAnalyzer()
+
+                # ÜÇ AŞAMALI HRC KONTROLÜ
+        logger.info(f"Üç aşamalı HRC kontrolü başlatılıyor: {filename}")
+        file_ext = os.path.splitext(filepath)[1].lower()
+
+        if file_ext == '.pdf':
+            # PDF için üç aşamalı kontrol (OCR dahil)
+            logger.info("Aşama 1: İlk sayfa HRC özgü kelime kontrolü...")
+            if check_strong_keywords_first_pages(filepath):
+                logger.info("✅ Aşama 1 geçti - HRC özgü kelimeler bulundu")
+            else:
+                logger.info("Aşama 2: İlk sayfa excluded kelime kontrolü...")
+                if check_excluded_keywords_first_pages(filepath):
+                    logger.info("❌ Aşama 2'de excluded kelimeler bulundu - HRC değil")
+                    try:
+                        os.remove(filepath)
+                    except:
+                        pass
+                    return jsonify({
+                        'error': 'Invalid document type',
+                        'message': 'Bu dosya HRC raporu değil (farklı rapor türü tespit edildi). Lütfen HRC kuvvet-basınç ölçüm raporu yükleyiniz.',
+                        'details': {
+                            'filename': filename,
+                            'document_type': 'OTHER_REPORT_TYPE',
+                            'required_type': 'HRC_KUVVET_BASINC_RAPORU'
+                        }
+                    }), 400
+                else:
+                    # AŞAMA 3: PyPDF2 ile tam doküman kontrolü
+                    logger.info("Aşama 3: Tam doküman critical terms kontrolü...")
+                    try:
+                        import PyPDF2
+                        with open(filepath, 'rb') as pdf_file:
+                            pdf_reader = PyPDF2.PdfReader(pdf_file)
+                            text = ""
+                            for page in pdf_reader.pages:
+                                text += page.extract_text() + "\n"
+                        
+                        if not text or len(text.strip()) == 0:
+                            try:
+                                os.remove(filepath)
+                            except:
+                                pass
+                            return jsonify({
+                                'error': 'Text extraction failed',
+                                'message': 'Dosyadan yeterli metin çıkarılamadı'
+                            }), 400
+                        
+                        if not validate_document_server(text):
+                            try:
+                                os.remove(filepath)
+                            except:
+                                pass
+                            return jsonify({
+                                'error': 'Invalid document type',
+                                'message': 'Yüklediğiniz dosya HRC kuvvet-basınç ölçüm raporu değil! Lütfen geçerli bir HRC raporu yükleyiniz.',
+                                'details': {
+                                    'filename': filename,
+                                    'document_type': 'NOT_HRC_REPORT',
+                                    'required_type': 'HRC_KUVVET_BASINC_RAPORU'
+                                }
+                            }), 400
+                            
+                    except Exception as e:
+                        logger.error(f"Aşama 3 hatası: {e}")
+                        try:
+                            os.remove(filepath)
+                        except:
+                            pass
+                        return jsonify({
+                            'error': 'Analysis failed',
+                            'message': 'Dosya analizi sırasında hata oluştu'
+                        }), 500
+
+        elif file_ext in ['.docx', '.doc', '.txt']:
+            # DOCX/TXT için sadece tam doküman kontrolü
+            logger.info(f"DOCX/TXT dosyası için tam doküman kontrolü: {file_ext}")
+            text = ""
+            if file_ext in ['.docx', '.doc']:
+                text = analyzer.extract_text_from_docx(filepath)
+            elif file_ext == '.txt':
+                text = analyzer.extract_text_from_txt(filepath)
+            
+            if not text or len(text.strip()) == 0:
+                try:
+                    os.remove(filepath)
+                except:
+                    pass
+                return jsonify({
+                    'error': 'Text extraction failed',
+                    'message': 'Dosyadan yeterli metin çıkarılamadı'
+                }), 400
+            
+            if not validate_document_server(text):
+                try:
+                    os.remove(filepath)
+                except:
+                    pass
+                return jsonify({
+                    'error': 'Invalid document type',
+                    'message': 'Yüklediğiniz dosya HRC kuvvet-basınç ölçüm raporu değil! Lütfen geçerli bir HRC raporu yükleyiniz.',
+                    'details': {
+                        'filename': filename,
+                        'document_type': 'NOT_HRC_REPORT',
+                        'required_type': 'HRC_KUVVET_BASINC_RAPORU'
+                    }
+                }), 400
+
+        logger.info(f"HRC raporu doğrulandı, analiz başlatılıyor: {filename}")
         analysis_result = analyzer.analyze_hrc_report(filepath)
         
         try:

@@ -64,13 +64,44 @@ class ATTypeInspectionAnalyzer:
         }
     
     def extract_text_from_pdf(self, pdf_path: str) -> str:
+        """Extract text from PDF using PyPDF2 and OCR fallback"""
+        text = ""
+        
         try:
+            # First try PyPDF2
             with open(pdf_path, 'rb') as file:
                 reader = PyPDF2.PdfReader(file)
-                text = "".join(page.extract_text() for page in reader.pages)
-            return text.strip()
-        except:
+                for page in reader.pages:
+                    text += page.extract_text() or ""
+            
+            logging.info(f"PyPDF2 extracted {len(text)} characters")
+            
+            # If PyPDF2 gives insufficient text, use OCR
+            if len(text.strip()) < 100:
+                logging.info("Insufficient text with PyPDF2, trying OCR...")
+                
+                import pdf2image
+                pages = pdf2image.convert_from_path(pdf_path, dpi=200)
+                ocr_text = ""
+                
+                for i, page in enumerate(pages, 1):
+                    try:
+                        page_text = pytesseract.image_to_string(page, lang='tur+eng')
+                        ocr_text += page_text + "\n"
+                        logging.info(f"OCR extracted {len(page_text)} characters from page {i}")
+                    except Exception as e:
+                        logging.warning(f"OCR failed for page {i}: {e}")
+                        continue
+                
+                if len(ocr_text.strip()) > len(text.strip()):
+                    text = ocr_text
+                    logging.info(f"OCR total text length: {len(text)}")
+            
+        except Exception as e:
+            logging.error(f"Error extracting text: {e}")
             return ""
+        
+        return text
     
     def detect_language(self, text: str) -> str:
         if not LANG_DETECT:
@@ -355,27 +386,111 @@ def analyze_at_declaration():
         analyzer = ATTypeInspectionAnalyzer()
         file_ext = os.path.splitext(filepath)[1].lower()
         
-        if file_ext == '.pdf':
-            if check_strong_keywords_first_pages(filepath):
-                pass
-            else:
-                if check_excluded_keywords_first_pages(filepath):
-                    try: os.remove(filepath)
-                    except: pass
-                    return jsonify({'error': 'Invalid document type'}), 400
-                else:
-                    try:
-                        with open(filepath, 'rb') as f:
-                            text = "".join(page.extract_text() for page in PyPDF2.PdfReader(f).pages)
-                        if not text or len(text.strip()) < 50 or not validate_document_server(text):
-                            try: os.remove(filepath)
-                            except: pass
-                            return jsonify({'error': 'Invalid document type'}), 400
-                    except:
-                        try: os.remove(filepath)
-                        except: pass
-                        return jsonify({'error': 'Analysis failed'}), 500
+        # ÜÇ AŞAMALI AT UYGUNLUK BEYANI KONTROLÜ
+        logger.info(f"Üç aşamalı AT Uygunluk Beyanı kontrolü başlatılıyor: {filename}")
 
+        if file_ext == '.pdf':
+            logger.info("Aşama 1: İlk sayfa AT Uygunluk Beyanı özgü kelime kontrolü...")
+            if check_strong_keywords_first_pages(filepath):
+                logger.info("✅ Aşama 1 geçti - AT Uygunluk Beyanı özgü kelimeler bulundu")
+            else:
+                logger.info("Aşama 2: İlk sayfa excluded kelime kontrolü...")
+                if check_excluded_keywords_first_pages(filepath):
+                    logger.info("❌ Aşama 2'de excluded kelimeler bulundu - AT Uygunluk Beyanı değil")
+                    try:
+                        os.remove(filepath)
+                    except:
+                        pass
+                    return jsonify({
+                        'error': 'Invalid document type',
+                        'message': 'Bu dosya AT Uygunluk Beyanı değil (farklı rapor türü tespit edildi). Lütfen AT Uygunluk Beyanı yükleyiniz.',
+                        'details': {
+                            'filename': filename,
+                            'document_type': 'OTHER_REPORT_TYPE',
+                            'required_type': 'AT_UYGUNLUK_BEYANI'
+                        }
+                    }), 400
+                else:
+                    # AŞAMA 3: PyPDF2 ile tam doküman kontrolü
+                    logger.info("Aşama 3: Tam doküman critical terms kontrolü...")
+                    try:
+                        with open(filepath, 'rb') as pdf_file:
+                            pdf_reader = PyPDF2.PdfReader(pdf_file)
+                            text = ""
+                            for page in pdf_reader.pages:
+                                text += page.extract_text() + "\n"
+                        
+                        if not text or len(text.strip()) < 50:
+                            try:
+                                os.remove(filepath)
+                            except:
+                                pass
+                            return jsonify({
+                                'error': 'Text extraction failed',
+                                'message': 'Dosyadan yeterli metin çıkarılamadı'
+                            }), 400
+                        
+                        if not validate_document_server(text):
+                            try:
+                                os.remove(filepath)
+                            except:
+                                pass
+                            return jsonify({
+                                'error': 'Invalid document type',
+                                'message': 'Yüklediğiniz dosya AT Uygunluk Beyanı değil! Lütfen geçerli bir AT Uygunluk Beyanı yükleyiniz.',
+                                'details': {
+                                    'filename': filename,
+                                    'document_type': 'NOT_AT_DECLARATION',
+                                    'required_type': 'AT_UYGUNLUK_BEYANI'
+                                }
+                            }), 400
+                            
+                    except Exception as e:
+                        logger.error(f"Aşama 3 hatası: {e}")
+                        try:
+                            os.remove(filepath)
+                        except:
+                            pass
+                        return jsonify({
+                            'error': 'Analysis failed',
+                            'message': 'Dosya analizi sırasında hata oluştu'
+                        }), 500
+                    
+        elif file_ext in ['.docx', '.doc', '.txt']:
+            # DOCX/TXT için sadece tam doküman kontrolü
+            logger.info(f"DOCX/TXT dosyası için tam doküman kontrolü: {file_ext}")
+            text = ""
+            if file_ext in ['.docx', '.doc']:
+                text = analyzer.extract_text_from_docx(filepath)
+            elif file_ext == '.txt':
+                text = analyzer.extract_text_from_txt(filepath)
+            
+            if not text or len(text.strip()) == 0:
+                try:
+                    os.remove(filepath)
+                except:
+                    pass
+                return jsonify({
+                    'error': 'Text extraction failed',
+                    'message': 'Dosyadan yeterli metin çıkarılamadı'
+                }), 400
+            
+            if not validate_document_server(text):
+                try:
+                    os.remove(filepath)
+                except:
+                    pass
+                return jsonify({
+                    'error': 'Invalid document type',
+                    'message': 'Yüklediğiniz dosya mekanik titreşim ölçüm raporu değil! Lütfen geçerli bir titreşim raporu yükleyiniz.',
+                    'details': {
+                        'filename': filename,
+                        'document_type': 'NOT_AT_DECLARATION_REPORT',
+                        'required_type': 'AT_DECLARATION_REPORT'
+                    }
+                }), 400
+
+        logger.info(f"AT Uygunluk Beyanı doğrulandı, analiz başlatılıyor: {filename}")
         report = analyzer.analyze_at_declaration(filepath)
         try: os.remove(filepath)
         except: pass
