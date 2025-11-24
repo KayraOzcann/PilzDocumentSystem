@@ -99,44 +99,6 @@ criteria_details_data = {
 # }
 # Eğer yoksa: {}
 pattern_definitions_data = {
-    "proje_no": [
-        r"(?:30292390|PROJE\s*NO|PROJECT\s*NO)"
-    ],
-    "sistem_tipi": [
-        r"(?i)(?:elektrik\s*şeması|electric\s*circuit|electrical\s*diagram)"
-    ],
-    "tarih": [
-        r"(\d{2}\.\d{2}\.\d{4})"
-    ],
-    "elektrik_paneli": [
-        r"(?i)(?:ELEKTRİK\s*PANELİ|ELECTRICAL\s*PANEL|CONTROL\s*PANEL)"
-    ],
-    "voltaj": [
-        r"(?i)(?:(\d+)\s*V|(\d+)\s*volt)"
-    ],
-    "akim": [
-        r"(?i)(?:(\d+)\s*A|(\d+)\s*amp)"
-    ],
-    "guc": [
-        r"(?i)(?:(\d+)\s*W|(\d+)\s*watt|(\d+)\s*kW)"
-    ],
-    "frekans": [
-        r"(?i)(?:(\d+)\s*Hz|(\d+)\s*hertz)"
-    ],
-    "klemens_blogu": [
-        r"(?i)(?:KLEMENS|TERMINAL|TB\d+|X\d+)"
-    ]
-}
-
-# ============================================
-# TODO: VALIDATION KEYWORDS - CRITICAL TERMS
-# ============================================
-# Format: {
-#     "Kategori İsmi": ["kelime1", "kelime2", ...]
-# }
-# Eğer yoksa: {}
-
-pattern_definitions_data = {
     "extract_values": {
         "proje_no": [r"(?:30292390|PROJE\s*NO|PROJECT\s*NO)"],
         "sistem_tipi": [r"(?i)(?:elektrik\s*şeması|electric\s*circuit|electrical\s*diagram)"],
@@ -148,7 +110,22 @@ pattern_definitions_data = {
         "frekans": [r"(?i)(?:(\d+)\s*Hz|(\d+)\s*hertz)"],
         "klemens_blogu": [r"(?i)(?:KLEMENS|TERMINAL|TB\d+|X\d+)"]
     }
-}   
+} 
+
+# ============================================
+# TODO: VALIDATION KEYWORDS - CRITICAL TERMS
+# ============================================
+# Format: {
+#     "Kategori İsmi": ["kelime1", "kelime2", ...]
+# }
+# Eğer yoksa: {}
+
+critical_terms = [  
+    ["elektrik", "electrical", "circuit", "devre", "şema", "diagram", "voltage", "current"],
+    ["kontaktör", "contactor", "röle", "relay", "sigorta", "fuse", "mcb", "rcd", "switch"],
+    ["volt", "v", "amper", "a", "watt", "w", "ohm", "ω", "hz", "hertz"],
+    ["stop", "start", "emergency", "acil", "güvenlik", "safety", "control", "kontrol"]  
+]
 
 # ============================================
 # TODO: VALIDATION KEYWORDS - STRONG KEYWORDS
@@ -167,7 +144,7 @@ strong_keywords = [
     "wrp-",
     "light curtain",
     "contactors",
-    "controller"
+    "controller",
 ]
 
 # ============================================
@@ -339,19 +316,37 @@ def migrate_service():
         
         # 5. Validation Keywords - Critical Terms
         if critical_terms:
-            print(f"\n🔑 Validation Keywords (Critical Terms) ekleniyor...")
-            for category, keywords in critical_terms.items():
-                vk = ValidationKeyword(
-                    document_type_id=doc_type.id,
-                    keyword_type='critical_terms',
-                    category=category,
-                    keywords=keywords
-                )
-                db.session.add(vk)
+            print("🔑 Validation Keywords (Critical Terms) ekleniyor...")
+            
+            # ✅ FORMAT KONTROLÜ: Dictionary mi List mi?
+            if isinstance(critical_terms, dict):
+                # Format 1: Dictionary (Kategorili - Titreşim gibi)
+                for category, keywords in critical_terms.items():
+                    validation = ValidationKeyword(
+                        document_type_id=doc_type.id,
+                        keyword_type='critical_terms',
+                        category=category,
+                        keywords=keywords
+                    )
+                    db.session.add(validation)
+                    print(f"   ✅ {category}: {len(keywords)} kelime")
+            
+            elif isinstance(critical_terms, list):
+                # Format 2: List of Lists (Kategorisiz - Elektrik gibi)
+                for idx, keyword_list in enumerate(critical_terms, 1):
+                    validation = ValidationKeyword(
+                        document_type_id=doc_type.id,
+                        keyword_type='critical_terms',
+                        category=f'category_{idx}',
+                        keywords=keyword_list
+                    )
+                    db.session.add(validation)
+                    print(f"   ✅ Kategori {idx}: {len(keyword_list)} kelime")
+            
             db.session.commit()
-            print(f"✅ {len(critical_terms)} critical term kategorisi eklendi")
+            print(f"✅ Critical terms eklendi\n")
         else:
-            print(f"\n⏭️  Critical Terms yok, atlanıyor...")
+            print("⏭️ Critical terms boş, atlanıyor\n")
         
         # 6. Validation Keywords - Strong Keywords
         if strong_keywords:
