@@ -21,6 +21,18 @@ from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
 # ============================================
+# DATABASE IMPORTS (YENİ)
+# ============================================
+from flask import current_app
+from database import db, init_db
+from db_loader import load_service_config
+
+# ============================================
+# CONFIG IMPORT (YENİ)
+# ============================================
+from config import Config
+
+# ============================================
 # LOGGING CONFIGURATION
 # ============================================
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -70,71 +82,40 @@ class VibrationAnalysisResult:
 class VibrationReportAnalyzer:
     """Mekanik Titreşim Ölçüm Raporu analiz sınıfı"""
     
-    def __init__(self):
+    def __init__(self, app=None):
         logger.info("Mekanik Titreşim Ölçüm Raporu analiz sistemi başlatılıyor...")
         
-        self.criteria_weights = {
-            "Rapor Kimlik Bilgileri": 10,
-            "Ölçüm Ortam, Makine ve Çalışan Bilgileri": 10,
-            "Ölçüm Cihazı ve Kalibrasyon Bilgileri": 10,
-            "Titreşim Türleri ve Yasal Değerler": 15,
-            "Ölçüm Metodolojisi ve Uygulanan Standartlar": 10,
-            "Ölçüm Sonuçları ve Analizler": 20,
-            "Değerlendirme, Yorum ve Önlemler": 20,
-            "Ekler ve Görseller": 5
-        }
-        
-        self.criteria_details = {
-            "Rapor Kimlik Bilgileri": {
-                "rapor_numarasi": {"pattern": r"(?:Rapor\s*No|Report\s*No|Rapor\s*Numaras[ıi]|Report\s*Number|Döküman\s*No|Document\s*No|Belge\s*No|Test\s*No)", "weight": 2},
-                "rapor_tarihi": {"pattern": r"(?:Rapor\s*Tarih|Report\s*Date|Düzenleme\s*Tarih|Hazırlanma\s*Tarih|Prepared\s*Date|Test\s*Tarih|\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4})", "weight": 2},
-                "olcum_tarihi_saati": {"pattern": r"(?:Ölçüm\s*Tarih|Measurement\s*Date|Test\s*Tarih|Test\s*Date|Ölçüm\s*Saat|Measurement\s*Time|Test\s*Time|\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4})", "weight": 2},
-                "hazırlayan_kurulus": {"pattern": r"(?:Hazırlayan\s*Kuruluş|Prepared\s*By|Ölçümü\s*Yapan|Measured\s*By|Test\s*Yapan|Tested\s*By|Firma|Company|Şirket|Corporation|Kurum|Institution|Akredite|Accredited)", "weight": 2},
-                "olcum_uzman": {"pattern": r"(?:Ölçüm\s*Yapan\s*Uzman|Measurement\s*Expert|Test\s*Uzman|Test\s*Expert|Uzman|Expert|Yetkili|Authorized|İmza|Signature|Onay|Approval|Sorumlu|Responsible)", "weight": 2}
-            },
-            "Ölçüm Ortam, Makine ve Çalışan Bilgileri": {
-                "firma_adi_adres": {"pattern": r"(?:Firma\s*Ad[ıi]|Company\s*Name|Şirket|Corporation|İşyeri|Workplace|Kuruluş|Organization|Adres|Address|Konum|Location)", "weight": 2},
-                "ortam_tanimi": {"pattern": r"(?:Ortam|Environment|Fabrika|Factory|Atölye|Workshop|Şantiye|Construction|Ofis|Office|Tesis|Facility|Alan|Area|Bölge|Zone)", "weight": 2},
-                "makine_ekipman": {"pattern": r"(?:Makine|Machine|Ekipman|Equipment|Alet|Tool|Cihaz|Device|Model|Seri\s*No|Serial\s*Number|Konum|Position|Yerleşim|Layout)", "weight": 2},
-                "calisan_bilgileri": {"pattern": r"(?:Çalışan|Employee|Worker|Personel|Staff|Sicil\s*No|Personnel\s*No|ID\s*No|Görev|Task|Job|Position|Unvan|Title)", "weight": 2},
-                "maruziyet_suresi": {"pattern": r"(?:Maruziyet\s*Süre|Exposure\s*Time|Çalışma\s*Süre|Working\s*Time|Saat|Hour|Dakika|Minute|Günlük|Daily|Haftalık|Weekly)", "weight": 2}
-            },
-            "Ölçüm Cihazı ve Kalibrasyon Bilgileri": {
-                "cihaz_marka_model": {"pattern": r"(?:Titreşim\s*Ölçer|Vibration\s*Meter|İvmeölçer|Accelerometer|Sensör|Sensor|Marka|Brand|Model|Tip|Type|Cihaz|Device|Instrument)", "weight": 4},
-                "seri_numarasi": {"pattern": r"(?:Seri\s*No|Serial\s*Number|S/N|SN|Seri|Serial|Numara|Number|ID)", "weight": 2},
-                "kalibrasyon_durumu": {"pattern": r"(?:Kalibrasyon|Calibration|Sertifika|Certificate|Akreditasyon|Accreditation|Geçerlilik|Validity|Son\s*Kalibrasyon|Last\s*Calibration|İzlenebilir|Traceable)", "weight": 4}
-            },
-            "Titreşim Türleri ve Yasal Değerler": {
-                "yasal_dayanak": {"pattern": r"(?:6331\s*sayılı|İş\s*Sağlığ[ıi]|Occupational\s*Health|Work\s*Safety|Yönetmelik|Regulation|Directive|Kanun|Law|Mevzuat|Legislation)", "weight": 3},
-                "titresim_turleri": {"pattern": r"(?:El[\\-\\s]*Kol\s*Titreşim|Hand[\\-\\s]*Arm\s*Vibration|HAV|Bütün\s*Vücut\s*Titreşim|Whole\s*Body\s*Vibration|WBV|Titreşim\s*Tür|Vibration\s*Type)", "weight": 4},
-                "maruziyet_degerler": {"pattern": r"(?:Maruziyet\s*Değer|Exposure\s*Value|Eylem\s*Değer|Action\s*Value|Sınır\s*Değer|Limit\s*Value|A\\(8\\)|m/s2|2[\\.,]5|5[\\.,]0|0[\\.,]5|1[\\.,]15)", "weight": 4},
-                "deger_tablolari": {"pattern": r"(?:Tablo|Table|Liste|List|Değer|Value|El[\\-\\s]*Kol|Hand[\\-\\s]*Arm|Bütün\s*Vücut|Whole\s*Body|2[\\.,]5|5[\\.,]0|0[\\.,]5|1[\\.,]15)", "weight": 4}
-            },
-            "Ölçüm Metodolojisi ve Uygulanan Standartlar": {
-                "uygulanan_standartlar": {"pattern": r"(?:TS\s*EN\s*ISO\s*5349|TS\s*ISO\s*2631|ISO\s*5349|ISO\s*2631|Standart|Standard|Norm|Specification)", "weight": 4},
-                "olcum_sekli": {"pattern": r"(?:Tri[\\-\\s]*aksiyel|Tri[\\-\\s]*axial|İvmeölçer|Accelerometer|Sensör|Sensor|Ölçüm\s*Şekl|Measurement\s*Method|Test\s*Method)", "weight": 3},
-                "a8_hesaplaması": {"pattern": r"(?:A\\(8\\)|Günlük\s*Maruziyet|Daily\s*Exposure|8\s*saat|8\s*hour|Referans|Reference|Normalleştir|Normalize|Hesaplama|Calculation)", "weight": 3}
-            },
-            "Ölçüm Sonuçları ve Analizler": {
-                "olcum_verileri": {"pattern": r"(?:İvme|Acceleration|Hız|Velocity|Yer\s*değiştirme|Displacement|m/s2|mm/s|µm|Tablo|Table|Veri|Data|Sonuç|Result)", "weight": 6},
-                "a8_degerleri": {"pattern": r"(?:A\\(8\\)|Günlük\s*Maruziyet\s*Değer|Daily\s*Exposure\s*Value|Hesaplanan|Calculated|m/s2)", "weight": 6},
-                "makine_sagligi": {"pattern": r"(?:Makine\s*Sağlığ[ıi]|Machine\s*Health|Arıza\s*Teşhis|Fault\s*Diagnosis|FFT|Spektral\s*Analiz|Spectral\s*Analysis|Fourier|Dalga\s*Form|Waveform)", "weight": 4},
-                "sonuc_tablolari": {"pattern": r"(?:Sonuç\s*Tablosu|Result\s*Table|Değerlendirme\s*Tablosu|Evaluation\s*Table|Yasal\s*Değerlendirme|Legal\s*Assessment|Uygun|Suitable|Eylem\s*Değeri\s*Aşıl|Action\s*Value\s*Exceeded)", "weight": 4}
-            },
-            "Değerlendirme, Yorum ve Önlemler": {
-                "yasal_uygunluk": {"pattern": r"(?:Yasal\s*Uygunluk|Legal\s*Compliance|Uygun|Suitable|Uygunsuz|Non[\\-\\s]*Suitable|Eylem\s*Değer|Action\s*Value|Sınır\s*Değer|Limit\s*Value|Aşıl|Exceed)", "weight": 5},
-                "uzman_yorumu": {"pattern": r"(?:Uzman\s*Yorumu|Expert\s*Opinion|Değerlendirme|Evaluation|Analiz|Analysis|Yorum|Comment|Görüş|Opinion|Çevresel\s*Koşul|Environmental\s*Condition)", "weight": 5},
-                "iyilestirici_onlemler": {"pattern": r"(?:İyileştirici\s*Önlem|Improvement\s*Measure|Mühendislik\s*Kontrol|Engineering\s*Control|İdari\s*Kontrol|Administrative\s*Control|KKD|PPE|Öneri|Recommendation|Tedbir|Measure)", "weight": 5},
-                "onlem_detaylari": {"pattern": r"(?:Titreşim\s*Sönümleyici|Vibration\s*Damper|Anti[\\-\\s]*titreşim|Anti[\\-\\s]*vibration|Eldiven|Glove|İzolasyon|Isolation|Rotasyon|Rotation|Eğitim|Training|Bakım|Maintenance)", "weight": 5}
-            },
-            "Ekler ve Görseller": {
-                "kroki_plan": {"pattern": r"(?:Kroki|Sketch|Plan|Layout|Yerleşim\s*Plan|Site\s*Plan|Ölçüm\s*Nokta|Measurement\s*Point|Konum|Location)", "weight": 1},
-                "fotograflar": {"pattern": r"(?:Fotoğraf|Photo|Görsel|Visual|Resim|Picture|Image|Şekil|Figure)", "weight": 1},
-                "kalibrasyon_sertifikalari": {"pattern": r"(?:Kalibrasyon\s*Sertifika|Calibration\s*Certificate|Sertifika\s*Kopya|Certificate\s*Copy)", "weight": 1},
-                "mevzuat_standart_listesi": {"pattern": r"(?:Mevzuat\s*Liste|Legislation\s*List|Standart\s*Liste|Standard\s*List|Referans|Reference|Atıf|Citation)", "weight": 1},
-                "hesaplama_detaylari": {"pattern": r"(?:A\\(8\\)\s*Hesaplama|A\\(8\\)\s*Calculation|Hesaplama\s*Detay|Calculation\s*Detail|Formül|Formula|Denklem|Equation)", "weight": 1}
-            }
-        }
+        # Flask app context varsa DB'den yükle, yoksa boş başlat
+        if app:
+            with app.app_context():
+                try:
+                    config = load_service_config('vibration_report')
+                    
+                    # DB'den yüklenen veriler
+                    self.criteria_weights = config.get('criteria_weights', {})
+                    self.criteria_details = config.get('criteria_details', {})
+                    self.pattern_definitions = config.get('pattern_definitions', {})
+                    self.validation_keywords = config.get('validation_keywords', {})
+                    self.category_actions = config.get('category_actions', {})
+                    
+                    logger.info(f"✅ Veritabanından yüklendi: {len(self.criteria_weights)} kategori")
+                    
+                except Exception as e:
+                    logger.error(f"⚠️ Veritabanından yükleme başarısız: {e}")
+                    logger.warning("⚠️ Fallback: Boş config kullanılıyor")
+                    self.criteria_weights = {}
+                    self.criteria_details = {}
+                    self.pattern_definitions = {}
+                    self.validation_keywords = {}
+                    self.category_actions = {}
+        else:
+            # Flask app yoksa boş başlat (eski davranış)
+            logger.warning("⚠️ Flask app context yok, boş config kullanılıyor")
+            self.criteria_weights = {}
+            self.criteria_details = {}
+            self.pattern_definitions = {}
+            self.validation_keywords = {}
+            self.category_actions = {}
     
     def detect_language(self, text: str) -> str:
         """Metin dilini tespit et"""
@@ -350,14 +331,18 @@ class VibrationReportAnalyzer:
             "a8_degeri": "Bulunamadı",
             "yasal_uygunluk": "Bulunamadı"
         }
-        
+
+        # DB'den pattern'leri al
+        report_no_patterns = self.pattern_definitions.get('report_no_patterns', {}).get('rapor_numarasi', [])
+        measurement_date_patterns = self.pattern_definitions.get('measurement_date_patterns', {}).get('olcum_tarihi', [])
+        report_date_patterns = self.pattern_definitions.get('report_date_patterns', {}).get('rapor_tarihi', [])
+        device_patterns = self.pattern_definitions.get('device_patterns', {}).get('olcum_cihazi', [])
+        company_patterns = self.pattern_definitions.get('company_patterns', {}).get('firma_adi', [])
+        vibration_type_patterns = self.pattern_definitions.get('vibration_type_patterns', {}).get('titresim_turu', [])
+        a8_patterns = self.pattern_definitions.get('a8_patterns', {}).get('a8_degeri', [])
+        compliance_patterns = self.pattern_definitions.get('compliance_patterns', {}).get('yasal_uygunluk', [])
+            
         # RAPOR NUMARASI
-        report_no_patterns = [
-            r"(?i)(?:RAPOR\s*NO|REPORT\s*NO|RAPOR\s*NUMARAS[II])\s*[|\s]*\s*([A-Z0-9\-\/]{3,20})",
-            r"(?i)(?:RAPOR\s*NO|REPORT\s*NO|RAPOR\s*NUMARAS[II]|REPORT\s*NUMBER|DÖKÜMAN\s*NO|DOCUMENT\s*NO)\s*[:=]?\s*([A-Z0-9\-\/]{3,20})",
-            r"(?i)(?:TEST\s*NO|BELGE\s*NO|REFERANS\s*NO|REF\s*NO)\s*[:=]?\s*([A-Z0-9\-\/]{3,20})"
-        ]
-        
         for pattern in report_no_patterns:
             match = re.search(pattern, text)
             if match:
@@ -365,31 +350,15 @@ class VibrationReportAnalyzer:
                 if 3 <= len(result) <= 20:
                     values["rapor_numarasi"] = result
                     break
-        
+    
         # ÖLÇÜM TARİHİ
-        measurement_date_patterns = [
-            r"(?i)(?:ÖLÇÜM\s*TARİH[İI]?\s*\/?\s*SAAT[İI]?)\s*[|\s]*\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})",
-            r"(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})\s*\/?\s*\d{1,2}:\d{1,2}[\-:]\d{1,2}:\d{1,2}",
-            r"(?i)(?:ÖLÇÜM\s*TARİH[İI]?|MEASUREMENT\s*DATE|TEST\s*TARİH[İI]?|TEST\s*DATE)\s*[:=]\s*(\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4})",
-            r"(?i)(?:ÖLÇÜM.*?(?:TARİH|DATE).*?)\s*[|\s]*\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})",
-            r"(?i)(?:ÖLÇÜM\s*YAPILDI[ĞG]I|MEASURED\s*ON)\s*[:=]?\s*(\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4})",
-            r"(?:TARİH[İI]?\s*\/?\s*SAAT[İI]?).*?(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})",
-            r"\b(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})\b"
-        ]
-        
         for pattern in measurement_date_patterns:
             match = re.search(pattern, text)
             if match:
                 values["olcum_tarihi"] = match.group(1)
                 break
         
-        # RAPOR TARİHİ
-        report_date_patterns = [
-            r"(?i)(?:RAPOR\s*TARİH[İI]?\s*\/?\s*SAAT[İI]?)\s*[|\s]*\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})",
-            r"(?i)(?:RAPOR\s*TARİH[İI]?|REPORT\s*DATE|HAZIRLANMA\s*TARİH[İI]?|PREPARED\s*ON|DÜZENLEME\s*TARİH[İI]?)\s*[:=]\s*(\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4})",
-            r"(?i)(?:BELGE|DÖKÜMAN|DOCUMENT).*?TARİH[İI]?.*?(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})"
-        ]
-        
+        # RAPOR TARİH
         for pattern in report_date_patterns:
             match = re.search(pattern, text)
             if match:
@@ -400,12 +369,6 @@ class VibrationReportAnalyzer:
             values["rapor_tarihi"] = "Rapor tarihi ayrı belirtilmemiş"
         
         # ÖLÇÜM CİHAZI
-        device_patterns = [
-            r"(?i)(?:TİTREŞİM\s*ÖLÇER|VIBRATION\s*METER)\s*[:=]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9\s\.\-]{2,50}(?=\s*(?:\d{4,}|Seri|No|$)))",
-            r"(?i)(?:İVMEÖLÇER|ACCELEROMETER)\s*[:=]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9\s\.\-]{2,50}(?=\s*(?:\d{4,}|Seri|No|$)))",
-            r"(?i)(?:MARKA|BRAND)\s*[:=]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9\s\.\-]{2,30})(?:.*?(?:MODEL|TİP|TYPE)\s*[:=]?\s*([A-ZÇĞİÖŞÜ0-9\-]{1,30}))?"
-        ]
-        
         for pattern in device_patterns:
             match = re.search(pattern, text)
             if match:
@@ -415,11 +378,6 @@ class VibrationReportAnalyzer:
                     break
         
         # FİRMA ADI
-        company_patterns = [
-            r"(?i)(?:FİRMA\s*ADI|COMPANY\s*NAME|ŞİRKET|İŞYERİ|WORKPLACE)\s*[:\-]?\s*([A-ZÇĞİÖŞÜ0-9][A-ZÇĞİÖŞÜ0-9\.\&\süçğıöş\-]{3,60})",
-            r"(?<!\w)([A-ZÇĞİÖŞÜ][A-Za-zÇĞİÖŞÜçğıöşü\s\.\&]{2,50}?(?:A\.Ş|LTD\.?\s*ŞTİ|SANAYİ|TİCARET|İÇECEK|GIDA|TEKSTİL|OTOMOTİV|İNŞAAT|MAKİNA|COMPANY|CORP|CORPORATION|INC|INCORPORATED)\.?)(?!\w)"
-        ]
-        
         for pattern in company_patterns:
             matches = re.findall(pattern, text)
             for result in matches:
@@ -430,12 +388,7 @@ class VibrationReportAnalyzer:
             if values["firma_adi"] != "Bulunamadı":
                 break
         
-        # TİTREŞİM TÜRÜ
-        vibration_type_patterns = [
-            r"(?i)(EL[\\-\\s]*KOL\s*TİTREŞİM|HAND[\\-\\s]*ARM\s*VIBRATION|HAV)",
-            r"(?i)(BÜTÜN\s*VÜCUT\s*TİTREŞİM|WHOLE\s*BODY\s*VIBRATION|WBV)"
-        ]
-        
+        # TİTREŞİM TÜRÜ    
         for pattern in vibration_type_patterns:
             match = re.search(pattern, text)
             if match:
@@ -447,12 +400,6 @@ class VibrationReportAnalyzer:
                 break
         
         # A(8) DEĞERİ
-        a8_patterns = [
-            r"(?i)A\(8\)\s*[:=]?\s*([0-9]+[.,][0-9]+)\s*m/s2",
-            r"(?i)GÜNLÜK\s*MARUZİYET\s*DEĞERİ\s*[:=]?\s*([0-9]+[.,][0-9]+)\s*m/s2",
-            r"(?i)DAILY\s*EXPOSURE\s*VALUE\s*[:=]?\s*([0-9]+[.,][0-9]+)\s*m/s2"
-        ]
-        
         for pattern in a8_patterns:
             match = re.search(pattern, text)
             if match:
@@ -460,12 +407,6 @@ class VibrationReportAnalyzer:
                 break
         
         # YASAL UYGUNLUK
-        compliance_patterns = [
-            r"(?i)\b(UYGUN|SUITABLE|CONFORM|GEÇERLİ|VALID|PASS)\b",
-            r"(?i)\b(UYGUNSUZ|NOT\s*SUITABLE|NON[\\-\\s]*CONFORM|GEÇERSİZ|INVALID|FAIL)\b",
-            r"(?i)(?:EYLEM\s*DEĞERİ\s*AŞIL|ACTION\s*VALUE\s*EXCEED|SINIR\s*DEĞERİ\s*AŞIL|LIMIT\s*VALUE\s*EXCEED)"
-        ]
-        
         for pattern in compliance_patterns:
             match = re.search(pattern, text)
             if match:
@@ -552,7 +493,7 @@ class VibrationReportAnalyzer:
             return False, f"RAPOR GEÇERSİZ: Tarih kontrolü yapılamadı - {e}"
 
     def generate_improvement_actions(self, analysis_results: Dict, scores: Dict) -> List[str]:
-        """Dinamik iyileştirme önerileri oluştur"""
+        """Dinamik iyileştirme önerileri oluştur - DB'den gelen actions ile"""
         actions = []
         
         sorted_categories = sorted(
@@ -560,59 +501,15 @@ class VibrationReportAnalyzer:
             key=lambda x: x[1]["percentage"]
         )
         
-        category_actions = {
-            "Rapor Kimlik Bilgileri": [
-                "Rapor numarasını benzersiz ve takip edilebilir şekilde belirtiniz",
-                "Rapor düzenleme tarihini açıkça yazınız",
-                "Ölçüm tarih ve saat aralığını detaylandırınız",
-                "Ölçümü yapan akredite kuruluş bilgilerini eksiksiz yazınız",
-                "Ölçüm uzmanının adı, unvanı ve imzasını alınız"
-            ],
-            "Ölçüm Ortam, Makine ve Çalışan Bilgileri": [
-                "Firma adı ve tam adresini belirtiniz",
-                "Çalışma ortamını detaylı tanımlayınız (fabrika, atölye, şantiye vb.)",
-                "Titreşim kaynağı makine/ekipman bilgilerini eksiksiz yazınız",
-                "Maruz kalan çalışan bilgilerini (ad, sicil no, görev) ekleyiniz",
-                "Günlük maruziyet süresini saat/dakika olarak belirtiniz"
-            ],
-            "Ölçüm Cihazı ve Kalibrasyon Bilgileri": [
-                "Titreşim ölçer/ivmeölçer marka ve modelini yazınız",
-                "Tüm cihazların seri numaralarını belirtiniz",
-                "Güncel kalibrasyon sertifikalarını rapora ekleyiniz",
-                "Cihazların ulusal standartlara göre izlenebilirliğini teyit ediniz"
-            ],
-            "Titreşim Türleri ve Yasal Değerler": [
-                "6331 sayılı İSG Kanunu ve ilgili yönetmeliğe atıf yapınız",
-                "El-Kol ve Bütün Vücut titreşim türlerini açıklayınız",
-                "Maruziyet eylem ve sınır değerlerini tablo halinde sunınuz",
-                "Yasal değerlerin anlamlarını (eylem/sınır değeri) açıklayınız"
-            ],
-            "Ölçüm Metodolojisi ve Uygulanan Standartlar": [
-                "TS EN ISO 5349 (El-Kol) ve TS ISO 2631 (Bütün Vücut) standartlarını belirtiniz",
-                "Tri-aksiyel ölçüm şeklini ve sensör yerleşimini açıklayınız",
-                "A(8) günlük maruziyet değeri hesaplama yöntemini detaylandırınız",
-                "8 saatlik referans çalışma süresi normalizasyonunu açıklayınız"
-            ],
-            "Ölçüm Sonuçları ve Analizler": [
-                "İvme, hız ve yer değiştirme değerlerini tablo halinde sunınız",
-                "Her çalışan/görev için A(8) değerlerini hesaplayınız",
-                "Gerekiyorsa FFT spektral analizleri ve dalga formlarını ekleyiniz",
-                "Sonuç tablosunda yasal değerlendirme sütunu bulundurunuz"
-            ],
-            "Değerlendirme, Yorum ve Önlemler": [
-                "Yasal uygunluk durumunu açıkça belirtiniz",
-                "Uzman yorumu ve çevresel faktör değerlendirmesi yapınız",
-                "Mühendislik, idari ve KKD önlemlerini öncelik sırasıyla listeyiniz",
-                "Titreşim sönümleyici, anti-titreşim eldiven gibi spesifik önerilerde bulununuz"
-            ],
-            "Ekler ve Görseller": [
-                "Ölçüm noktaları kroki/yerleşim planını hazırlayınız",
-                "Ölçüm sırasında çekilmiş fotoğrafları ekleyiniz",
-                "Kalibrasyon sertifikalarının kopyalarını sunınız",
-                "İlgili mevzuat ve standart listesini hazırlayınız",
-                "A(8) hesaplama detaylarını gerektiğinde ekleyiniz"
-            ]
-        }
+        # DB'den category_actions al (self.category_actions zaten __init__'te yüklendi)
+        category_actions = self.category_actions
+        
+        # Eğer DB'den veri gelmediyse, boş liste döndür
+        if not category_actions:
+            logger.warning("⚠️ Category actions bulunamadı, boş öneri listesi döndürülüyor")
+            if scores["percentage"] < 50:
+                return ["ÖNCELİK: Rapor yapısını ve içeriğini kapsamlı olarak yeniden düzenleyiniz"]
+            return []
         
         for category, score_data in sorted_categories[:5]:
             if score_data["percentage"] < 70:
@@ -622,7 +519,7 @@ class VibrationReportAnalyzer:
             actions.insert(0, "ÖNCELİK: Rapor yapısını ve içeriğini kapsamlı olarak yeniden düzenleyiniz")
         
         return actions
-    
+        
     def generate_recommendations(self, analysis_results: Dict, scores: Dict, date_valid: bool = True, date_message: str = "") -> List[str]:
         """Öneriler oluştur"""
         recommendations = []
@@ -756,22 +653,24 @@ def map_language_code(lang_code):
     return lang_mapping.get(lang_code, 'turkish')
 
 
-def validate_document_server(text):
-    """Server kodunda doküman validasyonu - Titreşim için"""
+def validate_document_server(text, validation_keywords):
+    """Server kodunda doküman validasyonu - DB'den gelen keywords ile"""
     
-    critical_terms = [
-        # Titreşim temel terimleri (en az 1 tane olmalı)
-        ["titreşim", "vibration", "oscillation", "salınım", "mechanical vibration", "mekanik titreşim"],
-        
-        # Ölçüm/Frekans terimleri (en az 1 tane olmalı)  
-        ["frekans", "frequency", "hz", "amplitude", "genlik", "rms", "acceleration", "ivme"],
-        
-        # Titreşim standartları (mutlaka olmalı)
-        ["iso 2631", "iso 5349", "ts en iso 5349", "ts iso 2631", "en iso 5349"],
-        
-        # Maruziyet/Sağlık terimleri (en az 1 tane olmalı)
-        ["maruziyet", "exposure", "a(8)", "günlük", "daily", "sağlık", "health", "risk"]
-    ]
+    # DB'den gelen critical_terms
+    critical_terms_data = validation_keywords.get('critical_terms', [])
+    
+    # Liste formatına dönüştür (eski format uyumluluğu)
+    critical_terms = []
+    for item in critical_terms_data:
+        if isinstance(item, dict) and 'keywords' in item:
+            critical_terms.append(item['keywords'])
+        elif isinstance(item, list):
+            critical_terms.append(item)
+    
+    # Eğer DB'den veri gelmediyse, boş validasyon (hata verme)
+    if not critical_terms:
+        logger.warning("⚠️ Critical terms bulunamadı, validasyon atlanıyor")
+        return True  # Varsayılan: geçerli kabul et
     
     category_found = []
     
@@ -780,33 +679,27 @@ def validate_document_server(text):
         for term in category:
             if re.search(rf"\b{term}\b", text, re.IGNORECASE):
                 found_in_category = True
-                logger.info(f"Titreşim Kategori {i+1} bulundu: '{term}'")
+                logger.info(f"Kategori {i+1} bulundu: '{term}'")
                 break
         category_found.append(found_in_category)
     
     valid_categories = sum(category_found)
     
-    logger.info(f"Doküman validasyonu: {valid_categories}/4 kritik kategori bulundu")
+    logger.info(f"Doküman validasyonu: {valid_categories}/{len(critical_terms)} kritik kategori bulundu")
     
-    return valid_categories >= 4
+    return valid_categories >= len(critical_terms) - 1  # En az (n-1) kategori bulunmalı
 
 
-def check_strong_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada özgü kelimeleri OCR ile ara - Titreşim için"""
-    strong_keywords = [
-        "titreşim",
-        "vibration",
-        "oscillation",
-        "frequency",
-        "frekans",
-        "hz",
-        "acceleration",
-        "iso 2631",
-        "iso 5349",
-        "a(8)",
-        "maruziyet",
-        "TİTREŞİM"
-    ]
+def check_strong_keywords_first_pages(filepath, validation_keywords):
+    """İlk 1-2 sayfada özgü kelimeleri OCR ile ara - DB'den gelen keywords ile"""
+    
+    # DB'den strong keywords al
+    strong_keywords = validation_keywords.get('strong_keywords', [])
+    
+    # Eğer DB'den veri gelmediyse, validasyon atla
+    if not strong_keywords:
+        logger.warning("⚠️ Strong keywords bulunamadı, validasyon atlanıyor")
+        return True  # Varsayılan: geçerli kabul et
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=200, first_page=1, last_page=2)
@@ -833,26 +726,16 @@ def check_strong_keywords_first_pages(filepath):
         return False
 
 
-def check_excluded_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara"""
-    excluded_keywords = [
-        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
-        "espe",
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
-        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
-        "loto",
-        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        "uygunluk", "beyan", "muayene", "conformity", "declaration",
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
-        "montaj", "assembly",
-        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
-        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
-        "aydınlatma", "lighting",  "illumination",  "lux",  "lümen",  "lumen",  "ts en 12464",  "en 12464", "ışık",  "ışık şiddeti",
-    ]
+def check_excluded_keywords_first_pages(filepath, validation_keywords):
+    """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara - DB'den"""
+    
+    # DB'den excluded keywords al
+    excluded_keywords = validation_keywords.get('excluded_keywords', [])
+    
+    # Eğer DB'den veri gelmediyse, validasyon atla
+    if not excluded_keywords:
+        logger.warning("⚠️ Excluded keywords bulunamadı, validasyon atlanıyor")
+        return False  # Varsayılan: excluded yok kabul et
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=200, first_page=1, last_page=2)
@@ -917,6 +800,11 @@ def get_main_issues_titresim(analysis_result):
 # ============================================
 app = Flask(__name__)
 
+# Database configuration (YENİ)
+app.config['SQLALCHEMY_DATABASE_URI'] = Config.SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = Config.SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['SQLALCHEMY_ECHO'] = Config.SQLALCHEMY_ECHO
+
 # Upload configuration
 UPLOAD_FOLDER = 'temp_uploads_titresim'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'doc', 'txt'}
@@ -967,7 +855,7 @@ def analyze_titresim_report():
             logger.info(f"Mekanik Titreşim Raporu kontrol ediliyor: {filename}")
 
             # Create analyzer instance
-            analyzer = VibrationReportAnalyzer()
+            analyzer = VibrationReportAnalyzer(app=app) 
             
             # ÜÇ AŞAMALI TİTREŞİM KONTROLÜ
             logger.info(f"Üç aşamalı titreşim kontrolü başlatılıyor: {filename}")
@@ -976,11 +864,11 @@ def analyze_titresim_report():
             if file_ext == '.pdf':
                 # PDF için üç aşamalı kontrol (OCR dahil)
                 logger.info("Aşama 1: İlk sayfa titreşim özgü kelime kontrolü...")
-                if check_strong_keywords_first_pages(filepath):
+                if check_strong_keywords_first_pages(filepath, analyzer.validation_keywords):
                     logger.info("✅ Aşama 1 geçti - Titreşim özgü kelimeler bulundu")
                 else:
                     logger.info("Aşama 2: İlk sayfa excluded kelime kontrolü...")
-                    if check_excluded_keywords_first_pages(filepath):
+                    if check_excluded_keywords_first_pages(filepath, analyzer.validation_keywords):
                         logger.info("❌ Aşama 2'de excluded kelimeler bulundu - Titreşim değil")
                         try:
                             os.remove(filepath)
@@ -1016,7 +904,7 @@ def analyze_titresim_report():
                                     'message': 'Dosyadan yeterli metin çıkarılamadı'
                                 }), 400
                             
-                            if not validate_document_server(text):
+                            if not validate_document_server(text, analyzer.validation_keywords):
                                 try:
                                     os.remove(filepath)
                                 except:
@@ -1285,6 +1173,12 @@ def index():
         },
         'example_curl': 'curl -X POST -F "file=@titresim_raporu.pdf" http://localhost:8000/api/titresim-report'
     })
+
+# ============================================
+# DATABASE INITIALIZATION
+# ============================================
+with app.app_context():
+    db.init_app(app)
 
 
 # ============================================

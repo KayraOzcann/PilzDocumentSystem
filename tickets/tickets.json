@@ -1,0 +1,186 @@
+[
+  {
+    "ticket_no": "ticket1",
+    "ticket_id": "titresim_20251124_151724",
+    "document_name": "Coca_Cola_Titresim_Olcum_Raporu.pdf",
+    "document_type": "MEKANIK_TITRESIM_OLCUM_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/Coca_Cola_Titresim_Olcum_Raporu.pdf",
+    "opening_date": "2025-11-24T15:17:24.972863",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 80.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 80.0
+      },
+      "category_scores": {
+        "Değerlendirme, Yorum ve Önlemler": {
+          "max_score": 20,
+          "percentage": 60.0,
+          "score": 12.0,
+          "status": "CONDITIONAL"
+        },
+        "Ekler ve Görseller": {
+          "max_score": 5,
+          "percentage": 60.0,
+          "score": 3.0,
+          "status": "CONDITIONAL"
+        },
+        "Rapor Kimlik Bilgileri": {
+          "max_score": 10,
+          "percentage": 60.0,
+          "score": 6.0,
+          "status": "CONDITIONAL"
+        },
+        "Titreşim Türleri ve Yasal Değerler": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Ölçüm Cihazı ve Kalibrasyon Bilgileri": {
+          "max_score": 10,
+          "percentage": 60.0,
+          "score": 6.0,
+          "status": "CONDITIONAL"
+        },
+        "Ölçüm Metodolojisi ve Uygulanan Standartlar": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Ölçüm Ortam, Makine ve Çalışan Bilgileri": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Ölçüm Sonuçları ve Analizler": {
+          "max_score": 20,
+          "percentage": 90.0,
+          "score": 18.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "a8_degeri": "Bulunamadı",
+        "firma_adi": "Bulunamadı",
+        "olcum_cihazi": "Bulunamadı",
+        "olcum_tarihi": "28.11.2023",
+        "rapor_numarasi": "Bulunamadı",
+        "rapor_tarihi": "Rapor tarihi ayrı belirtilmemiş",
+        "titresim_turu": "El-Kol Titreşimi",
+        "yasal_uygunluk": "UYGUN"
+      },
+      "recommendations": [
+        "❌ RAPOR GEÇERSİZ: Ölçüm tarihi 1 yıldan eski"
+      ],
+      "summary": {
+        "conclusion": "Mekanik titreşim ölçüm raporu TS EN ISO 5349 ve TS ISO 2631 standartlarına uygundur (%80)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket2",
+    "ticket_id": "titresim_20251124_163026",
+    "document_name": "Coca_Cola_Titresim_Olcum_Raporu.pdf",
+    "document_type": "MEKANIK_TITRESIM_OLCUM_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/Coca_Cola_Titresim_Olcum_Raporu.pdf",
+    "opening_date": "2025-11-24T16:30:26.093164",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 80.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 80.0
+      },
+      "category_scores": {
+        "Değerlendirme, Yorum ve Önlemler": {
+          "max_score": 20,
+          "percentage": 60.0,
+          "score": 12.0,
+          "status": "CONDITIONAL"
+        },
+        "Ekler ve Görseller": {
+          "max_score": 5,
+          "percentage": 60.0,
+          "score": 3.0,
+          "status": "CONDITIONAL"
+        },
+        "Rapor Kimlik Bilgileri": {
+          "max_score": 10,
+          "percentage": 60.0,
+          "score": 6.0,
+          "status": "CONDITIONAL"
+        },
+        "Titreşim Türleri ve Yasal Değerler": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Ölçüm Cihazı ve Kalibrasyon Bilgileri": {
+          "max_score": 10,
+          "percentage": 60.0,
+          "score": 6.0,
+          "status": "CONDITIONAL"
+        },
+        "Ölçüm Metodolojisi ve Uygulanan Standartlar": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Ölçüm Ortam, Makine ve Çalışan Bilgileri": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Ölçüm Sonuçları ve Analizler": {
+          "max_score": 20,
+          "percentage": 90.0,
+          "score": 18.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "a8_degeri": "Bulunamadı",
+        "firma_adi": "Bulunamadı",
+        "olcum_cihazi": "Bulunamadı",
+        "olcum_tarihi": "28.11.2023",
+        "rapor_numarasi": "Bulunamadı",
+        "rapor_tarihi": "Rapor tarihi ayrı belirtilmemiş",
+        "titresim_turu": "El-Kol Titreşimi",
+        "yasal_uygunluk": "UYGUN"
+      },
+      "recommendations": [
+        "❌ RAPOR GEÇERSİZ: Ölçüm tarihi 1 yıldan eski"
+      ],
+      "summary": {
+        "conclusion": "Mekanik titreşim ölçüm raporu TS EN ISO 5349 ve TS ISO 2631 standartlarına uygundur (%80)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  }
+]
