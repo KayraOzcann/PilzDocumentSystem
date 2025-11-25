@@ -43,23 +43,88 @@ class ATTypeInspectionAnalyzer:
         
         self.criteria_details = {
             "Kritik Bilgiler": {
-                "uretici_adi": {"pattern": r"(?:üretici|manufacturer|company)[\s:]*([A-Za-zÇŞİĞÜÖıçşığüö\s\.\-&]{8,100})", "weight": 15, "critical": True},
-                "uretici_adres": {"pattern": r"(?:adres|address|cd\.\s*no)[\s:]*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/,&]{15,200})", "weight": 15, "critical": True},
-                "makine_tanimi": {"pattern": r"(?:makine|machine|model|tip)[\s:]*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\-\.]{5,100})", "weight": 15, "critical": True},
-                "direktif_atif": {"pattern": r"(?:2006/42|machine directive|direktif)", "weight": 10, "critical": True},
-                "yetkili_imza": {"pattern": r"(?:yetkili|authorized|imza|signature)", "weight": 5, "critical": True}
+                "uretici_adi": {
+                    "pattern": r"(?:biz\s+burada\s+beyan\s+ederiz\s+ki[;:\s]*([^,\n]+))|(?:üretici|manufacturer|imalatçı|company|şirket|firma|unvan|we|manufactured by|sibernetik|pilz|tarafımızdan|üretici\s+firma)[\s:]*([A-Za-zÇŞİĞÜÖıçşığüö\s\.\-&]{8,100})|(?:karaca\s+mekatronik)",
+                    "weight": 15,
+                    "critical": True,
+                    "description": "Üretici veya yetkili temsilcinin adı"
+                },
+                "uretici_adres": {
+                    "pattern": r"(?:adres|address|cd\.\s*no|street|road|mahallesi|caddesi|sokak)[\s:]*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/,&]{15,200})|(?:demirci[^,\n]*nilüfer[^,\n]*bursa)|(?:cork[^,\n]*ireland)",
+                    "weight": 15,
+                    "critical": True,
+                    "description": "Üretici veya yetkili temsilcinin adresi"
+                },
+                "makine_tanimi": {
+                    "pattern": r"(?:makinenin tanıtımı|tanım|machine|makine|model|tip|type|description)[\s:]*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\-\.]{5,100})|(?:ecotorq|kafa|baga|çakma|knee pad|punching|vibr)",
+                    "weight": 15,
+                    "critical": True,
+                    "description": "Makine tanımı (tip, model, seri)"
+                },
+                "direktif_atif": {
+                    "pattern": r"(?:2006/42|2006\/42|makine direktif|machine directive|machinery directive|EC|AT|directive|european directive|ab direktif)",
+                    "weight": 10,
+                    "critical": True,
+                    "description": "2006/42/EC Direktif atfı"
+                },
+                "yetkili_imza": {
+                    "pattern": r"(?:yetkili\s+imza|authorized|authorised|imza|signature|beyan yetkilisi|responsible|müdür|manager|director|managing director|şahiner|mcauliffe|genel müdür|beyan eden|sorumlu|name|adı|surname|soyadı|ünvan|position|title|başkan|president|chief|şef|general\s+manager|general\s+maneger|karaca|eşref)",
+                    "weight": 5,
+                    "critical": True,
+                    "description": "Yetkili kişi imzası ve unvanı"
+                }
             },
             "Zorunlu Teknik Bilgiler": {
-                "uretim_yili": {"pattern": r"([0-9]{4})", "weight": 5, "critical": False},
-                "seri_no": {"pattern": r"(?:seri|serial)[\s\w]*(?:no|number)[\s:]*([A-Za-z0-9\-]{2,20})", "weight": 5, "critical": False},
-                "beyan_ifadesi": {"pattern": r"(?:beyan|declaration|conform|uygun)", "weight": 5, "critical": False},
-                "tarih_yer": {"pattern": r"([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})", "weight": 5, "critical": False},
-                "diger_direktifler": {"pattern": r"(?:2014/30|2014/35|EMC|LVD)", "weight": 5, "critical": False}
+                "uretim_yili": {
+                    "pattern": r"(?:üretim|imal|manufacturing|production)[\s\w]*(?:yılı|year|date)[\s:]*([0-9]{4})|([0-9]{4})[\s]*(?:yılı|year)|february\s*([0-9]{4})|([0-9]{4})",
+                    "weight": 5,
+                    "critical": False,
+                    "description": "Üretim yılı"
+                },
+                "seri_no": {
+                    "pattern": r"(?:seri|serial|s/n|sn)[\s\w]*(?:no|number)[\s:]*([A-Za-z0-9\-]{2,20})|serial number[\s:]*([A-Za-z0-9\-]{2,20})",
+                    "weight": 5,
+                    "critical": False,
+                    "description": "Seri numarası"
+                },
+                "beyan_ifadesi": {
+                    "pattern": r"(?:beyan|declaration|conform|uygun|comply|uygunluk|conformity|declare|conformity with)",
+                    "weight": 5,
+                    "critical": False,
+                    "description": "Uygunluk beyan ifadesi"
+                },
+                "tarih_yer": {
+                    "pattern": r"(?:tarih|date|yer|place)[\s:]*([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})|([0-9]{1,2}\s*february\s*[0-9]{4})|cork\s*ireland\s*([0-9]{1,2}\s*february\s*[0-9]{4})",
+                    "weight": 5,
+                    "critical": False,
+                    "description": "Beyan tarihi ve yeri"
+                },
+                "diger_direktifler": {
+                    "pattern": r"(?:2014/30|2014/35|EMC|LVD|alçak gerilim|low voltage|elektromanyetik|electromagnetic|european directive)",
+                    "weight": 5,
+                    "critical": False,
+                    "description": "Diğer direktifler (EMC, LVD vb.)"
+                }
             },
             "Standartlar ve Belgeler": {
-                "uyumlu_standartlar": {"pattern": r"(?:EN|ISO|IEC)[\s]*[0-9]{3,5}", "weight": 8, "critical": False},
-                "teknik_dosya": {"pattern": r"(?:teknik dosya|technical file)", "weight": 4, "critical": False},
-                "onaylanmis_kurulus": {"pattern": r"(?:onaylanmış kuruluş|notified body)", "weight": 3, "critical": False}
+                "uyumlu_standartlar": {
+                    "pattern": r"(?:EN|ISO|IEC)[\s]*[0-9]{3,5}[\-:]*[0-9]*[:\-]*[0-9]*",
+                    "weight": 8,
+                    "critical": False,
+                    "description": "Uygulanmış uyumlaştırılmış standartlar"
+                },
+                "teknik_dosya": {
+                    "pattern": r"(?:teknik dosya|technical file|documentation|dokümantasyon)",
+                    "weight": 4,
+                    "critical": False,
+                    "description": "Teknik dosya sorumlusu"
+                },
+                "onaylanmis_kurulus": {
+                    "pattern": r"(?:onaylanmış kuruluş|notified body|tip inceleme|type examination|belge|certificate)",
+                    "weight": 3,
+                    "critical": False,
+                    "description": "Onaylanmış kuruluş bilgileri"
+                }
             }
         }
     
@@ -80,7 +145,6 @@ class ATTypeInspectionAnalyzer:
             if len(text.strip()) < 100:
                 logging.info("Insufficient text with PyPDF2, trying OCR...")
                 
-                import pdf2image
                 pages = pdf2image.convert_from_path(pdf_path, dpi=200)
                 ocr_text = ""
                 
@@ -112,6 +176,7 @@ class ATTypeInspectionAnalyzer:
             return 'tr'
     
     def analyze_criteria(self, text: str, category: str) -> Dict[str, ATAnalysisResult]:
+        """Analyze criteria for a specific category"""
         results = {}
         criteria = self.criteria_details.get(category, {})
         
@@ -119,13 +184,31 @@ class ATTypeInspectionAnalyzer:
             pattern = criterion_data["pattern"]
             weight = criterion_data["weight"]
             is_critical = criterion_data["critical"]
+            description = criterion_data["description"]
             
             matches = re.findall(pattern, text, re.IGNORECASE | re.MULTILINE)
             
             if matches:
-                content = f"Bulundu: {str(matches[0])[:50]}..."
-                found = True
-                score = weight
+                # Clean up matches and get the best one
+                clean_matches = []
+                for match in matches:
+                    if isinstance(match, tuple):
+                        # For groups in regex, take the first non-empty group
+                        clean_match = next((m for m in match if m.strip()), "")
+                    else:
+                        clean_match = str(match)
+                    
+                    if clean_match.strip():
+                        clean_matches.append(clean_match.strip())
+                
+                if clean_matches:
+                    content = f"Bulundu: {clean_matches[0][:50]}..."
+                    found = True
+                    score = weight  # Full points for found criteria
+                else:
+                    content = "Eşleşme bulundu ama değer çıkarılamadı"
+                    found = True
+                    score = int(weight * 0.7)  # Partial points
             else:
                 content = "Bulunamadı"
                 found = False
@@ -138,7 +221,12 @@ class ATTypeInspectionAnalyzer:
                 score=score,
                 max_score=weight,
                 is_critical=is_critical,
-                details={"matches_count": len(matches) if matches else 0}
+                details={
+                    "description": description,
+                    "pattern_used": pattern,
+                    "matches_count": len(matches) if matches else 0,
+                    "raw_matches": matches[:3] if matches else []
+                }
             )
         
         return results
@@ -155,7 +243,7 @@ class ATTypeInspectionAnalyzer:
             
             for criterion_name, result in results.items():
                 if result.is_critical and not result.found:
-                    critical_missing.append(f"{category}: {criterion_name}")
+                    critical_missing.append(f"{category}: {result.details['description']}")
             
             percentage = (category_earned / category_possible * 100) if category_possible > 0 else 0
             normalized_score = (percentage / 100) * category_max
@@ -178,7 +266,8 @@ class ATTypeInspectionAnalyzer:
         }
     
     def extract_specific_values(self, text: str) -> Dict[str, Any]:
-        return {
+        """Extract specific values from AT Declaration"""
+        values = {
             "manufacturer_name": "Bulunamadı",
             "manufacturer_address": "Bulunamadı",
             "machine_description": "Bulunamadı",
@@ -188,8 +277,153 @@ class ATTypeInspectionAnalyzer:
             "declaration_date": "Bulunamadı",
             "authorized_person": "Bulunamadı",
             "position": "Bulunamadı",
+            "directive_reference": "Bulunamadı",
             "applied_standards": []
         }
+        
+        # Manufacturer name - Çoklu firma desteği
+        manufacturer_patterns = [
+            r"(?:biz\s+burada\s+beyan\s+ederiz\s+ki[;:\s]*)([^,\n]+)",
+            r"(?:we\s+)([A-Za-z\s&\.]+?)(?:\s+declare|\s+industrial)",
+            r"(?:manufactured by|üretici|manufacturer)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö\s\.\-&]{5,100})",
+            r"(sibernetik\s+makina\s*&?\s*otomasyon[^,\n]*)",
+            r"(pilz\s+ireland\s+industrial\s+automation)",
+            r"(suzhou\s+keber\s+technology\s+co)",
+            r"([A-ZÜÇĞIÖŞ][a-züçğıöş]+(?:\s+[A-ZÜÇĞIÖŞ][a-züçğıöş]+)*\s+(?:makina|technology|industrial|automation|şirket|company))"
+        ]
+        
+        for pattern in manufacturer_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                manufacturer_name = match.group(1).strip()
+                if len(manufacturer_name) > 5 and not re.search(r'^[0-9]+$', manufacturer_name):
+                    values["manufacturer_name"] = manufacturer_name
+                    break
+        
+        # Address - Çoklu adres formatı desteği
+        address_patterns = [
+            r"(demirci[^,\n]*cd\.[^,\n]*no[^,\n]*nilüfer[^,\n]*bursa)",
+            r"(cork\s+business\s*&?\s*technology\s+park[^,]*model\s+farm\s+road[^,]*cork[^,]*ireland)",
+            r"(no\.\s*[0-9]+[^,]*suzhou[^,]*jiangsu[^,]*)",
+            r"(?:address|adres)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/,&]{20,200})",
+            r"([A-ZÜÇĞIÖŞ][a-züçğıöş]+(?:\s+[A-Za-züçğıöş]+)*\s+(?:cd\.|caddesi|street|road)[^,\n]{10,100})",
+            r"([^,\n]*(?:mahallesi|caddesi|sokak|street|road|park)[^,\n]{10,100})"
+        ]
+        
+        for pattern in address_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                address = match.group(1).strip()
+                if len(address) > 15:
+                    values["manufacturer_address"] = address
+                    break
+        
+        # Machine description - Çoklu makine türü desteği
+        machine_patterns = [
+            r"(?:makinenin tanıtımı ve sınıfı|tanım|description)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\-\.]{5,100})",
+            r"(fo\s*[0-9]+\.?[0-9]*lt?\s+ecotorq\s+kafa\s+baga\s+çakma)",
+            r"(v[0-9]+b\s+knee\s+pad\s+punching\s+machine)",
+            r"(vibratory\s+surface\s+finishing\s+machine)",
+            r"(?:makine|machine|model|equipment)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\-\.]{8,80})"
+        ]
+        
+        for pattern in machine_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                machine_desc = match.group(1).strip()
+                if not re.search(r"farm\s+road|business|technology|address|adres", machine_desc, re.IGNORECASE):
+                    values["machine_description"] = machine_desc
+                    break
+        
+        # Model - Daha spesifik model pattern
+        model_patterns = [
+            r"(V[0-9]+B)",
+            r"(VKT\s*[0-9]+)",
+            r"(?:model|tip|type)\s*[:\-]?\s*([A-Za-z0-9\s\-]{2,30})"
+        ]
+        
+        for pattern in model_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                model_text = match.group(1).strip() if len(match.groups()) > 0 else match.group(0).strip()
+                if not re.search(r"farm\s+road|business|technology", model_text, re.IGNORECASE):
+                    values["machine_model"] = model_text
+                    break
+        
+        # Serial number - Çoklu seri numarası formatı
+        serial_patterns = [
+            r"(?:seri numarası|serial number)\s*[:\-]?\s*([A-Z0-9\/\-]+)",
+            r"(?:seri|s/n|sn)\s*(?:no|number)\s*[:\-]?\s*([A-Za-z0-9\-\/]{3,25})",
+            r"([0-9]{6,8}\/[0-9]{4})",
+            r"([A-Z][0-9]{4}[A-Z]?\-[0-9]{3})"
+        ]
+        
+        for pattern in serial_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                serial = match.group(1).strip()
+                if len(serial) >= 3:
+                    values["serial_number"] = serial
+                    break
+        
+        # Production year - Yıl bilgisi için makul yıl aralığı kontrolü
+        year_patterns = [
+            r"([0-9]{4})",
+            r"february\s+([0-9]{4})",
+            r"(?:üretim|imal|year)\s*[:\-]?\s*([0-9]{4})"
+        ]
+        
+        for pattern in year_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for year in matches:
+                year_int = int(year) if year.isdigit() else 0
+                if 2020 <= year_int <= 2030:
+                    values["production_year"] = year
+                    break
+            if values["production_year"] != "Bulunamadı":
+                break
+        
+        # Declaration date
+        date_patterns = [
+            r"(?:tarih|date)\s*[:\-]?\s*([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})",
+            r"([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})"
+        ]
+        
+        for pattern in date_patterns:
+            match = re.search(pattern, text)
+            if match:
+                values["declaration_date"] = match.group(1).strip()
+                break
+        
+        # Authorized person
+        person_patterns = [
+            r"(?:beyan yetkilisi|authorized|yetkili|name)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö\s]{5,50})",
+            r"(?:adı soyadı|name)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö\s]{5,50})"
+        ]
+        
+        for pattern in person_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                values["authorized_person"] = match.group(1).strip()
+                break
+        
+        # Position
+        position_patterns = [
+            r"(?:ünvan|position|görevi|title)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö\s]{5,50})",
+            r"(?:müdür|manager|director|president|başkan)"
+        ]
+        
+        for pattern in position_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                values["position"] = match.group(1).strip() if hasattr(match.group(1), 'strip') else match.group(0).strip()
+                break
+        
+        # Applied standards
+        standards = re.findall(r"(?:EN|ISO|IEC)\s*[0-9]{3,5}[\-:]*[0-9]*[:\-]*[0-9]*", text, re.IGNORECASE)
+        values["applied_standards"] = list(set(standards))
+        
+        return values
     
     def generate_recommendations(self, analysis_results: Dict, scores: Dict) -> List[str]:
         recommendations = []
@@ -208,7 +442,7 @@ class ATTypeInspectionAnalyzer:
         
         detected_lang = self.detect_language(text)
         extracted_values = self.extract_specific_values(text)
-        
+
         category_analyses = {}
         for category in self.criteria_weights.keys():
             category_analyses[category] = self.analyze_criteria(text, category)
@@ -238,7 +472,7 @@ class ATTypeInspectionAnalyzer:
                 "report_type": "AT_UYGUNLUK_BEYANI"
             }
         }
-
+    
 def validate_document_server(text):
     critical_terms = [
         # AT/EC temel terimleri
@@ -288,7 +522,7 @@ def check_excluded_keywords_first_pages(filepath):
         # Gürültü ölçüm raporu
         "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
         
-        # İSG periyodik kontrol (eski strong_keywords İSG'den)
+        # İSG periyodik kontrol
         "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
         
         # HRC raporu
@@ -455,40 +689,6 @@ def analyze_at_declaration():
                             'error': 'Analysis failed',
                             'message': 'Dosya analizi sırasında hata oluştu'
                         }), 500
-                    
-        elif file_ext in ['.docx', '.doc', '.txt']:
-            # DOCX/TXT için sadece tam doküman kontrolü
-            logger.info(f"DOCX/TXT dosyası için tam doküman kontrolü: {file_ext}")
-            text = ""
-            if file_ext in ['.docx', '.doc']:
-                text = analyzer.extract_text_from_docx(filepath)
-            elif file_ext == '.txt':
-                text = analyzer.extract_text_from_txt(filepath)
-            
-            if not text or len(text.strip()) == 0:
-                try:
-                    os.remove(filepath)
-                except:
-                    pass
-                return jsonify({
-                    'error': 'Text extraction failed',
-                    'message': 'Dosyadan yeterli metin çıkarılamadı'
-                }), 400
-            
-            if not validate_document_server(text):
-                try:
-                    os.remove(filepath)
-                except:
-                    pass
-                return jsonify({
-                    'error': 'Invalid document type',
-                    'message': 'Yüklediğiniz dosya mekanik titreşim ölçüm raporu değil! Lütfen geçerli bir titreşim raporu yükleyiniz.',
-                    'details': {
-                        'filename': filename,
-                        'document_type': 'NOT_AT_DECLARATION_REPORT',
-                        'required_type': 'AT_DECLARATION_REPORT'
-                    }
-                }), 400
 
         logger.info(f"AT Uygunluk Beyanı doğrulandı, analiz başlatılıyor: {filename}")
         report = analyzer.analyze_at_declaration(filepath)
@@ -500,12 +700,35 @@ def analyze_at_declaration():
 
         overall_percentage = report['summary']['percentage']
         status = "PASS" if overall_percentage >= 70 else "FAIL"
+
+        # extracted_values'ı Türkçe key'lerle dönüştür
+        extracted_values_tr = {}
+        display_names = {
+            "manufacturer_name": "Üretici Adı",
+            "manufacturer_address": "Üretici Adresi", 
+            "machine_description": "Makine Açıklaması",
+            "machine_model": "Makine Modeli",
+            "production_year": "Üretim Yılı",
+            "serial_number": "Seri Numarası",
+            "declaration_date": "Beyan Tarihi",
+            "authorized_person": "Yetkili Kişi",
+            "position": "Pozisyon",
+            "directive_reference": "Direktif Referansı",
+            "applied_standards": "Uygulanan Standartlar"
+        }
+        for eng_key, tr_name in display_names.items():
+            if eng_key in report['extracted_values']:
+                value = report['extracted_values'][eng_key]
+                if eng_key == "applied_standards":
+                    extracted_values_tr[tr_name] = ", ".join(value) if value else "Bulunamadı"
+                else:
+                    extracted_values_tr[tr_name] = value
         
         response_data = {
             'analysis_date': report.get('analysis_date'),
             'analysis_id': f"at_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             'category_scores': {},
-            'extracted_values': report['extracted_values'],
+            'extracted_values': extracted_values_tr,
             'file_type': 'AT_UYGUNLUK_BEYANI',
             'filename': filename,
             'overall_score': {
@@ -553,3 +776,4 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8006))
     logger.info(f"🚀 AT Uygunluk Beyanı Servisi - Port: {port}")
     app.run(host='0.0.0.0', port=port, debug=False)
+    

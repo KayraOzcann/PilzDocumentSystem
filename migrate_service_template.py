@@ -20,13 +20,12 @@ init_db(app)
 # ============================================
 
 # Servis bilgileri
-DOCUMENT_TYPE_CODE = 'electric_circuit'  # TODO: Değiştir (örn: 'electric_circuit', 'espe_report')
-DOCUMENT_TYPE_NAME = 'Elektrik Devre Şeması Analizi'  # TODO: Değiştir
-DOCUMENT_TYPE_DESCRIPTION = 'Elektrik devre şemalarının analizi'  # TODO: Değiştir
-SERVICE_FILE = 'elektrik_service.py'  # TODO: Değiştir
-ENDPOINT = '/api/elektrik-report'  # TODO: Değiştir
-ICON = '🔌'  # TODO: Değiştir
-
+DOCUMENT_TYPE_CODE = 'at_declaration'  # TODO: Değiştir (örn: 'electric_circuit', 'espe_report')
+DOCUMENT_TYPE_NAME = 'AT Tip Muayene Analizi'  # TODO: Değiştir
+DOCUMENT_TYPE_DESCRIPTION = 'AT Tip Muayene raporlarının analizi'  # TODO: Değiştir
+SERVICE_FILE = 'at_declaration_service.py'  # TODO: Değiştir
+ENDPOINT = '/api/at-declaration'  # TODO: Değiştir
+ICON = '🔍'  # TODO: Değiştir
 # ============================================
 # TODO: CRITERIA WEIGHTS (Kategoriler + Puanlar)
 # ============================================
@@ -35,11 +34,9 @@ ICON = '🔌'  # TODO: Değiştir
 # Eğer yoksa: {}
 
 criteria_weights_data = {
-            "Semboller ve İşaretler": 30,
-            "Bağlantı Hatları": 25,
-            "Etiketleme ve Numara Sistemleri": 20,
-            "Kontrol Panosu / Makine Otomasyon Öğeleri": 15,
-            "Şematik Yerleşim": 10
+            "Kritik Bilgiler": 60,
+            "Zorunlu Teknik Bilgiler": 25,
+            "Standartlar ve Belgeler": 15
 }
 
 # ============================================
@@ -53,39 +50,89 @@ criteria_weights_data = {
 # Eğer yoksa: {}
 
 criteria_details_data = {
-    "Semboller ve İşaretler": {
-                "direnc_sembol": {"pattern": r"(?i)(?:direnç|resistor|ohm|Ω|R\d+|[0-9]+[RKM][0-9]*|zigzag|potansiyometre|pot|trimmer|━+|─+)", "weight": 6},
-                "kondansator_sembol": {"pattern": r"(?i)(?:kondansatör|capacitor|C\d+|[0-9]+[µnpF]+|paralel\s*çizgi|elektrolitik|seramik|\|\||═+|◇.*?\|\||◇.*?═+|⬧.*?\|\||⬧.*?═+|⬥.*?\|\||⬥.*?═+|<>.*?\|\||<>.*?═+|[\u25C7\u25C8\u25C6].*?(?:\|\||═+))", "weight": 6},
-                "bobin_sembol": {"pattern": r"(?i)(?:bobin|inductor|L\d+|[0-9]+[mH]+|spiral|solenoid|trafo|transformatör|transformer|⤾|⟲|⥀)", "weight": 5},
-                "diyot_sembol": {"pattern": r"(?i)(?:diyot|diode|D\d+|LED|zener|köprü|bridge|rectifier|doğrultucu|▶|►|⊳)", "weight": 5},
-                "transistor_sembol": {"pattern": r"(?i)(?:transistör|transistor|Q\d+|NPN|PNP|FET|MOSFET|BJT|darlington|⊲|△)", "weight": 4},
-                "toprak_sembol": {"pattern": r"(?i)(?:toprak|ground|earth|GND|⏚|⊥|chassis|şasi|PE|↧|⌁)", "weight": 2},
-                "sigorta_sembol": {"pattern": r"(?i)(?:sigorta|fuse|F\d+|MCB|RCD|devre\s*kesici|circuit\s*breaker|termik|⚡|═+)", "weight": 2}
+            "Kritik Bilgiler": {
+                "uretici_adi": {
+                    "pattern": r"(?:biz\s+burada\s+beyan\s+ederiz\s+ki[;:\s]*([^,\n]+))|(?:üretici|manufacturer|imalatçı|company|şirket|firma|unvan|we|manufactured by|sibernetik|pilz|tarafımızdan|üretici\s+firma)[\s:]*([A-Za-zÇŞİĞÜÖıçşığüö\s\.\-&]{8,100})|(?:karaca\s+mekatronik)",
+                    "weight": 15,
+                    "critical": True,
+                    "description": "Üretici veya yetkili temsilcinin adı"
+                },
+                "uretici_adres": {
+                    "pattern": r"(?:adres|address|cd\.\s*no|street|road|mahallesi|caddesi|sokak)[\s:]*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/,&]{15,200})|(?:demirci[^,\n]*nilüfer[^,\n]*bursa)|(?:cork[^,\n]*ireland)",
+                    "weight": 15,
+                    "critical": True,
+                    "description": "Üretici veya yetkili temsilcinin adresi"
+                },
+                "makine_tanimi": {
+                    "pattern": r"(?:makinenin tanıtımı|tanım|machine|makine|model|tip|type|description)[\s:]*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\-\.]{5,100})|(?:ecotorq|kafa|baga|çakma|knee pad|punching|vibr)",
+                    "weight": 15,
+                    "critical": True,
+                    "description": "Makine tanımı (tip, model, seri)"
+                },
+                "direktif_atif": {
+                    "pattern": r"(?:2006/42|2006\/42|makine direktif|machine directive|machinery directive|EC|AT|directive|european directive|ab direktif)",
+                    "weight": 10,
+                    "critical": True,
+                    "description": "2006/42/EC Direktif atfı"
+                },
+                "yetkili_imza": {
+                    "pattern": r"(?:yetkili\s+imza|authorized|authorised|imza|signature|beyan yetkilisi|responsible|müdür|manager|director|managing director|şahiner|mcauliffe|genel müdür|beyan eden|sorumlu|name|adı|surname|soyadı|ünvan|position|title|başkan|president|chief|şef|general\s+manager|general\s+maneger|karaca|eşref)",
+                    "weight": 5,
+                    "critical": True,
+                    "description": "Yetkili kişi imzası ve unvanı"
+                }
             },
-            "Bağlantı Hatları": {
-                "iletken_baglanti": {"pattern": r"(?i)(?:kablo|wire|cable|hat|line|bağlantı|connection|conductor|iletken|NYA|NYM|H0[57]|━+|─+)", "weight": 8},
-                "kesisen_hatlar": {"pattern": r"(?i)(?:kesişen|crossing|köprü|bridge|junction|node|düğüm|bağlantı\s*noktası|●|⊏|⊐)", "weight": 6},
-                "baglanti_noktalari": {"pattern": r"(?i)(?:bağlantı\s*noktası|connection\s*point|terminal|node|klemens|terminal\s*block|X\d+|●|○|◯|⊙)", "weight": 6},
-                "elektriksel_yon": {"pattern": r"(?i)(?:yön|direction|ok|arrow|akış|flow|akım|current|→|←|↑|↓|⟶|⇾)", "weight": 5}
+            "Zorunlu Teknik Bilgiler": {
+                "uretim_yili": {
+                    "pattern": r"(?:üretim|imal|manufacturing|production)[\s\w]*(?:yılı|year|date)[\s:]*([0-9]{4})|([0-9]{4})[\s]*(?:yılı|year)|february\s*([0-9]{4})|([0-9]{4})",
+                    "weight": 5,
+                    "critical": False,
+                    "description": "Üretim yılı"
+                },
+                "seri_no": {
+                    "pattern": r"(?:seri|serial|s/n|sn)[\s\w]*(?:no|number)[\s:]*([A-Za-z0-9\-]{2,20})|serial number[\s:]*([A-Za-z0-9\-]{2,20})",
+                    "weight": 5,
+                    "critical": False,
+                    "description": "Seri numarası"
+                },
+                "beyan_ifadesi": {
+                    "pattern": r"(?:beyan|declaration|conform|uygun|comply|uygunluk|conformity|declare|conformity with)",
+                    "weight": 5,
+                    "critical": False,
+                    "description": "Uygunluk beyan ifadesi"
+                },
+                "tarih_yer": {
+                    "pattern": r"(?:tarih|date|yer|place)[\s:]*([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})|([0-9]{1,2}\s*february\s*[0-9]{4})|cork\s*ireland\s*([0-9]{1,2}\s*february\s*[0-9]{4})",
+                    "weight": 5,
+                    "critical": False,
+                    "description": "Beyan tarihi ve yeri"
+                },
+                "diger_direktifler": {
+                    "pattern": r"(?:2014/30|2014/35|EMC|LVD|alçak gerilim|low voltage|elektromanyetik|electromagnetic|european directive)",
+                    "weight": 5,
+                    "critical": False,
+                    "description": "Diğer direktifler (EMC, LVD vb.)"
+                }
             },
-            "Etiketleme ve Numara Sistemleri": {
-                "bilesenlerin_etiketlenmesi": {"pattern": r"(?i)(?:[RCL]\d+|[QDT]\d+|[MKF]\d+|[UIC]\d+|[+-]V(?:cc|dd|ss)|[+-]?\d+V|S[0-9]|K[0-9])", "weight": 6},
-                "elektriksel_degerler": {"pattern": r"(?i)(?:\d+(?:\.\d+)?.*?(?:[VvAaMmWwΩ]|volt|amp|watt|ohm|VA|kVA|mA|µA)|[~=]|\~|\∿)", "weight": 5},
-                "klemens_numaralari": {"pattern": r"(?i)(?:klemens|terminal|X\d+|TB\d+|[0-9]+\.[0-9]+|L[123N]|PE|[UVWN]\d*)", "weight": 5},
-                "kablo_etiketleri": {"pattern": r"(?i)(?:kablo|wire|H\d+|W\d+|[0-9]+[AWG]|NYA|NYM|H0[57]|[0-9xX]+mm²)", "weight": 4}
-            },
-            "Kontrol Panosu / Makine Otomasyon Öğeleri": {
-                "plc_giris_cikis": {"pattern": r"(?i)(?:PLC|I[0-9]+|Q[0-9]+|DI|DO|AI|AO|input|output|giriş|çıkış|[0-9]+[VI][0-9]+)", "weight": 4},
-                "kontaktor_rele": {"pattern": r"(?i)(?:kontaktör|contactor|röle|relay|K\d+|KM\d+|NO|NC|coil|bobin|⤾|⟲)", "weight": 4},
-                "motor_starter": {"pattern": r"(?i)(?:motor|starter|M\d+|drive|sürücü|inverter|softstarter|DOL|VFD|⊏⊐|▭M)", "weight": 3},
-                "buton_sensor": {"pattern": r"(?i)(?:buton|button|sensör|sensor|S\d+|B\d+|switch|anahtar|proximity|PNP|NPN|○|◯|⊙)", "weight": 2},
-                "ac_dc_guc": {"pattern": r"(?i)(?:AC|DC|güç|power|[0-9]+[VvAa]|~|⎓|[1-3]~|\+|-|N|PE|L[123]|\∿|=)", "weight": 2}
-            },
-            "Şematik Yerleşim": {
-                "bilgi_akisi": {"pattern": r"(?i)(?:giriş|input|çıkış|output|soldan|sağa|yukarı|aşağı|→|←|↑|↓|⟶|⇾)", "weight": 3},
-                "mantikli_dizilim": {"pattern": r"(?i)(?:işleme|process|dönüşüm|transformation|kontrol|control|güç|power|▭|⊏⊐)", "weight": 3},
-                "sayfa_basligi": {"pattern": r"(?i)(?:proje|project|tarih|date|çizim|drawing|revizyon|revision|ref|no)", "weight": 2},
-                "cerceve_frame": {"pattern": r"(?i)(?:çerçeve|frame|başlık|title|numara|number|sayfa|page|sheet|▭|□)", "weight": 2}
+            "Standartlar ve Belgeler": {
+                "uyumlu_standartlar": {
+                    "pattern": r"(?:EN|ISO|IEC)[\s]*[0-9]{3,5}[\-:]*[0-9]*[:\-]*[0-9]*",
+                    "weight": 8,
+                    "critical": False,
+                    "description": "Uygulanmış uyumlaştırılmış standartlar"
+                },
+                "teknik_dosya": {
+                    "pattern": r"(?:teknik dosya|technical file|documentation|dokümantasyon)",
+                    "weight": 4,
+                    "critical": False,
+                    "description": "Teknik dosya sorumlusu"
+                },
+                "onaylanmis_kurulus": {
+                    "pattern": r"(?:onaylanmış kuruluş|notified body|tip inceleme|type examination|belge|certificate)",
+                    "weight": 3,
+                    "critical": False,
+                    "description": "Onaylanmış kuruluş bilgileri"
+                }
             }
 }
 
@@ -99,17 +146,43 @@ criteria_details_data = {
 # }
 # Eğer yoksa: {}
 pattern_definitions_data = {
-    "extract_values": {
-        "proje_no": [r"(?:30292390|PROJE\s*NO|PROJECT\s*NO)"],
-        "sistem_tipi": [r"(?i)(?:elektrik\s*şeması|electric\s*circuit|electrical\s*diagram)"],
-        "tarih": [r"(\d{2}\.\d{2}\.\d{4})"],
-        "elektrik_paneli": [r"(?i)(?:ELEKTRİK\s*PANELİ|ELECTRICAL\s*PANEL|CONTROL\s*PANEL)"],
-        "voltaj": [r"(?i)(?:(\d+)\s*V|(\d+)\s*volt)"],
-        "akim": [r"(?i)(?:(\d+)\s*A|(\d+)\s*amp)"],
-        "guc": [r"(?i)(?:(\d+)\s*W|(\d+)\s*watt|(\d+)\s*kW)"],
-        "frekans": [r"(?i)(?:(\d+)\s*Hz|(\d+)\s*hertz)"],
-        "klemens_blogu": [r"(?i)(?:KLEMENS|TERMINAL|TB\d+|X\d+)"]
-    }
+        "extract_values": {
+            "manufacturer_name":[
+            r"(?:biz\s+burada\s+beyan\s+ederiz\s+ki[;:\s]*)([^,\n]+)",
+            r"(?:we\s+)([A-Za-z\s&\.]+?)(?:\s+declare|\s+industrial)",
+            r"(?:manufactured by|üretici|manufacturer)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö\s\.\-&]{5,100})",
+            r"(sibernetik\s+makina\s*&?\s*otomasyon[^,\n]*)",
+            r"(pilz\s+ireland\s+industrial\s+automation)",
+            r"(suzhou\s+keber\s+technology\s+co)",
+            r"([A-ZÜÇĞIÖŞ][a-züçğıöş]+(?:\s+[A-ZÜÇĞIÖŞ][a-züçğıöş]+)*\s+(?:makina|technology|industrial|automation|şirket|company))"],
+
+            "manufacturer_address":[r"(demirci[^,\n]*cd\.[^,\n]*no[^,\n]*nilüfer[^,\n]*bursa)",
+            r"(cork\s+business\s*&?\s*technology\s+park[^,]*model\s+farm\s+road[^,]*cork[^,]*ireland)",
+            r"(no\.\s*[0-9]+[^,]*suzhou[^,]*jiangsu[^,]*)",
+            r"(?:address|adres)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/,&]{20,200})",
+            r"([A-ZÜÇĞIÖŞ][a-züçğıöş]+(?:\s+[A-Za-züçğıöş]+)*\s+(?:cd\.|caddesi|street|road)[^,\n]{10,100})",
+            r"([^,\n]*(?:mahallesi|caddesi|sokak|street|road|park)[^,\n]{10,100})"],
+                
+            "machine_description": [r"(?:makinenin tanıtımı ve sınıfı|tanım|description)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\-\.]{5,100})",
+            r"(fo\s*[0-9]+\.?[0-9]*lt?\s+ecotorq\s+kafa\s+baga\s+çakma)",
+            r"(v[0-9]+b\s+knee\s+pad\s+punching\s+machine)",
+            r"(vibratory\s+surface\s+finishing\s+machine)",
+            r"(?:makine|machine|model|equipment)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\-\.]{8,80})"],
+
+            "production_year":[r"([0-9]{4})",
+            r"february\s+([0-9]{4})",
+            r"(?:üretim|imal|year)\s*[:\-]?\s*([0-9]{4})"],
+
+            "declaration_date":[r"(?:tarih|date)\s*[:\-]?\s*([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})",
+            r"([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})"],
+
+            "authorized_person":[r"(?:beyan yetkilisi|authorized|yetkili|name)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö\s]{5,50})",
+            r"(?:adı soyadı|name)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö\s]{5,50})"],
+
+            "position":[r"(?:ünvan|position|görevi|title)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö\s]{5,50})",
+            r"(?:müdür|manager|director|president|başkan)"]
+
+        }
 } 
 
 # ============================================
@@ -121,10 +194,20 @@ pattern_definitions_data = {
 # Eğer yoksa: {}
 
 critical_terms = [  
-    ["elektrik", "electrical", "circuit", "devre", "şema", "diagram", "voltage", "current"],
-    ["kontaktör", "contactor", "röle", "relay", "sigorta", "fuse", "mcb", "rcd", "switch"],
-    ["volt", "v", "amper", "a", "watt", "w", "ohm", "ω", "hz", "hertz"],
-    ["stop", "start", "emergency", "acil", "güvenlik", "safety", "control", "kontrol"]  
+        # AT/EC temel terimleri
+        ["AT TİP", "at tip", "ec type", "uygunluk", "beyan", "muayene", "conformity", "declaration"],
+        
+        # Sertifika ve belgelendirme terimleri
+        ["SERTİFİKA", "sertifika", "certificate", "belge", "document", "onay", "approval"],
+        
+        # Makine direktifi ve standart terimleri
+        ["2006/42/EC", "direktif", "directive", "makine", "machine", "standart", "standard"],
+        
+        # Üretici ve yetkili terimleri
+        ["üretici", "manufacturer", "yetkili", "authorized", "imza", "signature", "sorumlu", "responsible"],
+        
+        # Muayene ve kontrol terimleri
+        ["muayene", "inspection", "kontrol", "control", "test", "değerlendirme", "assessment", "onaylanmış kuruluş"]
 ]
 
 # ============================================
@@ -134,17 +217,7 @@ critical_terms = [
 # Eğer yoksa: []
 
 strong_keywords = [
-    "elektrik",
-    "circuit",
-    "electrical",
-    "voltage",
-    "amper",
-    "ohm",
-    "enclosure",
-    "wrp-",
-    "light curtain",
-    "contactors",
-    "controller",
+       "uygunluk", "beyan", "declaration","muayene","declare"
 ]
 
 # ============================================
@@ -154,23 +227,29 @@ strong_keywords = [
 # Eğer yoksa: []
 
 excluded_keywords = [
-    # Topraklama raporu (eski strong_keywords)
-        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
-        
         # Aydınlatma raporu
         "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
+        
+        # Hidrolik devre şeması
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
+        
+        # Pnömatik devre şeması
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
+
+        # Gürültü ölçüm raporu
+        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
+        
+        # İSG periyodik kontrol
+        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
         
         # HRC raporu
         "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
         
+        # Elektrik devre şeması
+        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
+        
         # Espe raporu  
         "espe",
-        
-        # Hidrolik devre şeması
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
-        
-        # Gürültü ölçüm raporu
-        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
         
         # Manuel/kullanma kılavuzu
         "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
@@ -181,17 +260,11 @@ excluded_keywords = [
         # LVD raporu
         "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
         
-        # AT tip muayene (AT uygunluk beyanı)
-        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
-        
-        # İSG periyodik kontrol
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        
-        # Pnömatik devre şeması
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
-        
         # Montaj talimatları
         "montaj", "assembly",
+        
+        # EN 60204-1 topraklama raporu
+        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
         
         # Bakım talimatları
         "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",

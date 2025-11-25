@@ -17,7 +17,7 @@ init_db(app)
 # ============================================
 # TODO: AYNI SERVİS KODUNU BURAYA DA YAZIN
 # ============================================
-SERVICE_CODE = 'electric_circuit'  # TODO: migrate_service_template.py ile aynı olmalı!
+SERVICE_CODE = 'at_declaration'  # TODO: migrate_service_template.py ile aynı olmalı!
 
 print("\n" + "=" * 80)
 print(f"{SERVICE_CODE.upper()} - MİGRATION KONTROL")
@@ -93,15 +93,37 @@ with app.app_context():
     # ============================================
     print(f"\n🔍 3. Pattern Definitions (extract_specific_values)")
     patterns = PatternDefinition.query.filter_by(document_type_id=doc_type.id).all()
-    
+
     if len(patterns) == 0:
         print(f"   ⚠️  Pattern yok (Bazı servislerde olmayabilir)")
         warnings.append("Pattern Definitions yok")
     else:
-        print(f"   ✅ {len(patterns)} pattern grubu yüklendi")
+        # Pattern gruplarına göre grupla
+        pattern_groups = {}
         for pattern in patterns:
-            print(f"      • {pattern.pattern_group} → {pattern.field_name}: {len(pattern.patterns)} pattern")
-    
+            if pattern.pattern_group not in pattern_groups:
+                pattern_groups[pattern.pattern_group] = []
+            pattern_groups[pattern.pattern_group].append(pattern)
+        
+        total_patterns = sum(len(p.patterns) for p in patterns)
+        print(f"   ✅ {len(pattern_groups)} pattern grubu, {len(patterns)} field, {total_patterns} pattern yüklendi")
+        
+        # Her grubu göster
+        for group_name, group_patterns in pattern_groups.items():
+            group_pattern_count = sum(len(p.patterns) for p in group_patterns)
+            print(f"      📁 {group_name}: {len(group_patterns)} field, {group_pattern_count} pattern")
+            
+            # Her field'ı göster
+            for pattern in group_patterns:
+                print(f"         └─ {pattern.field_name}: {len(pattern.patterns)} pattern")
+                # İlk pattern'in önizlemesi (çok uzunsa kısalt)
+                if pattern.patterns:
+                    first_pattern = pattern.patterns[0]
+                    if len(first_pattern) > 60:
+                        print(f"            └─ {first_pattern[:60]}...")
+                    else:
+                        print(f"            └─ {first_pattern}")
+        
     # ============================================
     # 4. CRITICAL TERMS KONTROL
     # ============================================

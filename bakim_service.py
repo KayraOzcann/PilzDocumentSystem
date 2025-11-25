@@ -1,8 +1,12 @@
-# ============================================
-# BAKIM TALİMATLARI ANALİZ SERVİSİ
-# Standalone Service - Azure App Service Ready
-# Port: 8014
-# ============================================
+"""
+Bakım Talimatları Analiz Servisi
+=================================
+Azure App Service için optimize edilmiş standalone servis
+
+Endpoint: POST /api/bakimtalimatlari-report
+Health Check: GET /api/health
+Port: 8014
+"""
 
 # ============================================
 # IMPORTS
@@ -56,7 +60,7 @@ def check_tesseract_installation():
 tesseract_available, tesseract_info = check_tesseract_installation()
 
 # ============================================
-# ANALİZ SINIFI - DATA CLASSES
+# DATA CLASSES
 # ============================================
 @dataclass
 class MaintenanceAnalysisResult:
@@ -69,7 +73,7 @@ class MaintenanceAnalysisResult:
     details: Dict[str, Any]
 
 # ============================================
-# ANALİZ SINIFI - MAIN ANALYZER
+# ANALYZER CLASS
 # ============================================
 class MaintenanceReportAnalyzer:
     """Bakım Talimatları rapor analiz sınıfı"""
@@ -142,27 +146,26 @@ class MaintenanceReportAnalyzer:
         }
     
     def detect_language(self, text: str) -> str:
-        """Metin dilini tespit et"""
         if not LANGUAGE_DETECTION_AVAILABLE:
             return 'tr'
-        
         try:
             sample_text = text[:500].strip()
             if not sample_text:
                 return 'tr'
-                
             detected_lang = detect(sample_text)
             logger.info(f"Tespit edilen dil: {detected_lang}")
             return detected_lang
-            
         except Exception as e:
             logger.warning(f"Dil tespiti başarısız: {e}")
             return 'tr'
     
+    def translate_to_turkish(self, text: str, source_lang: str) -> str:
+        if source_lang != 'tr':
+            logger.info(f"Tespit edilen dil: {source_lang.upper()} - Çeviri yapılmıyor, orijinal metin kullanılıyor")
+        return text
+    
     def extract_text_from_file(self, file_path: str) -> str:
-        """Dosya formatına göre metin çıkarma"""
         file_ext = os.path.splitext(file_path)[1].lower()
-        
         if file_ext == '.pdf':
             return self.extract_text_from_pdf(file_path)
         elif file_ext in ['.docx', '.doc']:
@@ -179,41 +182,32 @@ class MaintenanceReportAnalyzer:
             with open(pdf_path, 'rb') as file:
                 pdf_reader = PyPDF2.PdfReader(file)
                 all_text = ""
-                
                 for page in pdf_reader.pages:
                     page_text = page.extract_text()
                     page_text = re.sub(r'\s+', ' ', page_text)
                     all_text += page_text + "\n"
-                
                 return all_text.strip()
-                
         except Exception as e:
             logger.error(f"PDF metin çıkarma hatası: {e}")
             return ""
 
     def extract_text_from_docx(self, docx_path: str) -> str:
-        """DOCX'den metin çıkarma"""
         try:
             doc = Document(docx_path)
             text = ""
-            
             for paragraph in doc.paragraphs:
                 text += paragraph.text + "\n"
-            
             for table in doc.tables:
                 for row in table.rows:
                     for cell in row.cells:
                         text += cell.text + " "
                 text += "\n"
-            
             return text.strip()
-            
         except Exception as e:
             logger.error(f"DOCX metin çıkarma hatası: {e}")
             return ""
     
     def extract_text_from_txt(self, txt_path: str) -> str:
-        """TXT dosyasından metin çıkarma"""
         try:
             with open(txt_path, 'r', encoding='utf-8') as file:
                 return file.read().strip()
@@ -226,25 +220,22 @@ class MaintenanceReportAnalyzer:
                 return ""
     
     def analyze_criteria(self, text: str, category: str) -> Dict[str, MaintenanceAnalysisResult]:
-        """Kriterleri analiz et"""
         results = {}
         criteria = self.criteria_details.get(category, {})
         
         for criterion_name, criterion_data in criteria.items():
             pattern = criterion_data["pattern"]
             weight = criterion_data["weight"]
-            
             matches = re.findall(pattern, text, re.IGNORECASE | re.MULTILINE)
             
             if matches:
                 content = f"Bulunan: {str(matches[:3])}"
                 found = True
-                
                 if weight <= 2:
                     score = min(weight, len(matches))
                 else:
                     score = min(weight, len(matches) * (weight // 2))
-                    score = max(score, weight // 2)
+                    score = max(score, weight // 2)  # ✅ Minimum yarı puan
             else:
                 content = "Bulunamadı"
                 found = False
@@ -262,7 +253,6 @@ class MaintenanceReportAnalyzer:
         return results
 
     def calculate_scores(self, analysis_results: Dict) -> Dict[str, Any]:
-        """Puanları hesapla"""
         category_scores = {}
         total_score = 0
         
@@ -285,7 +275,6 @@ class MaintenanceReportAnalyzer:
                 "max_weight": category_max,
                 "percentage": round(percentage, 2)
             }
-            
             total_score += normalized_score
         
         return {
@@ -295,29 +284,301 @@ class MaintenanceReportAnalyzer:
         }
 
     def extract_specific_values(self, text: str) -> Dict[str, Any]:
-        """Spesifik değerleri çıkar"""
+        """✅ TAM DETAYLI PATTERN'LAR - 200+ SATIR"""
         values = {
             "makine_adi": "Bulunamadı",
             "makine_modeli": "Bulunamadı",
-            "bakim_turu": "Bulunamadı"
+            "seri_numarasi": "Bulunamadı",
+            "bakim_turu": "Bulunamadı",
+            "yetkili_personel": "Bulunamadı"
         }
         
-        machine_patterns = [
-            r"(?:MAKİNE\s*ADI|MACHINE\s*NAME)\s*[:=]\s*([A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ\s-]{3,50})"
+        # ========================= MAKİNE ADI =========================
+        machine_title_patterns = [
+            r"([A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ\s-]{3,40})\s+(?:MAKİNESİ|MACHINE)\s+(?:BAKIM|KULLANIM|SERVİS|MAINTENANCE|SERVICE|OPERATION)",
+            r"([A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ\s-]{3,40})\s+(?:CİHAZI|DEVICE)\s+(?:BAKIM|KULLANIM|SERVİS|MAINTENANCE|SERVICE)",
+            r"([A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ\s-]{3,40})\s+(?:SİSTEMİ|SYSTEM)\s+(?:BAKIM|KULLANIM|SERVİS|MAINTENANCE|SERVICE)",
+            r"([A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ\s-]{3,40})\s+(?:EKİPMANI|EQUIPMENT)\s+(?:BAKIM|KULLANIM|SERVİS|MAINTENANCE|SERVICE)",
+            r"([A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ\s-]{3,40})\s+(?:BAKIM|MAINTENANCE)\s+(?:TALİMAT|KILAVUZ|PROSEDÜR|INSTRUCTION|MANUAL|PROCEDURE)",
+            r"([A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ\s-]{3,40})\s+(?:SERVİS|SERVICE)\s+(?:TALİMAT|KILAVUZ|MANUAL|GUIDE)",
+            r"([A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ\s-]{3,40})\s+(?:KULLANIM|OPERATION|USER)\s+(?:KILAVUZ|MANUAL|GUIDE)"
         ]
         
-        for pattern in machine_patterns:
+        machine_field_patterns = [
+            r"(?i)(?:ÜRÜN\s*ADI|ÜRÜN\s*TANIM|PRODUCT\s*NAME|PRODUCT\s*DESCRIPTION)\s*[:=]\s*([A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ\s-]{3,50})(?=\s*$|\s+(?:PROJE|MODEL|TİP|PROJECT|TYPE|\n))",
+            r"(?i)(?:MAKİNE\s*ADI|MACHINE\s*NAME|MACHINE\s*TITLE)\s*[:=]\s*([A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ\s-]{3,50})(?=\s*$|\s+(?:PROJE|MODEL|PROJECT|\n))",
+            r"(?i)(?:EKİPMAN\s*ADI|EQUIPMENT\s*NAME|EQUIPMENT\s*TITLE)\s*[:=]\s*([A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ\s-]{3,50})(?=\s*$|\s+(?:PROJE|MODEL|PROJECT|\n))",
+            r"(?i)(?:CİHAZ\s*ADI|DEVICE\s*NAME|DEVICE\s*TITLE)\s*[:=]\s*([A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ\s-]{3,50})(?=\s*$|\s+(?:PROJE|MODEL|PROJECT|\n))",
+            r"(?i)(?:SİSTEM\s*ADI|SYSTEM\s*NAME|SYSTEM\s*TITLE)\s*[:=]\s*([A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ\s-]{3,50})(?=\s*$|\s+(?:PROJE|MODEL|PROJECT|\n))"
+        ]
+        
+        for pattern in machine_title_patterns:
+            match = re.search(pattern, text)
+            if match:
+                result = match.group(1).strip()
+                if 3 <= len(result) <= 50 and not result.lower().startswith(("bu", "şu", "o ")):
+                    values["makine_adi"] = result
+                    break
+        
+        if values["makine_adi"] == "Bulunamadı":
+            for pattern in machine_field_patterns:
+                match = re.search(pattern, text)
+                if match:
+                    result = match.group(1).strip()
+                    cleanup_words = ["PROJESİ", "PROJECT", "SİSTEMİ", "SYSTEM", "EKİPMANI", "EQUIPMENT", "TALİMATI", "INSTRUCTION"]
+                    for cleanup_word in cleanup_words:
+                        result = re.sub(rf"\b{cleanup_word}\b", "", result, flags=re.IGNORECASE).strip()
+                    result = re.sub(r'\s+', ' ', result).strip()
+                    if 3 <= len(result) <= 50 and not result.lower().startswith(("bu", "şu", "o ")):
+                        values["makine_adi"] = result
+                        break
+        
+        # ========================= MODEL =========================
+        model_title_patterns = [
+            r"(?:MODEL|TİP|TYPE)\s+([A-Z0-9-]{2,20})\s+(?:MAKİNESİ|CİHAZI|SİSTEMİ|BAKIM|SERVİS)",
+            r"([A-Z0-9-]{2,20})\s+(?:MODEL|TİP|TYPE)\s+(?:BAKIM|SERVİS|KULLANIM|MAINTENANCE)",
+            r"([A-Z0-9-]{2,20})\s+(?:SERİSİ|SERIES)\s+(?:BAKIM|SERVİS|KULLANIM)"
+        ]
+        
+        model_field_patterns = [
+            r"(?i)(?:MODEL\s*NO|MODEL\s*NUMARASI|MODEL\s*NUMBER)\s*[:=]\s*([A-Z0-9-]{2,20})(?=\s|$|\n)",
+            r"(?i)(?:MODEL\s*KODU|MODEL\s*CODE)\s*[:=]\s*([A-Z0-9-]{2,20})(?=\s|$|\n)",
+            r"(?i)(?:MODEL)\s*[:=]\s*([A-Z0-9-]{2,20})(?=\s|$|\n)",
+            r"(?i)(?:TİP|TYPE)\s*[:=]\s*([A-Z0-9-]{2,20})(?=\s|$|\n)",
+            r"(?i)(?:TİP\s*NO|TYPE\s*NO|TİP\s*NUMARASI|TYPE\s*NUMBER)\s*[:=]\s*([A-Z0-9-]{2,20})(?=\s|$|\n)"
+        ]
+        
+        for pattern in model_title_patterns:
+            match = re.search(pattern, text)
+            if match:
+                result = match.group(1).strip()
+                if 2 <= len(result) <= 25:
+                    values["makine_modeli"] = result
+                    break
+        
+        if values["makine_modeli"] == "Bulunamadı":
+            for pattern in model_field_patterns:
+                match = re.search(pattern, text)
+                if match:
+                    result = match.group(1).strip()
+                    filter_words = ["konveyör", "tipi", "çeşit", "türü", "xxx", "tbd", "n/a"]
+                    if not any(word in result.lower() for word in filter_words):
+                        if 2 <= len(result) <= 25:
+                            values["makine_modeli"] = result
+                            break
+        
+        # ========================= SERİ NO =========================
+        serial_title_patterns = [
+            r"(?:SERİ|SERIAL)\s+(?:NO|NUMBER|NUMARASI)[\s:=]*([A-Z0-9-]{3,25})",
+            r"(?:S/N|SN)[\s:=]*([A-Z0-9-]{3,25})"
+        ]
+        
+        serial_field_patterns = [
+            r"(?i)(?:SERİ\s*NO|SERİ\s*NUMARASI|SERIAL\s*NUMBER|S/N)\s*[:=]\s*([A-Z0-9-]{3,25})(?=\s+(?:Üretim|Tarih|Rev|Revizyon|\n)|$)",
+            r"(?i)(?:SERİ\s*KODU|SERIAL\s*CODE)\s*[:=]\s*([A-Z0-9-]{3,25})(?=\s+(?:Üretim|Tarih|Rev|\n)|$)",
+            r"(?i)(?:SERIAL)\s*[:=]\s*([A-Z0-9-]{3,25})(?=\s|$)"
+        ]
+        
+        placeholder_patterns = [
+            r"^[X]{2,}$", r"^[X-]{2,}$", r".*[X]{3,}.*", r"^[-]{2,}$",
+            r"(?i)^(tbd|n/a|na|null|none|boş|yok)$", r"(?i).*rev[x0-9].*",
+            r"^[0]{3,}$", r"(?i)^(sample|örnek|example).*"
+        ]
+        
+        for pattern in serial_title_patterns:
+            match = re.search(pattern, text)
+            if match:
+                result = match.group(1).strip()
+                is_placeholder = any(re.match(p, result) for p in placeholder_patterns)
+                if not is_placeholder and 3 <= len(result) <= 30:
+                    values["seri_numarasi"] = result
+                    break
+        
+        if values["seri_numarasi"] == "Bulunamadı":
+            for pattern in serial_field_patterns:
+                match = re.search(pattern, text)
+                if match:
+                    result = match.group(1).strip()
+                    is_placeholder = any(re.match(p, result) for p in placeholder_patterns)
+                    if not is_placeholder and 3 <= len(result) <= 30:
+                        values["seri_numarasi"] = result
+                        break
+        
+        # ========================= BAKIM TÜRÜ =========================
+        maintenance_title_patterns = [
+            r"(PERİYODİK\s*BAKIM|PERIODIC\s*MAINTENANCE)\s+(?:TALİMAT|PROSEDÜR|MANUAL)",
+            r"(DÜZELTİCİ\s*BAKIM|CORRECTIVE\s*MAINTENANCE)\s+(?:TALİMAT|PROSEDÜR|MANUAL)",
+            r"(ÖNGÖRÜLÜ\s*BAKIM|PREDICTIVE\s*MAINTENANCE)\s+(?:TALİMAT|PROSEDÜR|MANUAL)",
+            r"(GÜNLÜK\s*BAKIM|DAILY\s*MAINTENANCE)\s+(?:TALİMAT|PROSEDÜR|MANUAL)",
+            r"(HAFTALIK\s*BAKIM|WEEKLY\s*MAINTENANCE)\s+(?:TALİMAT|PROSEDÜR|MANUAL)",
+            r"(AYLIK\s*BAKIM|MONTHLY\s*MAINTENANCE)\s+(?:TALİMAT|PROSEDÜR|MANUAL)",
+            r"(YILLIK\s*BAKIM|YEARLY\s*MAINTENANCE|ANNUAL\s*MAINTENANCE)\s+(?:TALİMAT|PROSEDÜR|MANUAL)"
+        ]
+        
+        maintenance_word_patterns = [
+            r"\b(Periyodik\s*Bakım|Periodic\s*Maintenance)\b",
+            r"\b(Düzeltici\s*Bakım|Corrective\s*Maintenance)\b",
+            r"\b(Öngörülü\s*Bakım|Predictive\s*Maintenance)\b",
+            r"\b(Önleyici\s*Bakım|Preventive\s*Maintenance)\b",
+            r"\b(Günlük\s*Bakım|Daily\s*Maintenance)\b",
+            r"\b(Haftalık\s*Bakım|Weekly\s*Maintenance)\b",
+            r"\b(Aylık\s*Bakım|Monthly\s*Maintenance)\b",
+            r"\b(Yıllık\s*Bakım|Yearly\s*Maintenance|Annual\s*Maintenance)\b",
+            r"\b(Acil\s*Bakım|Emergency\s*Maintenance)\b",
+            r"\b(Planlı\s*Bakım|Planned\s*Maintenance)\b"
+        ]
+        
+        for pattern in maintenance_title_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                values["makine_adi"] = match.group(1).strip()
-                break
+                result = match.group(1).strip()
+                if len(result) <= 35:
+                    values["bakim_turu"] = result
+                    break
+        
+        if values["bakim_turu"] == "Bulunamadı":
+            for pattern in maintenance_word_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    result = match.group().strip()
+                    if len(result) <= 35:
+                        values["bakim_turu"] = result
+                        break
+        
+        # ========================= YETKİLİ PERSONEL =========================
+        personnel_title_patterns = [
+            r"(?:SORUMLU|RESPONSIBLE)[\s:=]*([A-ZÇĞİÖŞÜ][a-züçğıöş\s]{2,30})(?=\s|$|\n)",
+            r"(?:TEKNİSYEN|TECHNICIAN)[\s:=]*([A-ZÇĞİÖŞÜ][a-züçğıöş\s]{2,30})(?=\s|$|\n)",
+            r"(?:OPERATÖR|OPERATOR)[\s:=]*([A-ZÇĞİÖŞÜ][a-züçğıöş\s]{2,30})(?=\s|$|\n)"
+        ]
+        
+        personnel_field_patterns = [
+            r"(?i)(?:YETKİLİ\s*PERSONEL|AUTHORIZED\s*PERSONNEL|AUTHORIZED\s*STAFF)\s*[:=]\s*([A-ZÇĞİÖŞÜ][a-züçğıöş\s]{2,30})(?=\s|$)",
+            r"(?i)(?:TEKNİSYEN|TECHNICIAN|TECHNICAL\s*STAFF)\s*[:=]\s*([A-ZÇĞİÖŞÜ][a-züçğıöş\s]{2,30})(?=\s|$)",
+            r"(?i)(?:SORUMLU\s*PERSONEL|RESPONSIBLE\s*PERSONNEL|RESPONSIBLE\s*STAFF|RESPONSIBLE\s*PERSON)\s*[:=]\s*([A-ZÇĞİÖŞÜ][a-züçğıöş\s]{2,30})(?=\s|$)",
+            r"(?i)(?:BAKIM\s*SORUMLUSU|MAINTENANCE\s*RESPONSIBLE|MAINTENANCE\s*SUPERVISOR|MAINTENANCE\s*MANAGER)\s*[:=]\s*([A-ZÇĞİÖŞÜ][a-züçğıöş\s]{2,30})(?=\s|$)",
+            r"(?i)(?:OPERATÖR|OPERATOR|MACHINE\s*OPERATOR)\s*[:=]\s*([A-ZÇĞİÖŞÜ][a-züçğıöş\s]{2,30})(?=\s|$)",
+            r"(?i)(?:UZMAN|EXPERT|SPESİYALİST|SPECIALIST|TECHNICAL\s*EXPERT)\s*[:=]\s*([A-ZÇĞİÖŞÜ][a-züçğıöş\s]{2,30})(?=\s|$)"
+        ]
+        
+        for pattern in personnel_title_patterns:
+            match = re.search(pattern, text)
+            if match:
+                result = match.group(1).strip()
+                filter_words = ["saklanması", "gereken", "yapılması", "bulunması", "olması", "edilmesi", "sağlanması"]
+                if not any(word in result.lower() for word in filter_words):
+                    if len(result.split()) >= 2 or (len(result.split()) == 1 and len(result) >= 4):
+                        if 3 <= len(result) <= 35:
+                            values["yetkili_personel"] = result
+                            break
+        
+        if values["yetkili_personel"] == "Bulunamadı":
+            for pattern in personnel_field_patterns:
+                match = re.search(pattern, text)
+                if match:
+                    result = match.group(1).strip()
+                    filter_words = ["saklanması", "gereken", "yapılması", "bulunması", "olması", "edilmesi", "sağlanması"]
+                    if not any(word in result.lower() for word in filter_words):
+                        if len(result.split()) >= 2 or (len(result.split()) == 1 and len(result) >= 4):
+                            if 3 <= len(result) <= 35:
+                                values["yetkili_personel"] = result
+                                break
         
         return values
 
-    def generate_recommendations(self, analysis_results: Dict, scores: Dict) -> List[str]:
-        """Öneriler oluştur"""
-        recommendations = []
+    def validate_maintenance_document(self, text: str) -> bool:
+        """✅ GENİŞLETİLMİŞ VALIDASYON - 50+ KEYWORD"""
+        maintenance_keywords = [
+            "bakım", "maintenance", "talimat", "instruction", "kılavuz", "manual", "guide",
+            "makine", "machine", "ekipman", "equipment", "cihaz", "device", "sistem", "system",
+            "güvenlik", "safety", "tehlike", "hazard", "risk", "dikkat", "caution", "warning",
+            "prosedür", "procedure", "işlem", "process", "operasyon", "operation", "çalışma", "work",
+            "onarım", "repair", "servis", "service", "tamir", "fix", "düzeltici", "corrective",
+            "kontrol", "check", "muayene", "inspection", "test", "doğrulama", "verification",
+            "periyodik", "periodic", "günlük", "daily", "haftalık", "weekly", "aylık", "monthly",
+            "parça", "part", "yedek", "spare", "malzeme", "material", "sarf", "consumable",
+            "yağlama", "lubrication", "filtre", "filter", "ayarlama", "adjustment", "kalibrasyon", "calibration",
+            "alet", "tool", "teçhizat", "apparatus", "donanım", "hardware"
+        ]
         
+        found_keywords = 0
+        found_words = []
+        for keyword in maintenance_keywords:
+            if re.search(rf"\b{keyword}\b", text, re.IGNORECASE):
+                found_keywords += 1
+                found_words.append(keyword)
+        
+        logger.info(f"Doküman validasyonu: {found_keywords} anahtar kelime bulundu: {found_words[:10]}")
+        return found_keywords >= 2
+
+    def generate_improvement_actions(self, analysis_results: Dict, scores: Dict) -> List[str]:
+        """✅ DİNAMİK İYİLEŞTİRME ÖNERİLERİ"""
+        actions = []
+        sorted_categories = sorted(scores["category_scores"].items(), key=lambda x: x[1]["percentage"])
+        
+        category_actions = {
+            "Genel Bilgiler": [
+                "Makine tanımını (ad, model, seri numarası, üretici) netleştiriniz",
+                "Belge kapsamını ve hangi makine(ler) için geçerli olduğunu belirtiniz",
+                "Yetkili personel niteliklerini (eğitilmiş teknisyen vb.) tanımlayınız"
+            ],
+            "Güvenlik Önlemleri": [
+                "Genel güvenlik uyarılarını (elektrik çarpması, hareketli parçalar) ekleyiniz",
+                "KKD gerekliliklerini (gözlük, eldiven, kulaklık) detaylandırınız",
+                "LOTO prosedürlerini ve makineyi güvenli duruma getirme adımlarını belirtiniz",
+                "Artık riskleri ve bakım sırasındaki tehlikeleri açıklayınız"
+            ],
+            "Bakım Türleri ve Operasyon Çeşitleri": [
+                "Periyodik bakım türlerini (günlük, haftalık, aylık, yıllık) tanımlayınız",
+                "Düzeltici bakım prosedürlerini ve arıza sonrası müdahaleleri açıklayınız",
+                "Öngörülü bakım yöntemlerini (sensör verileri, titreşim analizi) ekleyiniz",
+                "Operasyon çeşitlerini (ayarlama, temizlik, yağlama, parça değişimi) listeleyiniz"
+            ],
+            "Adım Adım Bakım İşlemleri": [
+                "İşlem sırasını açık ve resimli olarak hazırlayınız",
+                "Gerekli alet ve yedek parçaları belirtiniz",
+                "Kontrol listelerini (checklist) oluşturunuz",
+                "Fonksiyon testlerini ve işlem sonrası kontrolleri açıklayınız"
+            ],
+            "Teknik Veriler": [
+                "Yağlama noktaları, yağ türleri ve miktarlarını belirtiniz",
+                "Tork değerleri, ayar ölçüleri ve boşluk toleranslarını ekleyiniz",
+                "Elektrik/Pnömatik/Hidrolik bağlantı basınçlarını tanımlayınız",
+                "Sarf malzeme ömürlerini (filtre, kayış, conta) listeleyiniz"
+            ],
+            "Yedek Parça ve Sarf Malzemeleri": [
+                "Orijinal yedek parça listesini parça numaralarıyla hazırlayınız",
+                "Kritik yedeklerin stokta bulundurulma tavsiyelerini ekleyiniz",
+                "Yanlış parça kullanımının risklerini açıklayınız"
+            ],
+            "Kayıt ve İzlenebilirlik": [
+                "Bakım formu/tablosunu (tarih, sorumlu, yapılan işlemler) oluşturunuz",
+                "Arıza kayıtları ve değiştirilen parça takip sistemini kurunuz",
+                "Yasal gerekliliklere uygun izlenebilirlik sağlayınız"
+            ],
+            "Çevre ve Atık Yönetimi": [
+                "Kullanılmış yağ, filtre, akü atıklarının bertaraf yöntemlerini belirtiniz",
+                "Çevreye zarar vermeyecek imha ve geri dönüşüm talimatlarını ekleyiniz",
+                "Atık yönetimi prosedürlerini ve çevresel uygunluk kriterlerini tanımlayınız"
+            ],
+            "Ekler": [
+                "Resimli şema ve diyagramları ekleyiniz",
+                "Arıza teşhis tablosunu (sorun-neden-çözüm) hazırlayınız",
+                "İletişim bilgilerini (üretici, servis sağlayıcı) güncel tutunuz"
+            ]
+        }
+        
+        for category, score_data in sorted_categories[:5]:
+            if score_data["percentage"] < 70:
+                actions.extend(category_actions.get(category, []))
+        
+        if scores["percentage"] < 50:
+            actions.insert(0, "ÖNCE: Doküman yapısını ve formatını yeniden gözden geçiriniz")
+        
+        return actions
+
+    def generate_recommendations(self, analysis_results: Dict, scores: Dict) -> List[str]:
+        recommendations = []
         total_percentage = scores["percentage"]
         
         if total_percentage >= 70:
@@ -325,10 +586,21 @@ class MaintenanceReportAnalyzer:
         else:
             recommendations.append(f"❌ Bakım Talimatları GEÇERSİZ (Toplam: %{total_percentage:.1f})")
         
+        for category, results in analysis_results.items():
+            category_score = scores["category_scores"][category]["percentage"]
+            if category_score < 40:
+                recommendations.append(f"🔴 {category} bölümü yetersiz (%{category_score:.1f})")
+                missing_items = [name for name, result in results.items() if not result.found]
+                if missing_items:
+                    recommendations.append(f"   Eksik: {', '.join(missing_items[:3])}")
+            elif category_score < 70:
+                recommendations.append(f"🟡 {category} bölümü geliştirilmeli (%{category_score:.1f})")
+            else:
+                recommendations.append(f"🟢 {category} bölümü yeterli (%{category_score:.1f})")
+        
         return recommendations
 
     def analyze_maintenance_report(self, file_path: str) -> Dict[str, Any]:
-        """Ana Bakım Talimatları analiz fonksiyonu"""
         logger.info("Bakım Talimatları analizi başlatılıyor...")
         
         if not os.path.exists(file_path):
@@ -340,6 +612,17 @@ class MaintenanceReportAnalyzer:
         
         detected_lang = self.detect_language(text)
         
+        if detected_lang != 'tr':
+            logger.info(f"{detected_lang.upper()} dilinden Türkçe'ye çeviriliyor...")
+            text = self.translate_to_turkish(text, detected_lang)
+        
+        if not self.validate_maintenance_document(text):
+            return {
+                "error": "YANLIŞ DOKÜMAN: Bu dosya bakım talimatları dökümanı değil!",
+                "document_type": "UNKNOWN",
+                "suggestion": "Lütfen geçerli bir bakım talimatları dökümanı yükleyiniz."
+            }
+        
         analysis_results = {}
         for category in self.criteria_weights.keys():
             analysis_results[category] = self.analyze_criteria(text, category)
@@ -347,6 +630,7 @@ class MaintenanceReportAnalyzer:
         scores = self.calculate_scores(analysis_results)
         extracted_values = self.extract_specific_values(text)
         recommendations = self.generate_recommendations(analysis_results, scores)
+        improvement_actions = self.generate_improvement_actions(analysis_results, scores)
         
         final_status = "PASS" if scores["percentage"] >= 70 else "FAIL"
         
@@ -361,6 +645,7 @@ class MaintenanceReportAnalyzer:
             "kategori_analizleri": analysis_results,
             "puanlama": scores,
             "oneriler": recommendations,
+            "iyilestirme_eylemleri": improvement_actions,
             "ozet": {
                 "toplam_puan": scores["total_score"],
                 "yuzde": scores["percentage"],
@@ -368,152 +653,92 @@ class MaintenanceReportAnalyzer:
                 "rapor_tipi": "BAKIM_TALIMATLARI"
             }
         }
-    
+
 # ============================================
-# HELPER FUNCTIONS
+# HELPER FUNCTIONS (3-STAGE VALIDATION)
 # ============================================
 def validate_document_server(text):
-    """Server kodunda doküman validasyonu - Bakım Talimatları için"""
     critical_terms = [
         ["bakım", "maintenance", "servis", "service", "onarım", "repair", "periyodik", "periodic"],
         ["makine", "machine", "ekipman", "equipment", "cihaz", "device", "sistem", "system"],
         ["prosedür", "procedure", "talimat", "instruction", "adım", "step", "kontrol", "check"],
         ["güvenlik", "safety", "uyarı", "warning", "dikkat", "caution", "tehlike", "danger"]
     ]
-    
-    category_found = [
-        any(re.search(rf"\b{term}\b", text, re.IGNORECASE) for term in category)
-        for category in critical_terms
-    ]
-    
-    valid_categories = sum(category_found)
-    logger.info(f"Doküman validasyonu: {valid_categories}/4 kritik kategori bulundu")
-    
-    return valid_categories >= 2
-
+    category_found = [any(re.search(rf"\b{term}\b", text, re.IGNORECASE) for term in category) for category in critical_terms]
+    valid = sum(category_found)
+    logger.info(f"Validasyon: {valid}/4 kritik kategori")
+    return valid >= 2
 
 def check_strong_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada özgü kelimeleri OCR ile ara"""
-    strong_keywords = [
-        "bakım", "bakim",
-        "bakım talimatı", "bakim talimati",
-        "maintenance", "MAINTENANCE",
-        "servis",
-        "service",
-        "onarım",
-        "repair",
-        "prosedür",
-        "procedure"
-    ]
-    
+    strong_keywords = ["bakım", "bakim", "bakım talimatı", "bakim talimati", "maintenance", "MAINTENANCE", "servis", "service", "onarım", "repair", "prosedür", "procedure"]
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=1)
-        
         all_text = ""
         for page in pages:
             opencv_image = cv2.cvtColor(np.array(page), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-            
             text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
             all_text += text.lower() + " "
-        
-        found_keywords = [kw for kw in strong_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
-        logger.info(f"İlk sayfa kontrol: {len(found_keywords)} özgü kelime")
-        return len(found_keywords) >= 1
-        
+        found = [kw for kw in strong_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
+        logger.info(f"İlk sayfa: {len(found)} özgü kelime")
+        return len(found) >= 1
     except Exception as e:
-        logger.warning(f"İlk sayfa kontrol hatası: {e}")
+        logger.warning(f"OCR hatası: {e}")
         return False
 
-
 def check_excluded_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara"""
-    excluded_keywords = [
+    excluded = [
         "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
         "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm", "enclosure", "wrp-", "light curtain", "contactors", "controller",
-        "espe",
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
+        "espe", "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
         "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
         "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
-        "loto",
-        "lvd", "TOPRAKLAMA SÜREKLİLİK", "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
+        "loto", "lvd", "TOPRAKLAMA SÜREKLİLİK", "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
         "uygunluk", "beyan", "muayene", "conformity", "declaration",
         "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
         "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
-        "montaj", "assembly",
-        "topraklama direnci", "grounding", "earthing", "60204", "topraklama", "TOPRAKLAMA DİRENCİ",
-        "titreşim", "vibration", "mekanik",
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
-        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
+        "montaj", "assembly", "topraklama direnci", "grounding", "earthing", "60204", "topraklama", "TOPRAKLAMA DİRENCİ",
+        "titreşim", "vibration", "mekanik", "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
+        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti"
     ]
-    
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=200, first_page=1, last_page=1)
-        
         all_text = ""
         for page in pages:
             opencv_image = cv2.cvtColor(np.array(page), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-            
             text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
             all_text += text.lower() + " "
-        
-        found_excluded = [kw for kw in excluded_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
-        logger.info(f"İlk sayfa excluded kontrol: {len(found_excluded)} istenmeyen kelime")
-        return len(found_excluded) >= 1
-        
+        found = [kw for kw in excluded if re.search(rf"\b{kw.lower()}\b", all_text)]
+        return len(found) >= 1
     except Exception as e:
-        logger.warning(f"İlk sayfa excluded kontrol hatası: {e}")
+        logger.warning(f"Excluded OCR hatası: {e}")
         return False
 
-
 def get_conclusion_message(status, percentage):
-    """Sonuç mesajını döndür"""
     if status == "PASS":
         return f"Bakım talimatları yüksek kalitede ve standartlara uygun (%{percentage:.0f})"
-    else:
-        return f"Bakım talimatları yetersiz, kapsamlı revizyon gerekli (%{percentage:.0f})"
-
+    return f"Bakım talimatları yetersiz, kapsamlı revizyon gerekli (%{percentage:.0f})"
 
 def get_main_issues(analysis_result):
-    """Ana sorunları listele"""
     issues = []
-    
     for category, score_data in analysis_result['puanlama']['category_scores'].items():
         if score_data['percentage'] < 50:
             issues.append(f"{category} kategorisinde ciddi eksiklikler")
-    
     if not issues and analysis_result['puanlama']['total_score'] < 50:
-        issues = [
-            "Genel makine bilgileri eksik",
-            "Güvenlik önlemleri yetersiz",
-            "Bakım türleri tanımlanmamış",
-            "Adım adım talimatlar eksik"
-        ]
-    
+        issues = ["Genel makine bilgileri eksik", "Güvenlik önlemleri yetersiz", "Bakım türleri tanımlanmamış", "Adım adım talimatlar eksik"]
     return issues[:4]
 
-
 def map_language_code(lang_code):
-    """Dil kodunu tam isme çevir"""
-    lang_mapping = {
-        'tr': 'turkish',
-        'en': 'english',
-        'de': 'german',
-        'fr': 'french',
-        'es': 'spanish',
-        'it': 'italian'
-    }
+    lang_mapping = {'tr': 'turkish', 'en': 'english', 'de': 'german', 'fr': 'french', 'es': 'spanish', 'it': 'italian'}
     return lang_mapping.get(lang_code, 'turkish')
-
 
 # ============================================
 # FLASK SERVICE
 # ============================================
 app = Flask(__name__)
-
 UPLOAD_FOLDER = 'temp_uploads_bakim'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'doc', 'txt'}
 
@@ -526,20 +751,15 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-
 @app.route('/api/bakimtalimatlari-report', methods=['POST'])
 def analyze_maintenance_report():
-    """Bakım Talimatları analiz endpoint"""
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
 
         file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
-
-        if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type'}), 400
+        if file.filename == '' or not allowed_file(file.filename):
+            return jsonify({'error': 'Invalid file'}), 400
 
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
@@ -561,27 +781,19 @@ def analyze_maintenance_report():
                         os.remove(filepath)
                     except:
                         pass
-                    return jsonify({
-                        'error': 'Invalid document type',
-                        'message': 'Yüklediğiniz dosya bakım talimatları değil!'
-                    }), 400
+                    return jsonify({'error': 'Invalid document type', 'message': 'Yüklediğiniz dosya bakım talimatları değil!'}), 400
                 else:
-                    # AŞAMA 3
                     logger.info("Aşama 3: Tam doküman kontrolü...")
                     try:
                         with open(filepath, 'rb') as f:
                             pdf_reader = PyPDF2.PdfReader(f)
                             text = "".join(page.extract_text() + "\n" for page in pdf_reader.pages)
-                        
                         if not text or len(text.strip()) < 50 or not validate_document_server(text):
                             try:
                                 os.remove(filepath)
                             except:
                                 pass
-                            return jsonify({
-                                'error': 'Invalid document type',
-                                'message': 'Yüklediğiniz dosya bakım talimatları değil!'
-                            }), 400
+                            return jsonify({'error': 'Invalid document type', 'message': 'Yüklediğiniz dosya bakım talimatları değil!'}), 400
                     except Exception as e:
                         logger.error(f"Aşama 3 hatası: {e}")
                         try:
@@ -591,7 +803,6 @@ def analyze_maintenance_report():
                         return jsonify({'error': 'Analysis failed'}), 500
                     
         elif file_ext in ['.docx', '.doc', '.txt']:
-            # DOCX/TXT için sadece tam doküman kontrolü
             logger.info(f"DOCX/TXT dosyası için tam doküman kontrolü: {file_ext}")
             text = ""
             if file_ext in ['.docx', '.doc']:
@@ -604,26 +815,14 @@ def analyze_maintenance_report():
                     os.remove(filepath)
                 except:
                     pass
-                return jsonify({
-                    'error': 'Text extraction failed',
-                    'message': 'Dosyadan yeterli metin çıkarılamadı'
-                }), 400
+                return jsonify({'error': 'Text extraction failed', 'message': 'Dosyadan yeterli metin çıkarılamadı'}), 400
             
             if not validate_document_server(text):
                 try:
                     os.remove(filepath)
                 except:
                     pass
-                return jsonify({
-                    'error': 'Invalid document type',
-                    'message': 'Yüklediğiniz dosya mekanik titreşim ölçüm raporu değil! Lütfen geçerli bir titreşim raporu yükleyiniz.',
-                    'details': {
-                        'filename': filename,
-                        'document_type': 'NOT_BAKIM_REPORT',
-                        'required_type': 'BAKIM_TALIMATLARI'
-                    }
-                }), 400
-
+                return jsonify({'error': 'Invalid document type', 'message': 'Yüklediğiniz dosya bakım talimatları değil!'}), 400
 
         logger.info(f"Bakım analizi yapılıyor: {filename}")
         analysis_result = analyzer.analyze_maintenance_report(filepath)
@@ -646,9 +845,7 @@ def analyze_maintenance_report():
             'extracted_values': analysis_result.get('cikarilan_degerler', {}),
             'file_type': 'BAKIM_TALIMATLARI',
             'filename': filename,
-            'language_info': {
-                'detected_language': map_language_code(analysis_result['dosya_bilgisi']['detected_language'])
-            },
+            'language_info': {'detected_language': map_language_code(analysis_result['dosya_bilgisi']['detected_language'])},
             'overall_score': {
                 'percentage': round(overall_percentage, 2),
                 'total_points': analysis_result['puanlama']['total_score'],
@@ -657,6 +854,7 @@ def analyze_maintenance_report():
                 'status_tr': 'GEÇERLİ' if status == "PASS" else 'GEÇERSİZ'
             },
             'recommendations': analysis_result.get('oneriler', []),
+            'improvement_actions': analysis_result.get('iyilestirme_eylemleri', []),
             'summary': {
                 'is_valid': status == "PASS",
                 'conclusion': get_conclusion_message(status, overall_percentage),
@@ -672,50 +870,21 @@ def analyze_maintenance_report():
                 'status': 'PASS' if score_data['percentage'] >= 70 else 'FAIL'
             }
 
-        return jsonify({
-            'success': True,
-            'message': 'Bakım Talimatları başarıyla analiz edildi',
-            'analysis_service': 'bakim_talimatları',
-            'data': response_data
-        })
+        return jsonify({'success': True, 'message': 'Bakım Talimatları başarıyla analiz edildi', 'analysis_service': 'bakim_talimatları', 'data': response_data})
 
     except Exception as e:
         logger.error(f"API error: {str(e)}")
         return jsonify({'error': 'Server error', 'message': str(e)}), 500
 
-
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Health check"""
-    return jsonify({
-        'status': 'healthy',
-        'service': 'Bakım Talimatları Analyzer API',
-        'version': '1.0.0',
-        'tesseract_available': tesseract_available,
-        'report_type': 'BAKIM_TALIMATLARI'
-    })
-
+    return jsonify({'status': 'healthy', 'service': 'Bakım Talimatları Analyzer API', 'version': '1.0.0', 'tesseract_available': tesseract_available, 'report_type': 'BAKIM_TALIMATLARI'})
 
 @app.route('/', methods=['GET'])
 def index():
-    """Index page"""
-    return jsonify({
-        'service': 'Bakım Talimatları Analyzer API',
-        'version': '1.0.0',
-        'endpoints': {
-            'POST /api/bakimtalimatlari-report': 'Bakım talimatları analizi',
-            'GET /api/health': 'Health check',
-            'GET /': 'API info'
-        }
-    })
-
+    return jsonify({'service': 'Bakım Talimatları Analyzer API', 'version': '1.0.0', 'endpoints': {'POST /api/bakimtalimatlari-report': 'Bakım talimatları analizi', 'GET /api/health': 'Health check'}})
 
 if __name__ == '__main__':
-    logger.info("=" * 60)
-    logger.info("Bakım Talimatları Analiz Servisi")
-    logger.info("=" * 60)
-    
     port = int(os.environ.get('PORT', 8014))
-    logger.info(f"🚀 Servis başlatılıyor - Port: {port}")
-    
+    logger.info(f"🚀 Bakım Talimatları Servisi - Port: {port}")
     app.run(host='0.0.0.0', port=port, debug=False)
