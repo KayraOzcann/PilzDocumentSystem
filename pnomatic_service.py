@@ -22,6 +22,7 @@ import math
 import cv2
 import numpy as np
 import fitz  # PyMuPDF
+from docx import Document
 
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
@@ -218,6 +219,16 @@ class PneumaticCircuitAnalyzer:
                 }
             }
         }
+        
+        # Görsel tanıma için şablon desenler
+        self.visual_templates = {
+            "pneumatic_cylinders": ["cylinder", "piston", "MGF", "silindir"],
+            "pneumatic_valves": ["VUVG", "valve", "valf", "Y01", "Y02"],
+            "pneumatic_frl": ["FRL", "filtre", "regulator", "MS6"],
+            "pneumatic_connections": ["connection", "T", "junction", "bağlantı"],
+            "flow_arrows": ["arrow", "ok", "→", "←"],
+            "pressure_gauges": ["gauge", "manometer", "PI", "pressure"]
+        }
 
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         """PDF'den metin çıkarma"""
@@ -240,6 +251,92 @@ class PneumaticCircuitAnalyzer:
             
         except Exception as e:
             logger.error(f"PDF metin çıkarma hatası: {e}")
+            return ""
+
+    def extract_text_with_ocr(self, pdf_path: str) -> str:
+        """Extract text from PDF using OCR with enhanced settings"""
+        try:
+            doc = fitz.open(pdf_path)
+            text = ""
+            
+            for page_num in range(min(5, len(doc))):
+                page = doc[page_num]
+                mat = fitz.Matrix(3.0, 3.0)
+                pix = page.get_pixmap(matrix=mat)
+                img_data = pix.pil_tobytes(format="PNG")
+                img = Image.open(io.BytesIO(img_data))
+                img_array = np.array(img)
+                
+                gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+                _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                
+                temp_path = f"temp_page_{page_num}.png"
+                cv2.imwrite(temp_path, thresh)
+                
+                # Multiple OCR passes with different settings
+                ocr_configs = [
+                    '--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,:-/+()[]{}ÇĞİÖŞÜçğıöşü ',
+                    '--psm 4',
+                    '--psm 11',
+                    '--psm 8',
+                    '--psm 3'
+                ]
+                
+                page_text = ""
+                for config in ocr_configs:
+                    try:
+                        ocr_result = pytesseract.image_to_string(temp_path, lang='tur+eng+deu', config=config)
+                        if len(ocr_result.strip()) > len(page_text.strip()):
+                            page_text = ocr_result
+                    except:
+                        continue
+                
+                text += f"\n--- PAGE {page_num + 1} ---\n{page_text}\n"
+                
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            
+            doc.close()
+            return text.strip()
+            
+        except Exception as e:
+            logger.error(f"OCR extraction error: {e}")
+            return ""
+
+    def extract_text_from_docx(self, docx_path: str) -> str:
+        """Extract text from DOCX file"""
+        try:
+            doc = Document(docx_path)
+            text = ""
+            for paragraph in doc.paragraphs:
+                text += paragraph.text + "\n"
+            
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        text += cell.text + " "
+                text += "\n"
+            
+            return text.strip()
+        except Exception as e:
+            logger.error(f"DOCX extraction error: {e}")
+            return ""
+
+    def extract_text_from_txt(self, txt_path: str) -> str:
+        """Extract text from TXT file"""
+        try:
+            encodings = ['utf-8', 'latin-1', 'cp1254', 'iso-8859-9']
+            for encoding in encodings:
+                try:
+                    with open(txt_path, 'r', encoding=encoding) as f:
+                        return f.read()
+                except UnicodeDecodeError:
+                    continue
+            
+            with open(txt_path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+        except Exception as e:
+            logger.error(f"TXT extraction error: {e}")
             return ""
 
     def extract_text_from_image(self, image_path: str) -> str:
@@ -266,7 +363,7 @@ class PneumaticCircuitAnalyzer:
         except Exception as e:
             logger.error(f"OCR hatası: {e}")
             return ""
-
+        
     def detect_visual_components(self, image_path: str) -> List[ComponentDetection]:
         """Görsel bileşen tespiti"""
         detections = []
@@ -489,6 +586,69 @@ class PneumaticCircuitAnalyzer:
         
         return values
 
+    def extract_project_information(self, text: str, ocr_text: str) -> Dict[str, Any]:
+        """Proje bilgilerini çıkarır (Türkçe ve İngilizce destekli)"""
+        combined_text = f"{text} {ocr_text}"
+        project_info = {}
+        
+        # Created by / Oluşturan
+        created_patterns = [
+            r"Created\s+by[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
+            r"Oluşturan[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
+            r"Tasarlayan[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
+            r"Designer[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))"
+        ]
+        for pattern in created_patterns:
+            match = re.search(pattern, combined_text, re.IGNORECASE)
+            if match:
+                project_info["created_by"] = match.group(1).strip()
+                break
+        
+        # Checked by / Kontrol eden
+        checked_patterns = [
+            r"Checked\s+by[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
+            r"Kontrol\s+eden[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))"
+        ]
+        for pattern in checked_patterns:
+            match = re.search(pattern, combined_text, re.IGNORECASE)
+            if match:
+                project_info["checked_by"] = match.group(1).strip()
+                break
+        
+        # Tarihler
+        date_patterns = [r"(\d{1,2}[./]\d{1,2}[./]\d{4})", r"(\d{4}-\d{1,2}-\d{1,2})"]
+        dates_found = []
+        for pattern in date_patterns:
+            dates = re.findall(pattern, combined_text)
+            dates_found.extend(dates)
+        
+        if dates_found:
+            project_info["creation_date"] = dates_found[-1] if dates_found else None
+        
+        # Circuit Number
+        circuit_patterns = [
+            r"Circuit\s+Number[:\s]*([A-Z0-9\-\.]+)",
+            r"Devre\s+Numarası[:\s]*([A-Z0-9\-\.]+)"
+        ]
+        for pattern in circuit_patterns:
+            match = re.search(pattern, combined_text, re.IGNORECASE)
+            if match:
+                project_info["circuit_number"] = match.group(1).strip()
+                break
+        
+        # Description
+        description_patterns = [
+            r"Description[:\s]*([A-ZÇĞÜŞİÖ0-9\s]+(?:PNOMATİK|PNEUMATIC|DİYAGRAM|DIAGRAM)[A-ZÇĞÜŞİÖ0-9\s]*)",
+            r"(PRES\s+PNOMATİK\s+DİYAGRAM\s*\d*)"
+        ]
+        for pattern in description_patterns:
+            match = re.search(pattern, combined_text, re.IGNORECASE)
+            if match:
+                project_info["description"] = match.group(1).strip()
+                break
+        
+        return project_info
+
     def generate_recommendations(self, analysis_results: Dict, scores: Dict, extracted_values: Dict) -> List[str]:
         """Öneri üretimi"""
         recommendations = []
@@ -561,6 +721,11 @@ class PneumaticCircuitAnalyzer:
                     doc.close()
                 except:
                     pass
+            
+            elif file_ext in ['.docx', '.doc']:
+                text = self.extract_text_from_docx(file_path)
+            elif file_ext == '.txt':
+                text = self.extract_text_from_txt(file_path)
                     
             elif file_ext in ['.jpg', '.jpeg', '.png', '.tiff', '.bmp']:
                 ocr_text = self.extract_text_from_image(file_path)
@@ -577,6 +742,7 @@ class PneumaticCircuitAnalyzer:
             
             scores = self.calculate_scores(analysis_results)
             extracted_values = self.extract_specific_values(text, ocr_text)
+            project_info = self.extract_project_information(text, ocr_text)
             recommendations = self.generate_recommendations(analysis_results, scores, extracted_values)
             
             report = {
@@ -588,6 +754,7 @@ class PneumaticCircuitAnalyzer:
                     "ocr_text_length": len(ocr_text),
                     "visual_components": len(visual_detections)
                 },
+                "project_information": project_info,
                 "extracted_values": extracted_values,
                 "category_analyses": analysis_results,
                 "scoring": scores,
@@ -609,49 +776,20 @@ class PneumaticCircuitAnalyzer:
 # ============================================
 # HELPER FUNCTIONS (Server Validasyon)
 # ============================================
-def map_language_code(lang_code):
-    """Dil kodunu tam isme çevir"""
-    lang_mapping = {
-        'tr': 'turkish',
-        'en': 'english', 
-        'de': 'german',
-        'fr': 'french',
-        'es': 'spanish',
-        'it': 'italian'
-    }
-    return lang_mapping.get(lang_code, 'turkish')
-
-
 def validate_document_server(text):
     """Server kodunda doküman validasyonu - Pnömatik Devre Şeması için"""
-    
     critical_terms = [
-        # Pnömatik temel terimleri
         ["pnömatik", "pnomatik", "pneumatic", "hava", "air", "basınçlı hava", "compressed air"],
-        
-        # Pnömatik bileşenleri ve semboller
         ["silindir", "cylinder", "valf", "valve", "vana", "frl", "lubricator", "regulator", "filter"],
-        
-        # Pnömatik basınç ve akış terimleri
         ["basınç", "pressure", "psi", "bar", "debi", "flow", "cfm", "l/min"],
-        
-        # Pnömatik kontrol elemanları
         ["kontrol", "control", "yön kontrol", "directional control", "hız kontrol", "speed control"],
-        
-        # ISO standartları ve teknik terimler
         ["iso 5599", "5599", "iso 1219", "sembol", "symbol", "bağlantı", "connection", "port"]
     ]
     
-    category_found = []
-    
-    for i, category in enumerate(critical_terms):
-        found_in_category = False
-        for term in category:
-            if re.search(rf"\b{term}\b", text, re.IGNORECASE):
-                found_in_category = True
-                logger.info(f"Pnömatik Kategori {i+1} bulundu: '{term}'")
-                break
-        category_found.append(found_in_category)
+    category_found = [
+        any(re.search(rf"\b{term}\b", text, re.IGNORECASE) for term in category)
+        for category in critical_terms
+    ]
     
     valid_categories = sum(category_found)
     logger.info(f"Doküman validasyonu: {valid_categories}/5 kritik kategori bulundu")
@@ -662,17 +800,7 @@ def validate_document_server(text):
 def check_strong_keywords_first_pages(filepath):
     """İlk 1-2 sayfada özgü kelimeleri OCR ile ara - Pnömatik Devre Şeması için"""
     strong_keywords = [
-        "pnömatik",
-        "pnomatik", 
-        "pneumatic",
-        "lubricator",
-        "inflate",
-        "psi",
-        "bar",
-        "regis",
-        "r102",
-        "regulator",
-        "dump valve"
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve"
     ]
     
     try:
@@ -684,11 +812,11 @@ def check_strong_keywords_first_pages(filepath):
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
             
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 3 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 3 -l tur+eng')
             all_text += text.lower() + " "
         
         found_keywords = [kw for kw in strong_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
-        logger.info(f"İlk sayfa kontrol: {len(found_keywords)} özgü kelime: {found_keywords}")
+        logger.info(f"İlk sayfa kontrol: {len(found_keywords)} özgü kelime")
         return len(found_keywords) >= 1
         
     except Exception as e:
@@ -699,53 +827,22 @@ def check_strong_keywords_first_pages(filepath):
 def check_excluded_keywords_first_pages(filepath):
     """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara"""
     excluded_keywords = [
-        # Aydınlatma raporu
         "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
-        
-        # Hidrolik devre şeması (eski strong_keywords hidrolikten)
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
-        
-        # HRC raporu
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219",
         "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        
-        # Elektrik devre şeması
         "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
-        
-        # Espe raporu  
         "espe",
-        
-        # Gürültü ölçüm raporu
         "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        
-        # Manuel/kullanma kılavuzu
         "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
-        
-        # LOTO raporu
         "loto",
-        
-        # LVD raporu
         "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        
-        # AT tip muayene
         "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
-        
-        # İSG periyodik kontrol
         "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        
-        # Montaj talimatları
         "montaj", "assembly",
-        
-        # EN 60204-1 topraklama raporu
         "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
-        
-        # Bakım talimatları
         "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
-        
-        # Mekanik titreşim raporu
         "titreşim", "vibration","TİTREŞİM",
-        
-        # AT tip inceleme sertifikası
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate"
     ]
     
     try:
@@ -757,11 +854,11 @@ def check_excluded_keywords_first_pages(filepath):
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
             
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 3 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 3 -l tur+eng')
             all_text += text.lower() + " "
         
         found_excluded = [kw for kw in excluded_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
-        logger.info(f"İlk sayfa excluded kontrol: {len(found_excluded)} istenmeyen kelime: {found_excluded}")
+        logger.info(f"İlk sayfa excluded kontrol: {len(found_excluded)} istenmeyen kelime")
         return len(found_excluded) >= 1
         
     except Exception as e:
@@ -806,13 +903,13 @@ def get_main_issues_pneumatic(analysis_result):
 app = Flask(__name__)
 
 UPLOAD_FOLDER = 'temp_uploads_pnomatic'
-ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
+ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png', 'docx', 'doc', 'txt'}
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -826,21 +923,14 @@ def analyze_pnomatic_control():
     """Pnömatik Devre Şeması analiz API endpoint'i - 3 Aşamalı Validasyon"""
     try:
         if 'file' not in request.files:
-            return jsonify({
-                'error': 'No file provided',
-                'message': 'Lütfen analiz edilmek üzere bir pnömatik devre şeması sağlayın'
-            }), 400
+            return jsonify({'error': 'No file provided', 'message': 'Lütfen bir pnömatik devre şeması sağlayın'}), 400
 
         file = request.files['file']
-
         if file.filename == '':
-            return jsonify({'error': 'No file selected', 'message': 'Lütfen bir dosya seçin'}), 400
+            return jsonify({'error': 'No file selected'}), 400
 
         if not allowed_file(file.filename):
-            return jsonify({
-                'error': 'Invalid file type',
-                'message': 'Sadece PDF, JPG, JPEG ve PNG dosyaları kabul edilir'
-            }), 400
+            return jsonify({'error': 'Invalid file type', 'message': 'Sadece PDF, JPG, JPEG, PNG, DOCX, TXT dosyaları kabul edilir'}), 400
 
         try:
             filename = secure_filename(file.filename)
@@ -849,39 +939,31 @@ def analyze_pnomatic_control():
             logger.info(f"Pnömatik Devre Şeması kontrol ediliyor: {filename}")
 
             analyzer = PneumaticCircuitAnalyzer()
-            
-            logger.info(f"Üç aşamalı pnömatik kontrolü başlatılıyor: {filename}")
             file_ext = os.path.splitext(filepath)[1].lower()
 
+            # 3 AŞAMALI KONTROL (sadece PDF için)
             if file_ext == '.pdf':
                 logger.info("Aşama 1: İlk sayfa pnömatik özgü kelime kontrolü...")
                 if check_strong_keywords_first_pages(filepath):
-                    logger.info("✅ Aşama 1 geçti - Pnömatik özgü kelimeler bulundu")
+                    logger.info("✅ Aşama 1 geçti")
                 else:
                     logger.info("Aşama 2: İlk sayfa excluded kelime kontrolü...")
                     if check_excluded_keywords_first_pages(filepath):
-                        logger.info("❌ Aşama 2'de excluded kelimeler bulundu - Pnömatik değil")
+                        logger.info("❌ Aşama 2'de excluded kelimeler bulundu")
                         try:
                             os.remove(filepath)
                         except:
                             pass
                         return jsonify({
                             'error': 'Invalid document type',
-                            'message': 'Bu dosya pnömatik devre şeması değil (farklı rapor türü tespit edildi).',
-                            'details': {
-                                'filename': filename,
-                                'document_type': 'OTHER_REPORT_TYPE',
-                                'required_type': 'PNOMATIK_DEVRE_SEMASI'
-                            }
+                            'message': 'Bu dosya pnömatik devre şeması değil'
                         }), 400
                     else:
                         logger.info("Aşama 3: Tam doküman critical terms kontrolü...")
                         try:
                             with open(filepath, 'rb') as pdf_file:
                                 pdf_reader = PyPDF2.PdfReader(pdf_file)
-                                text = ""
-                                for page in pdf_reader.pages:
-                                    text += page.extract_text() + "\n"
+                                text = "".join(page.extract_text() + "\n" for page in pdf_reader.pages)
                             
                             if not text or len(text.strip()) < 50:
                                 try:
@@ -901,11 +983,7 @@ def analyze_pnomatic_control():
                                 return jsonify({
                                     'error': 'Invalid document type',
                                     'message': 'Yüklediğiniz dosya pnömatik devre şeması değil!',
-                                    'details': {
-                                        'filename': filename,
-                                        'document_type': 'NOT_PNEUMATIC_CIRCUIT',
-                                        'required_type': 'PNOMATIK_DEVRE_SEMASI'
-                                    }
+                                    'details': {'filename': filename, 'document_type': 'NOT_PNEUMATIC_CIRCUIT'}
                                 }), 400
                                 
                         except Exception as e:
@@ -914,10 +992,37 @@ def analyze_pnomatic_control():
                                 os.remove(filepath)
                             except:
                                 pass
-                            return jsonify({
-                                'error': 'Analysis failed',
-                                'message': 'Dosya analizi sırasında hata oluştu'
-                            }), 500
+                            return jsonify({'error': 'Analysis failed'}), 500
+
+            elif file_ext in ['.docx', '.doc', '.txt']:
+                # DOCX/TXT için sadece tam doküman kontrolü
+                logger.info(f"DOCX/TXT dosyası için tam doküman kontrolü: {file_ext}")
+                text = ""
+                if file_ext in ['.docx', '.doc']:
+                    text = analyzer.extract_text_from_docx(filepath)
+                elif file_ext == '.txt':
+                    text = analyzer.extract_text_from_txt(filepath)
+                
+                if not text or len(text.strip()) == 0:
+                    try:
+                        os.remove(filepath)
+                    except:
+                        pass
+                    return jsonify({
+                        'error': 'Text extraction failed',
+                        'message': 'Dosyadan yeterli metin çıkarılamadı'
+                    }), 400
+                
+                if not validate_document_server(text):
+                    try:
+                        os.remove(filepath)
+                    except:
+                        pass
+                    return jsonify({
+                        'error': 'Invalid document type',
+                        'message': 'Yüklediğiniz dosya pnömatik devre şeması değil!',
+                        'details': {'filename': filename, 'document_type': 'NOT_PNEUMATIC_CIRCUIT'}
+                    }), 400
 
             elif file_ext in ['.jpg', '.jpeg', '.png']:
                 if not tesseract_available:
@@ -925,11 +1030,10 @@ def analyze_pnomatic_control():
                         os.remove(filepath)
                     except:
                         pass
-                    
                     return jsonify({
                         'error': 'OCR not available',
-                        'message': 'Tesseract OCR kurulu değil. Resim dosyalarını analiz edebilmek için Tesseract kurulumu gereklidir.',
-                        'details': {'tesseract_error': tesseract_info, 'file_type': file_ext, 'requires_ocr': True}
+                        'message': 'Tesseract OCR kurulu değil',
+                        'details': {'tesseract_error': tesseract_info}
                     }), 500
 
             logger.info(f"Pnömatik devre şeması doğrulandı, analiz başlatılıyor: {filename}")
@@ -937,44 +1041,22 @@ def analyze_pnomatic_control():
             
             try:
                 os.remove(filepath)
-                logger.info(f"Uploaded file {filename} cleaned up")
-            except Exception as e:
-                logger.warning(f"Could not remove uploaded file {filename}: {e}")
+            except:
+                pass
 
             if 'error' in analysis_result:
-                return jsonify({
-                    'error': 'Analysis failed',
-                    'message': analysis_result['error'],
-                    'details': {'filename': filename, 'analysis_details': analysis_result.get('details', {})}
-                }), 400
+                return jsonify({'error': 'Analysis failed', 'message': analysis_result['error']}), 400
 
             overall_percentage = analysis_result['summary']['percentage']
             status = "PASS" if overall_percentage >= 70 else "FAIL"
             
             response_data = {
-                'analysis_date': analysis_result.get('analysis_date', datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-                'analysis_details': {
-                    'found_criteria': len([r for results in analysis_result.get('scoring', {}).get('category_scores', {}).values() 
-                                         for r in results if isinstance(r, dict)]),
-                    'total_criteria': len([r for results in analysis_result.get('scoring', {}).get('category_scores', {}).values() 
-                                         for r in results if isinstance(r, dict)]),
-                    'percentage': round(overall_percentage, 1)
-                },
+                'analysis_date': analysis_result.get('analysis_date'),
                 'analysis_id': f"pneumatic_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                 'category_scores': {},
-                'date_validity': {
-                    'is_valid': True,
-                    'message': 'Pnömatik devre şemaları için tarih geçerliliği kontrolü uygulanmaz',
-                    'days_old': 0,
-                    'formatted_date': 'N/A'
-                },
                 'extracted_values': analysis_result.get('extracted_values', {}),
                 'file_type': 'PNOMATIK_DEVRE_SEMASI',
                 'filename': filename,
-                'language_info': {
-                    'detected_language': 'turkish',
-                    'file_type': file_ext.replace('.', '')
-                },
                 'overall_score': {
                     'percentage': round(overall_percentage, 2),
                     'total_points': analysis_result['summary']['total_score'],
@@ -983,6 +1065,7 @@ def analyze_pnomatic_control():
                     'status_tr': 'GEÇERLİ' if status == "PASS" else 'GEÇERSİZ',
                     'quality_level': analysis_result['summary']['quality_level']
                 },
+                'project_information': analysis_result.get('project_information', {}),
                 'recommendations': analysis_result.get('recommendations', []),
                 'summary': {
                     'is_valid': status == "PASS",
@@ -995,17 +1078,16 @@ def analyze_pnomatic_control():
                 for category, score_data in analysis_result['scoring']['category_scores'].items():
                     if isinstance(score_data, dict):
                         response_data['category_scores'][category] = {
-                            'score': score_data.get('normalized', score_data.get('score', 0)),
-                            'max_score': score_data.get('max_weight', score_data.get('max_score', 0)),
+                            'score': score_data.get('normalized', 0),
+                            'max_score': score_data.get('max_weight', 0),
                             'percentage': score_data.get('percentage', 0),
-                            'status': 'PASS' if score_data.get('percentage', 0) >= 70 else 'CONDITIONAL' if score_data.get('percentage', 0) >= 50 else 'FAIL'
+                            'status': 'PASS' if score_data.get('percentage', 0) >= 70 else 'FAIL'
                         }
 
             return jsonify({
                 'success': True,
                 'message': 'Pnömatik Devre Şeması başarıyla analiz edildi',
                 'analysis_service': 'pneumatic_circuit',
-                'service_description': 'Pnömatik Devre Şeması Analizi',
                 'data': response_data
             })
 
@@ -1015,45 +1097,29 @@ def analyze_pnomatic_control():
                     os.remove(filepath)
             except:
                 pass
-            
             logger.error(f"Analiz hatası: {str(analysis_error)}")
-            return jsonify({
-                'error': 'Analysis failed',
-                'message': f'Pnömatik devre şeması analizi sırasında hata oluştu: {str(analysis_error)}',
-                'details': {
-                    'error_type': type(analysis_error).__name__,
-                    'file_processed': filename if 'filename' in locals() else 'unknown'
-                }
-            }), 500
+            return jsonify({'error': 'Analysis failed', 'message': str(analysis_error)}), 500
 
     except Exception as e:
         logger.error(f"API endpoint hatası: {str(e)}")
-        return jsonify({
-            'error': 'Server error',
-            'message': f'Sunucu hatası: {str(e)}'
-        }), 500
+        return jsonify({'error': 'Server error', 'message': str(e)}), 500
 
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Health check endpoint - Pnömatik için"""
+    """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
         'service': 'Pneumatic Circuit Diagram Analyzer API',
         'version': '1.0.0',
         'tesseract_available': tesseract_available,
-        'tesseract_info': tesseract_info,
-        'upload_folder': UPLOAD_FOLDER,
-        'max_file_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024),
-        'supported_formats': list(ALLOWED_EXTENSIONS),
-        'report_type': 'PNOMATIK_DEVRE_SEMASI',
-        'features': ['OCR', 'Visual Component Detection', 'ISO 5599 Compliance']
+        'report_type': 'PNOMATIK_DEVRE_SEMASI'
     })
 
 
 @app.route('/', methods=['GET'])
 def index():
-    """Ana sayfa - API bilgileri - Pnömatik için"""
+    """Ana sayfa - API bilgileri"""
     return jsonify({
         'service': 'Pneumatic Circuit Diagram Analyzer API',
         'version': '1.0.0',
@@ -1062,17 +1128,6 @@ def index():
             'POST /api/pnomatic-control': 'Pnömatik devre şeması analizi',
             'GET /api/health': 'Servis sağlık kontrolü',
             'GET /': 'Bu bilgi sayfası'
-        },
-        'usage': {
-            'upload_format': 'multipart/form-data',
-            'file_field': 'file',
-            'supported_types': list(ALLOWED_EXTENSIONS),
-            'max_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
-        },
-        'scoring': {
-            'PASS': '≥70% - ISO 5599 standardına uygun',
-            'CONDITIONAL': '50-69% - Kabul edilebilir',
-            'FAIL': '<50% - Standarda uygun değil'
         }
     })
 
@@ -1084,25 +1139,10 @@ if __name__ == '__main__':
     logger.info("=" * 60)
     logger.info("Pnömatik Devre Şeması Analiz Servisi")
     logger.info("=" * 60)
-    logger.info(f"📁 Upload klasörü: {UPLOAD_FOLDER}")
-    logger.info(f"📊 Desteklenen formatlar: {', '.join(ALLOWED_EXTENSIONS)}")
-    logger.info(f"📏 Maksimum dosya boyutu: {app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB")
-    logger.info(f"🔍 Tesseract OCR: {'Kurulu' if tesseract_available else 'Kurulu değil'}")
-    logger.info("")
-    logger.info("🔗 API Endpoints:")
-    logger.info("  POST /api/pnomatic-control - Pnömatik devre şeması analizi")
-    logger.info("  GET /api/health - Servis sağlık kontrolü")
-    logger.info("  GET / - API bilgileri")
-    logger.info("=" * 60)
     
     port = int(os.environ.get('PORT', 8010))
     
     logger.info(f"🚀 Servis başlatılıyor - Port: {port}")
     logger.info("=" * 60)
     
-    app.run(
-        host='0.0.0.0',
-        port=port,
-        debug=False
-    )
-        
+    app.run(host='0.0.0.0', port=port, debug=False)

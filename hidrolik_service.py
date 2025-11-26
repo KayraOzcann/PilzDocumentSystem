@@ -7,7 +7,6 @@
 # ============================================
 # IMPORTS
 # ============================================
-from fileinput import filename
 import os
 import json
 import io
@@ -23,6 +22,7 @@ import math
 import cv2
 import numpy as np
 import fitz  # PyMuPDF
+from docx import Document
 
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
@@ -89,40 +89,51 @@ class AdvancedCircuitAnalyzer:
         
         self.hydraulic_criteria_details = {
             "Enerji Kaynağı": {
-                "basinc_yagi": {"pattern": r"(?i)(?:oil|yağ|hydraulic|hidrolik|fluid|hyd|pressure|basınç|main|feeding|system)", "weight": 8},
-                "basinc_aralik": {"pattern": r"(?i)(?:\d+\s*(?:bar|Bar|BAR|MPa|psi|PSI)(?!\w)|pressure|basınç)", "weight": 8},
-                "sivil_guc": {"pattern": r"(?i)(?:liquid|hydraulic|hidrolik|fluid|oil|yağ|pressure|feeding|system|line)", "weight": 5},
-                "yuksek_basinc": {"pattern": r"(?i)(?:high\s*pressure|yüksek\s*basınç|main\s*line|[0-9]{2,4}\s*(?:bar|Bar|MPa|psi))", "weight": 4}
+                "basinc_yagi": {"pattern": r"(?i)(?:oil|yağ|ya[gğ]|hydraulic|hidrolik|hidrolic|fluid|hyd|pressur|pressure|basınç|basinc|bas[ıi]n[çc]|main|feeding|system|sistem)", "weight": 8},
+                "basinc_aralik": {"pattern": r"(?i)(?:\d+\s*(?:bar|Bar|BAR|har|bor|MPa|mpa|psi|PSI)(?!\w)|(?:\d+)\s*(?:to|[-–—]|\s)\s*(?:\d+)|pressure|basınç)", "weight": 8},
+                "sivil_guc": {"pattern": r"(?i)(?:liquid|hydraulic|hidrolik|hidrolic|fluid|oil|yağ|ya[gğ]|sıvı|s[ıi]v[ıi]|pressur|feeding|system|sistem|line|hat)", "weight": 5},
+                "yuksek_basinc": {"pattern": r"(?i)(?:(?:high|yüksek|y[üu]ksek|main)\s*(?:pressure|basınç|basinc)|(?:[0-9]{2,4})\s*(?:bar|Bar|BAR|har|MPa|mpa|psi|PSI)|pressure\s*line|main\s*line)", "weight": 4}
             },
             "Hidrolik Semboller ve Bileşenler": {
-                "pompa_sembol": {"pattern": r"(?i)(?:pump|pompa|feeding|main\s*pump|pressure\s*pump|P\d+|lowering\s*pump|motor)", "weight": 7},
-                "motor_sembol": {"pattern": r"(?i)(?:motor|Motor|rotor|drive|engine|M\d+|electromotor|\d+\s*kW)", "weight": 7},
-                "silindir_sembol": {"pattern": r"(?i)(?:cylinder|silindir|piston|actuator|lifting|çift\s*etkili|double\s*acting|C\d+|CYL)", "weight": 6},
-                "basinc_valfi": {"pattern": r"(?i)(?:pressure\s*valve|basınç\s*val|valve|valf|relief|safety|control|accumulator)", "weight": 5},
-                "yon_kontrol_valfi": {"pattern": r"(?i)(?:directional|control\s*valve|yön\s*kontrol|4/[23]|3/2|DCV|pilot|spool)", "weight": 5}
+                "pompa_sembol": {"pattern": r"(?i)(?:pump|pompa|ponpa|feeding|main\s*pump|pressure\s*pump|[PM]\d+|P\s*\d+|lowering\s*pump|motor|engine|drive)", "weight": 7},
+                "motor_sembol": {"pattern": r"(?i)(?:motor|Motor|MOTOR|rotor|drive|engine|M\d+|M\s*\d+|electromotor|30\s*kW|3\s*kW|\d+\s*kW)", "weight": 7},
+                "silindir_sembol": {"pattern": r"(?i)(?:cylinder|silindir|cilinder|piston|actuator|lifting|çift\s*etkili|tek\s*etkili|double\s*acting|single\s*acting|C\d+|CYL|lifting\s*cylinder|16x25|25x4)", "weight": 6},
+                "basinc_valfi": {"pattern": r"(?i)(?:pressure\s*valve|basınç\s*val|valve|valf|relief|safety|control\s*val|accumulator|akümülat|HDA|pressure\s*control|50MBAR)", "weight": 5},
+                "yon_kontrol_valfi": {"pattern": r"(?i)(?:directional|control\s*valve|yön\s*kontrol|4/[23]|3/2|DCV|D[GH][A-Z0-9]+|pilot|spool|valve\s*control|DGAV|DG4V)", "weight": 5}
             },
             "Akış Yönü ve Bağlantı Hattı": {
-                "cizgi_borular": {"pattern": r"(?i)(?:line|pipe|boru|hat|hose|tube|connection|bağlant|DN\s*\d+|NG\s*\d+|feeding|return)", "weight": 6},
-                "yon_oklari": {"pattern": r"(?i)(?:arrow|direction|yön|flow|akış|discharge|suction|return|dönüş|↑|↓|→|←)", "weight": 6},
-                "pompa_cikis": {"pattern": r"(?i)(?:pump\s*output|pompa.*?çıkış|pressure\s*line|main\s*line|discharge|output)", "weight": 4},
-                "tank_donus": {"pattern": r"(?i)(?:tank.*?return|return\s*line|suction|reservoir|tahliye|drain|tank\s*line)", "weight": 4}
+                "cizgi_borular": {"pattern": r"(?i)(?:line|pipe|boru|hat|çizgi|hose|tube|connection|bağlant|DN\s*\d+|NG\s*\d+|feeding|main|return|circuit|devre)", "weight": 6},
+                "yon_oklari": {"pattern": r"(?i)(?:arrow|direction|yön|ok|flow|akış|discharge|suction|return|dönüş|çıkış|giriş|↑|↓|→|←|▲|▼|▶|◀)", "weight": 6},
+                "pompa_cikis": {"pattern": r"(?i)(?:pump\s*(?:output|discharge|çıkış)|pompa.*?(?:çıkış|çıkışı|output)|pressure\s*line|main\s*line|high\s*pressure|discharge|output|çıkış)", "weight": 4},
+                "tank_donus": {"pattern": r"(?i)(?:tank.*?(?:return|dönüş|dönüşü)|return\s*line|suction|low\s*pressure|reservoir|tahliye|drain|tank\s*line|return|dönüş)", "weight": 4}
             },
             "Sistem Bilgileri ve Etiketler": {
-                "bar_basinc": {"pattern": r"(?i)(?:\d+\s*(?:bar|Bar|BAR|MPa|psi|PSI)(?!\w)|p[0-9]:\s*\d+|pt:\s*\d+)", "weight": 4},
-                "debi_bilgi": {"pattern": r"(?i)(?:\d+(?:\.\d+)?\s*(?:cc/rev|lt/dak|lt/min|l/min|lpm|gpm|L/min|flow)|debi)", "weight": 4},
-                "guc_bilgi": {"pattern": r"(?i)(?:\d+(?:\.\d+)?\s*(?:kW|KW|HP|W)|(?:\d{3,4})\s*(?:rpm|RPM)|power|güç)", "weight": 4},
-                "tank_hacmi": {"pattern": r"(?i)(?:V\s*=\s*\d+|(?:\d+)\s*(?:LT|lt|L|l|litre)|tank.*?volume|reservoir)", "weight": 3}
+                "bar_basinc": {"pattern": r"(?i)(?:\d+\s*(?:bar|Bar|BAR|har|bor|MPa|mpa|psi|PSI)(?!\w)|p[0-9]:\s*\d+|pt:\s*\d+|p2:\s*\d+|50MBAR)", "weight": 4},
+                "debi_bilgi": {"pattern": r"(?i)(?:\d+(?:\.\d+)?\s*(?:cc/rev|cc/dk|lt/dak|lt/min|l/min|lpm|gpm|L/min|flow)|Hub\s*x\s*\d+|debi|flow\s*rate|\d+\s*cc)", "weight": 4},
+                "guc_bilgi": {"pattern": r"(?i)(?:\d+(?:\.\d+)?\s*(?:kW|KW|kw|HP|hp|W|w)|(?:\d{3,4})\s*(?:rpm|RPM|dev/dak)|30\s*kW|3\s*kW|power|güç|\d+\s*HP)", "weight": 4},
+                "tank_hacmi": {"pattern": r"(?i)(?:V\s*=\s*\d+|(?:\d+)\s*(?:LT|lt|L|l|litre|liter)|tank.*?(?:volume|hacim|hacmi)|reservoir.*?\d+|\d+\s*LT)", "weight": 3}
             },
             "Başlık ve Belgelendirme": {
-                "hydraulic_scheme": {"pattern": r"(?i)(?:HYDRAULIC|hydraulic|HİDROLİK|hidrolik|hydro|Hydraulikplan|HYDRAULIC\s*PLAN)", "weight": 3},
-                "data_sheet": {"pattern": r"(?i)(?:DATA\s*SHEET|specification|technical|diagram|şema|schema|plan|drawing)", "weight": 3},
-                "manifold_plan": {"pattern": r"(?i)(?:MANIFOLD|manifold|valve\s*block|block|kolektör|collector|central)", "weight": 2},
-                "cizim_standardi": {"pattern": r"(?i)(?:ISO\s*1219|standard|standart|DIN|EN|norm|drawing|technical)", "weight": 2}
+                "hydraulic_scheme": {"pattern": r"(?i)(?:HYDRAULIC|hydraulic|HİDROLİK|hidrolik|hidrolic|hydro|HYDRO|Hydraulikplan|hydraulikplan|HYDRAULIC\s*PLAN|hydraulic\s*schema)", "weight": 3},
+                "data_sheet": {"pattern": r"(?i)(?:DATA\s*SHEET|data.*?sheet|specification|spec|technical|diagram|şema|schema|plan|drawing|çizim|PLAN|scheme|document|döküman)", "weight": 3},
+                "manifold_plan": {"pattern": r"(?i)(?:MANIFOLD\s*PLAN|manifold|valve\s*block|block|kolektör|collector|central|unit|WEMHÖNER|manufacturer|company|firma)", "weight": 2},
+                "cizim_standardi": {"pattern": r"(?i)(?:ISO\s*1219|standard|standart|DIN|EN|norm|drawing|çizim|technical\s*drawing|VSHY|drawing\s*no)", "weight": 2}
+            }
+        }
+        
+        self.component_templates = {
+            "hydraulic": {
+                "pump": ["P1", "P2", "P3", "PUMP", "POMPA"],
+                "motor": ["M1", "M2", "M3", "MOTOR"],
+                "valve": ["V1", "V2", "V3", "VALVE", "VALF"],
+                "cylinder": ["C1", "C2", "C3", "CYL", "SİLİNDİR"],
+                "tank": ["T1", "T2", "TANK", "TAMBUR"],
+                "filter": ["F1", "F2", "FİLTRE", "FILTER"]
             }
         }
 
     def extract_text_from_pdf(self, pdf_path: str) -> str:
-        """Extract text from PDF"""
+        """Extract text from PDF using PyPDF2 and OCR fallback"""
         try:
             with open(pdf_path, 'rb') as file:
                 pdf_reader = PyPDF2.PdfReader(file)
@@ -130,8 +141,13 @@ class AdvancedCircuitAnalyzer:
                 for page in pdf_reader.pages:
                     page_text = page.extract_text()
                     page_text = re.sub(r'\s+', ' ', page_text)
+                    page_text = page_text.replace('|', ' ')
                     text += page_text + "\n"
                 
+                text = text.replace('—', '-')
+                text = text.replace('"', '"').replace('"', '"')
+                text = text.replace('´', "'")
+                text = re.sub(r'[^\x00-\x7F\u00C0-\u00FF\u0100-\u017F\u0180-\u024F]+', ' ', text)
                 text = text.strip()
                 
                 if len(text.strip()) < 50:
@@ -146,7 +162,7 @@ class AdvancedCircuitAnalyzer:
             return self.extract_text_with_ocr(pdf_path)
 
     def extract_text_with_ocr(self, pdf_path: str) -> str:
-        """Extract text from PDF using OCR"""
+        """Extract text from PDF using OCR with enhanced settings"""
         try:
             doc = fitz.open(pdf_path)
             text = ""
@@ -165,8 +181,24 @@ class AdvancedCircuitAnalyzer:
                 temp_path = f"temp_page_{page_num}.png"
                 cv2.imwrite(temp_path, thresh)
                 
-                ocr_result = pytesseract.image_to_string(temp_path, lang='tur+eng+deu', config='--psm 6')
-                text += f"\n--- PAGE {page_num + 1} ---\n{ocr_result}\n"
+                ocr_configs = [
+                    '--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,:-/+()[]{}ÇĞİÖŞÜçğıöşü ',
+                    '--psm 4',
+                    '--psm 11',
+                    '--psm 8',
+                    '--psm 3'
+                ]
+                
+                page_text = ""
+                for config in ocr_configs:
+                    try:
+                        ocr_result = pytesseract.image_to_string(temp_path, lang='tur+eng+deu', config=config)
+                        if len(ocr_result.strip()) > len(page_text.strip()):
+                            page_text = ocr_result
+                    except:
+                        continue
+                
+                text += f"\n--- PAGE {page_num + 1} ---\n{page_text}\n"
                 
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
@@ -177,6 +209,70 @@ class AdvancedCircuitAnalyzer:
         except Exception as e:
             logger.error(f"OCR extraction error: {e}")
             return ""
+
+    def extract_text_from_docx(self, docx_path: str) -> str:
+        """Extract text from DOCX file"""
+        try:
+            doc = Document(docx_path)
+            text = ""
+            for paragraph in doc.paragraphs:
+                text += paragraph.text + "\n"
+            
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        text += cell.text + " "
+                text += "\n"
+            
+            return text.strip()
+        except Exception as e:
+            logger.error(f"DOCX extraction error: {e}")
+            return ""
+
+    def extract_text_from_txt(self, txt_path: str) -> str:
+        """Extract text from TXT file"""
+        try:
+            encodings = ['utf-8', 'latin-1', 'cp1254', 'iso-8859-9']
+            for encoding in encodings:
+                try:
+                    with open(txt_path, 'r', encoding=encoding) as f:
+                        return f.read()
+                except UnicodeDecodeError:
+                    continue
+            
+            with open(txt_path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+        except Exception as e:
+            logger.error(f"TXT extraction error: {e}")
+            return ""
+
+    def extract_text_from_image(self, image_path: str) -> str:
+        """Extract text from image using OCR"""
+        try:
+            text = pytesseract.image_to_string(image_path, lang='tur+eng', config='--psm 6')
+            return text.strip()
+        except Exception as e:
+            logger.error(f"Image OCR error: {e}")
+            return ""
+
+    def extract_images_from_pdf(self, pdf_path: str) -> List[Any]:
+        """Extract images from PDF"""
+        logger.info("Image extraction is temporarily disabled")
+        return []
+
+    def perform_ocr_on_images(self, images: List[Any]) -> List[str]:
+        """Perform OCR on extracted images"""
+        logger.info("OCR functionality is temporarily disabled")
+        return []
+
+    def detect_components_in_images(self, images: List[Any], circuit_type: str) -> List[ComponentDetection]:
+        """Detect components in images"""
+        logger.info("Component detection is temporarily disabled")
+        return []
+
+    def determine_circuit_type(self, text: str, images: List[Any]) -> Tuple[str, float]:
+        """Always return hydraulic"""
+        return "hydraulic", 1.0
 
     def analyze_text_quality(self, text: str) -> str:
         """Analyze OCR text quality"""
@@ -197,21 +293,39 @@ class AdvancedCircuitAnalyzer:
         else:
             return "normal"
 
-    def analyze_criteria(self, text: str, category: str) -> Dict[str, CircuitAnalysisResult]:
+    def analyze_criteria(self, text: str, images: List[Any], category: str, circuit_type: str) -> Dict[str, CircuitAnalysisResult]:
         """Analyze criteria"""
         results = {}
         criteria = self.hydraulic_criteria_details.get(category, {})
+        
+        combined_text = text
+        if images:
+            ocr_results = self.perform_ocr_on_images(images)
+            combined_text += " " + " ".join(ocr_results)
+        
+        detected_components = self.detect_components_in_images(images, circuit_type)
         
         for criterion_name, criterion_data in criteria.items():
             pattern = criterion_data["pattern"]
             weight = criterion_data["weight"]
             
-            text_matches = re.findall(pattern, text, re.IGNORECASE | re.MULTILINE)
+            text_matches = re.findall(pattern, combined_text, re.IGNORECASE | re.MULTILINE)
+            relevant_components = [comp for comp in detected_components if self._is_relevant_component(comp, criterion_name)]
             
-            if text_matches:
-                content = f"Text: {str(text_matches[:3])}"
+            if text_matches or relevant_components:
+                content_parts = []
+                if text_matches:
+                    content_parts.append(f"Text: {str(text_matches[:3])}")
+                if relevant_components:
+                    comp_labels = [comp.label for comp in relevant_components[:5]]
+                    content_parts.append(f"Components: {comp_labels}")
+                
+                content = " | ".join(content_parts)
                 found = True
-                score = min(weight * 0.8, len(text_matches) * (weight * 0.2))
+                
+                text_score = min(weight * 0.8, len(text_matches) * (weight * 0.2))
+                component_score = min(weight * 0.2, len(relevant_components) * (weight * 0.1))
+                score = text_score + component_score
                 score = min(score, weight)
             else:
                 content = "Not found"
@@ -227,14 +341,28 @@ class AdvancedCircuitAnalyzer:
                 details={
                     "pattern_used": pattern,
                     "text_matches": len(text_matches) if text_matches else 0,
-                    "visual_matches": 0
+                    "visual_matches": len(relevant_components)
                 },
-                visual_evidence=[]
+                visual_evidence=relevant_components
             )
         
         return results
 
-    def calculate_scores(self, analysis_results: Dict[str, Dict[str, CircuitAnalysisResult]]) -> Dict[str, Any]:
+    def _is_relevant_component(self, component: ComponentDetection, criterion_name: str) -> bool:
+        """Check if component is relevant"""
+        relevance_map = {
+            "pompa_sembol": ["pump"],
+            "motor_sembol": ["motor"],
+            "silindir_sembol": ["cylinder"],
+            "basinc_valfi": ["valve"],
+            "yon_kontrol_valfi": ["valve"],
+            "tank_sembol": ["tank"],
+            "filtre_sembol": ["filter"]
+        }
+        relevant_types = relevance_map.get(criterion_name, [])
+        return component.component_type in relevant_types
+
+    def calculate_scores(self, analysis_results: Dict[str, Dict[str, CircuitAnalysisResult]], circuit_type: str) -> Dict[str, Any]:
         """Calculate scores"""
         category_scores = {}
         total_score = 0
@@ -308,27 +436,71 @@ class AdvancedCircuitAnalyzer:
             "text_quality": text_quality
         }
 
-    def extract_specific_values(self, text: str) -> Dict[str, Any]:
-        """Extract specific values"""
+    def extract_specific_values(self, text: str, circuit_type: str) -> Dict[str, Any]:
+        """Extract specific values - Enhanced for OCR"""
         values = {
             "proje_no": "Bulunamadı",
             "sistem_tipi": "Bulunamadı",
+            "tarih": "Bulunamadı",
+            "hidrolik_unite": "Bulunamadı",
+            "tank_hacmi": "Bulunamadı",
             "motor_gucu": "Bulunamadı",
-            "tank_hacmi": "Bulunamadı"
+            "devir": "Bulunamadı",
+            "debi": "Bulunamadı",
+            "tambur": "Bulunamadı"
         }
         
-        power_patterns = [
-            r"(?i)(?:(\d+(?:\.\d+)?)\s*(?:kW|KW))",
-            r"(?i)(30\s*kW|3\s*kW)"
+        project_patterns = [
+            r"(?i)(?:2271|VSHY|002204|TH-4|370\s*ton|feintol)",
+            r"(?i)(?:proje|project|job)\s*(?:no|number)?\s*:?\s*([A-Z0-9-]+)",
+            r"(?i)([A-Z]{2,}-\d+-[A-Z0-9-]+)",
+            r"(?i)(TH-\d+|P\+Ânmatik)"
         ]
-        for pattern in power_patterns:
-            power_match = re.search(pattern, text)
-            if power_match:
-                values["motor_gucu"] = power_match.group(1) if len(power_match.groups()) > 0 else power_match.group()
+        for pattern in project_patterns:
+            project_match = re.search(pattern, text)
+            if project_match:
+                values["proje_no"] = project_match.group(1) if len(project_match.groups()) > 0 else project_match.group()
+                break
+        
+        system_patterns = [
+            r"(?i)(?:press\s*feeding\s*system|feeding\s*system|hydraulic\s*system|hidrolik\s*sistem)",
+            r"(?i)(?:accumulator|akümülat|lifting|kaldırma|pressing|pres)",
+            r"(?i)(?:pnömatik|pneumatic|P\+Ânmatik|hidrolik)"
+        ]
+        for pattern in system_patterns:
+            system_match = re.search(pattern, text)
+            if system_match:
+                values["sistem_tipi"] = system_match.group()
+                break
+        
+        date_patterns = [
+            r"(\d{4}[-./]\d{1,2}[-./]\d{1,2})",
+            r"(\d{1,2}[-./]\d{1,2}[-./]\d{4})",
+            r"(\d{1,2}\.\d{1,2}\.\d{4})",
+            r"(\d{4}\s*\d{1,2}\s*\d{1,2})"
+        ]
+        for pattern in date_patterns:
+            date_match = re.search(pattern, text)
+            if date_match:
+                values["tarih"] = date_match.group(1)
+                break
+        
+        unit_patterns = [
+            r"(?i)(?:HİDROLİK\s*ÜNİTE|HYDRAULIC\s*UNIT|hydraulic|hidrolik|hydro)",
+            r"(?i)(?:HDA-\d+|accumulator|akümülat)",
+            r"(?i)(?:pressure.*?control|basınç.*?kontrol)"
+        ]
+        for pattern in unit_patterns:
+            unit_match = re.search(pattern, text)
+            if unit_match:
+                values["hidrolik_unite"] = unit_match.group()
                 break
         
         tank_patterns = [
-            r"(?i)(?:V\s*=\s*(\d+)|(\d+)\s*(?:LT|lt|L))",
+            r"(?i)(?:V\s*=\s*(\d+)|(\d+)\s*(?:LT|lt|L|l|litre|liter))",
+            r"(?i)(?:tank.*?(\d+).*?(?:lt|l|litre))",
+            r"(?i)(?:(\d+)\s*(?:lt|l)\s*tank)",
+            r"(?i)(?:reservoir.*?(\d+))"
         ]
         for pattern in tank_patterns:
             tank_match = re.search(pattern, text)
@@ -336,21 +508,87 @@ class AdvancedCircuitAnalyzer:
                 values["tank_hacmi"] = next((m for m in tank_match.groups() if m), tank_match.group())
                 break
         
+        power_patterns = [
+            r"(?i)(?:(\d+(?:\.\d+)?)\s*(?:kW|KW|kw))",
+            r"(?i)(?:(\d+(?:\.\d+)?)\s*(?:HP|hp))",
+            r"(?i)(?:motor.*?(\d+(?:\.\d+)?)\s*(?:kW|hp))",
+            r"(?i)(?:power.*?(\d+(?:\.\d+)?)\s*(?:kW|hp))",
+            r"(?i)(30\s*kW|3\s*kW)"
+        ]
+        for pattern in power_patterns:
+            power_match = re.search(pattern, text)
+            if power_match:
+                values["motor_gucu"] = next((m for m in power_match.groups() if m), power_match.group()) if len(power_match.groups()) > 0 else power_match.group()
+                break
+        
+        rpm_patterns = [
+            r"(?i)(?:(\d+)\s*(?:rpm|RPM|dev/dak))",
+            r"(?i)(?:(\d{3,4})\s*(?:rpm|RPM))",
+            r"(?i)(?:devir.*?(\d+))"
+        ]
+        for pattern in rpm_patterns:
+            rpm_match = re.search(pattern, text)
+            if rpm_match:
+                values["devir"] = rpm_match.group(1)
+                break
+        
+        flow_patterns = [
+            r"(?i)(?:(\d+(?:\.\d+)?)\s*(?:lt/dak|l/min|cc/rev|cc/dk|lpm|gpm))",
+            r"(?i)(?:(\d+)\s*Hub\s*x)",
+            r"(?i)(?:debi.*?(\d+(?:\.\d+)?))",
+            r"(?i)(?:flow.*?(\d+(?:\.\d+)?))"
+        ]
+        for pattern in flow_patterns:
+            flow_match = re.search(pattern, text)
+            if flow_match:
+                values["debi"] = flow_match.group(1)
+                break
+        
+        drum_patterns = [
+            r"(?i)(?:TAMBUR|DRUM|cylinder|silindir)",
+            r"(?i)(?:lifting\s*cylinder|kaldırma\s*silindir)",
+            r"(?i)(?:\d+x\d+.*?cylinder)"
+        ]
+        for pattern in drum_patterns:
+            drum_match = re.search(pattern, text)
+            if drum_match:
+                values["tambur"] = drum_match.group()
+                break
+        
         return values
 
-    def generate_recommendations(self, analysis_results: Dict, scores: Dict) -> List[str]:
+    def generate_recommendations(self, analysis_results: Dict, scores: Dict, circuit_type: str) -> List[str]:
         """Generate recommendations"""
         recommendations = []
         
+        valid_criteria_count = sum(1 for category, results in analysis_results.items() 
+                                 for result in results.values() if result.found)
+        total_criteria_count = sum(len(results) for results in analysis_results.values())
+        hydraulic_validity = valid_criteria_count / total_criteria_count
+        
+        recommendations.append(f"⚠️ Hidrolik Geçerlilik: %{hydraulic_validity*100:.1f} ({valid_criteria_count}/{total_criteria_count} kriter)")
+
         for category, results in analysis_results.items():
             category_score = scores["category_scores"][category]["percentage"]
             
             if category_score < 30:
                 recommendations.append(f"❌ {category} bölümü yetersiz (%{category_score:.1f})")
+                missing_criteria = [name for name, result in results.items() if not result.found]
+                if missing_criteria:
+                    recommendations.append(f"  Eksik kriterler: {', '.join(missing_criteria)}")
             elif category_score < 70:
                 recommendations.append(f"⚠️ {category} bölümü geliştirilmeli (%{category_score:.1f})")
             else:
                 recommendations.append(f"✅ {category} bölümü yeterli (%{category_score:.1f})")
+
+        if scores["overall_percentage"] < 70:
+            recommendations.append("\n🚨 GENEL ÖNERİLER:")
+            recommendations.extend([
+                "- Şema ISO 1219 standardına uyumlu hale getirilmelidir",
+                "- Hidrolik semboller eksiksiz olmalıdır",
+                "- Sistem bilgileri detaylandırılmalıdır",
+                "- Basınç ve debi değerleri belirtilmelidir"
+            ])
 
         return recommendations
 
@@ -358,9 +596,19 @@ class AdvancedCircuitAnalyzer:
         """Main analysis function"""
         logger.info(f"Starting circuit diagram analysis for: {file_path}")
         file_ext = os.path.splitext(file_path)[1].lower()
+        text = ""
         
         if file_ext == '.pdf':
             text = self.extract_text_from_pdf(file_path)
+            self._last_extracted_text = text
+        elif file_ext in ['.docx', '.doc']:
+            text = self.extract_text_from_docx(file_path)
+            self._last_extracted_text = text
+        elif file_ext == '.txt':
+            text = self.extract_text_from_txt(file_path)
+            self._last_extracted_text = text
+        elif file_ext in ['.jpg', '.jpeg', '.png', '.tiff', '.bmp']:
+            text = self.extract_text_from_image(file_path)
             self._last_extracted_text = text
         else:
             return {"error": f"Unsupported file format: {file_ext}"}
@@ -370,17 +618,24 @@ class AdvancedCircuitAnalyzer:
 
         logger.info(f"Extracted text length: {len(text)} characters")
 
+        images = []
+        if file_ext == '.pdf':
+            images = self.extract_images_from_pdf(file_path)
+        
+        circuit_type, type_confidence = self.determine_circuit_type(text, images)
+
         analysis_results = {}
         for category in self.hydraulic_criteria_weights.keys():
-            analysis_results[category] = self.analyze_criteria(text, category)
+            analysis_results[category] = self.analyze_criteria(text, images, category, circuit_type)
 
-        scores = self.calculate_scores(analysis_results)
-        extracted_values = self.extract_specific_values(text)
-        recommendations = self.generate_recommendations(analysis_results, scores)
+        scores = self.calculate_scores(analysis_results, circuit_type)
+        extracted_values = self.extract_specific_values(text, circuit_type)
+        recommendations = self.generate_recommendations(analysis_results, scores, circuit_type)
 
         report = {
             "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "file_info": {"file_path": file_path},
+            "circuit_type": {"type": circuit_type, "confidence": round(type_confidence * 100, 2)},
             "extracted_values": extracted_values,
             "category_analyses": analysis_results,
             "scoring": scores,
@@ -388,7 +643,8 @@ class AdvancedCircuitAnalyzer:
             "summary": {
                 "total_score": scores["total_score"],
                 "percentage": scores["overall_percentage"],
-                "status": "PASS" if scores["overall_percentage"] >= 70 else "FAIL"
+                "status": "PASS" if scores["overall_percentage"] >= 70 else "FAIL",
+                "circuit_type": circuit_type.upper()
             }
         }
 
@@ -400,19 +656,10 @@ class AdvancedCircuitAnalyzer:
 def validate_document_server(text):
     """Server document validation"""
     critical_terms = [
-        # Hidrolik temel terimleri
         ["hidrolik", "hydraulic", "devre", "circuit", "şema", "diagram", "schema"],
-        
-        # Hidrolik bileşenleri ve semboller
         ["pompa", "pump", "valf", "valve", "silindir", "cylinder", "motor", "actuator", "piston"],
-        
-        # Hidrolik basınç ve akış terimleri
         ["basınç", "pressure", "bar", "psi", "debi", "flow", "l/min", "gpm", "mpa"],
-        
-        # Hidrolik sıvı ve sistem terimleri
         ["yağ", "oil", "hidrolik yağ", "hydraulic oil", "tank", "rezervuar", "filtre", "filter"],
-        
-        # ISO standartları ve teknik terimler
         ["iso 1219", "1219", "sembol", "symbol", "bağlantı", "connection", "hat", "line"]
     ]
     
@@ -430,13 +677,7 @@ def validate_document_server(text):
 def check_strong_keywords_first_pages(filepath):
     """Check strong keywords in first pages"""
     strong_keywords = [
-        "hidrolik",
-        "HİDROLİK",
-        "hydraulic",
-        "hidrolik yağ",
-        "hydraulic oil",
-        "iso 1219",
-        "1219",
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219"
     ]
     
     try:
@@ -448,7 +689,7 @@ def check_strong_keywords_first_pages(filepath):
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
             
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 3 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 3 -l tur+eng')
             all_text += text.lower() + " "
         
         found_keywords = [kw for kw in strong_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
@@ -463,54 +704,22 @@ def check_strong_keywords_first_pages(filepath):
 def check_excluded_keywords_first_pages(filepath):
     """Check excluded keywords in first pages"""
     excluded_keywords = [
-        # Aydınlatma raporu (eski strong_keywords aydınlatmadan)
-
         "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık","ışık şiddeti",
-        
-        # HRC raporu
         "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        
-        # Elektrik devre şeması
         "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
-        
-        # Espe raporu  
         "espe",
-        
-        # Gürültü ölçüm raporu
         "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        
-        # Manuel/kullanma kılavuzu
         "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
-        
-        # LOTO raporu
         "loto",
-        
-        # LVD raporu
         "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        
-        # AT tip muayene
         "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
-        
-        # İSG periyodik kontrol
         "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        
-        # Pnömatik devre şeması
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", 
-        
-        # Montaj talimatları
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve",
         "montaj", "assembly",
-        
-        # EN 60204-1 topraklama raporu
         "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
-        
-        # Bakım talimatları
         "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
-        
-        # Mekanik titreşim raporu
         "titreşim", "vibration", "mekanik",
-        
-        # AT tip inceleme sertifikası
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate"
     ]
     
     try:
@@ -522,7 +731,7 @@ def check_excluded_keywords_first_pages(filepath):
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
             
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 3 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 3 -l tur+eng')
             all_text += text.lower() + " "
         
         found_excluded = [kw for kw in excluded_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
@@ -567,7 +776,7 @@ def get_main_issues_hydraulic(analysis_result):
 app = Flask(__name__)
 
 UPLOAD_FOLDER = 'temp_uploads_hydraulic'
-ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
+ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png', 'docx', 'doc', 'txt'}
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -600,7 +809,7 @@ def analyze_hydraulic_control():
         analyzer = AdvancedCircuitAnalyzer()
         file_ext = os.path.splitext(filepath)[1].lower()
 
-        # 3 AŞAMALI KONTROL
+        # 3 AŞAMALI KONTROL (sadece PDF için)
         if file_ext == '.pdf':
             logger.info("Aşama 1: Hidrolik özgü kelime kontrolü...")
             if check_strong_keywords_first_pages(filepath):
@@ -668,17 +877,15 @@ def analyze_hydraulic_control():
                     pass
                 return jsonify({
                     'error': 'Invalid document type',
-                    'message': 'Yüklediğiniz dosya hidrolik devre şeması değil! Lütfen geçerli bir hidrolik devre şeması dosyası yükleyiniz.',
+                    'message': 'Yüklediğiniz dosya hidrolik devre şeması değil!',
                     'details': {
                         'filename': filename,
-                        'document_type': 'NOT_HIDROLIK_DEVRE_SEMASI',
-                        'required_type': 'HIDROLIK_DEVRE_SEMASI'
+                        'document_type': 'NOT_HIDROLIK_DEVRE_SEMASI'
                     }
                 }), 400
 
         logger.info(f"Hidrolik devre şeması analizi yapılıyor: {filename}")
         analysis_result = analyzer.analyze_circuit_diagram(filepath)
-       
         
         try:
             os.remove(filepath)

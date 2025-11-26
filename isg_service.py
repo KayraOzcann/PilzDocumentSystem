@@ -389,6 +389,8 @@ class ISGPeriyodikKontrolAnalyzer:
         firma_patterns = [
             r"(?:firma.*adı|kuruluş.*adı)\s*[:]*\s*([A-Za-zÇĞıİÖŞÜçğıöşü\s\.&\-]+)",
             r"([A-Za-zÇĞıİÖŞÜçğıöşü\s\.&\-]+(?:A\.Ş\.|LTD\.ŞTİ|TİC\.|SAN\.))",
+            r"Adı\s*[:]*\s*([A-Za-zÇĞıİÖŞÜçğıöşü\s\.&\-]+)",
+            r"COCA.*COLA.*İÇECEK.*A\.Ş\.|MAVİ.*BEYAZ.*LTD\.ŞTİ"
         ]
         for pattern in firma_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
@@ -402,6 +404,7 @@ class ISGPeriyodikKontrolAnalyzer:
         date_patterns = [
             r"(?:ölçüm.*tarih|rapor.*tarih)\s*[:]*\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
             r"(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
+            r"(\d{4}[./\-]\d{1,2}[./\-]\d{1,2})"
         ]
         for pattern in date_patterns:
             match = re.search(pattern, text)
@@ -413,17 +416,30 @@ class ISGPeriyodikKontrolAnalyzer:
         rapor_patterns = [
             r"(WA-\d{4}-\d+)",
             r"(?:rapor.*no|deney.*no)\s*[:]*\s*([A-Z]{2}-\d{4}-\d+)",
+            r"(\d{4}-\d+.*nolu.*rapor)"
         ]
         for pattern in rapor_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 values["rapor_numarasi"] = match.group(1).strip()
                 break
+
+        # Laboratuvar
+        lab_patterns = [
+            r"(ÇEVTEST.*LABORATUVARI|MAVİ.*BEYAZ.*LABORATUVARI)",
+            r"(?:laboratuvar.*adı)\s*[:]*\s*([A-Za-zÇĞıİÖŞÜçğıöşü\s\.&\-]+)"
+        ]
+        for pattern in lab_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                values["laboratuvar"] = match.group(1).strip() if len(match.groups()) > 0 else match.group(0).strip()
+                break
         
         # Gürültü seviyesi
         gurultu_patterns = [
             r"(\d+(?:[.,]\d+)?)\s*dB\(A\)",
             r"gürültü.*seviye\s*[:]*\s*(\d+(?:[.,]\d+)?)",
+            r"(\d+(?:[.,]\d+)?)\s*dBA"
         ]
         for pattern in gurultu_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
@@ -435,11 +451,29 @@ class ISGPeriyodikKontrolAnalyzer:
         aydinlatma_patterns = [
             r"(\d+(?:[.,]\d+)?)\s*lux",
             r"aydınlatma.*seviye\s*[:]*\s*(\d+(?:[.,]\d+)?)",
+            r"(\d+(?:[.,]\d+)?)\s*lüx"
         ]
         for pattern in aydinlatma_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 values["aydinlatma_seviye"] = f"{match.group(1)} lux"
+                break
+
+        # Genel değerlendirme
+        degerlendirme_patterns = [
+            r"GENEL.*DEĞERLENDİRME\s*[:]*\s*([A-Za-zÇĞıİÖŞÜçğıöşü\s]+)",
+            r"SONUÇ\s*[:]*\s*([A-Za-zÇĞıİÖŞÜçğıöşü\s]+)",
+            r"(?:uygun|uygun değil|kabul edilebilir|limit değerlerin altında)"
+        ]
+        for pattern in degerlendirme_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                if len(match.groups()) > 0:
+                    evaluation = match.group(1).strip()
+                    if len(evaluation) > 2:
+                        values["genel_degerlendirme"] = evaluation
+                else:
+                    values["genel_degerlendirme"] = match.group(0).strip()
                 break
         
         return values

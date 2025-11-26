@@ -1,8 +1,10 @@
+"""
+Elektrik Devre Şeması Analiz Servisi
+====================================
+Endpoint: POST /api/elektrik-report
+Health: GET /api/health
+"""
 
-
-# ============================================
-# IMPORTS
-# ============================================
 import re
 import os
 import json
@@ -24,16 +26,9 @@ import pytesseract
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
-# ============================================
-# LOGGING CONFIGURATION
-# ============================================
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-
-# ============================================
-# ANALİZ SINIFI - DATA CLASSES
-# ============================================
 @dataclass
 class ComponentDetection:
     component_type: str
@@ -52,10 +47,6 @@ class CircuitAnalysisResult:
     details: Dict[str, Any]
     visual_evidence: List[ComponentDetection]
 
-
-# ============================================
-# ANALİZ SINIFI - MAIN ANALYZER
-# ============================================
 class AdvancedElectricCircuitAnalyzer:
     
     def __init__(self):
@@ -141,31 +132,85 @@ class AdvancedElectricCircuitAnalyzer:
         except Exception as e:
             logger.warning(f"Advanced image preprocessing failed: {e}")
             return img
-
     def extract_text_from_pdf(self, pdf_path: str) -> str:
-        """Extract text from PDF using PyPDF2"""
+        """Extract text and symbols from PDF using PyMuPDF and OCR"""
         try:
-            with open(pdf_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
-                text = ""
-                total_pages = len(pdf_reader.pages)
+            import fitz  # PyMuPDF
+            import io
+            
+            if not os.path.exists(pdf_path):
+                logger.error(f"PDF file does not exist: {pdf_path}")
+                return ""
                 
-                logger.info(f"PDF analizi başlatılıyor - Toplam sayfa: {total_pages}")
+            if not os.access(pdf_path, os.R_OK):
+                logger.error(f"PDF file is not readable: {pdf_path}")
+                return ""
+            
+            text = ""
+            try:
+                pdf_document = fitz.open(pdf_path)
                 
-                for page_num, page in enumerate(pdf_reader.pages):
-                    page_text = page.extract_text()
-                    page_text = re.sub(r'\s+', ' ', page_text)
-                    page_text = page_text.strip()
-                    text += page_text + "\n"
+                # Configure OCR for better symbol recognition
+                custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,-_/\\()[]{}+=<>~!@#$%^&*⏚⊥Ω∆±→←↑↓~≈⎓⌁∿⚡⤾⟲⥀▶►⊳⊲△↧●○◯⊙⟶⇾▭□⊏⊐|\\'
                 
-                # Metni temizle ve normalize et
-                text = self._normalize_electrical_text(text)
+                for page_num in range(len(pdf_document)):
+                    try:
+                        page = pdf_document[page_num]
+                        
+                        # First try direct text extraction
+                        try:
+                            page_text = page.get_text("text", flags=2)
+                        except:
+                            page_text = ""
+                        
+                        # If no text or minimal text, use OCR
+                        if not page_text.strip() or len(page_text.strip()) < 50:
+                            zoom = 4.0
+                            mat = fitz.Matrix(zoom, zoom)
+                            try:
+                                pix = page.get_pixmap(matrix=mat, alpha=False)
+                            except:
+                                try:
+                                    pix = page.get_pixmap(zoom=zoom, alpha=False)
+                                except:
+                                    logger.warning(f"Could not get pixmap for page {page_num + 1}")
+                                    continue
+                            
+                            img_data = pix.tobytes("png")
+                            img = Image.open(io.BytesIO(img_data))
+                            processed_img = self._preprocess_image_for_ocr(img)
+                            page_text = pytesseract.image_to_string(processed_img, config=custom_config)
+                        
+                        page_text = self._normalize_electrical_text(page_text)
+                        text += page_text + "\n"
+                        
+                        logger.info(f"Successfully extracted text from page {page_num + 1}")
+                        
+                    except Exception as page_error:
+                        logger.warning(f"Failed to process page {page_num + 1}: {str(page_error)}")
+                        continue
                 
-                logger.info(f"✅ PDF analizi tamamlandı - Metin uzunluğu: {len(text):,} karakter")
+                pdf_document.close()
+                
+                if not text.strip():
+                    logger.warning(f"No text extracted from PDF: {pdf_path}")
+                    return ""
+                
+                logger.info(f"Successfully extracted text from PDF: {pdf_path}")
+                logger.info(f"Extracted text length: {len(text)} characters")
+                    
                 return text
                 
+            except Exception as doc_error:
+                logger.error(f"Failed to process PDF document: {str(doc_error)}")
+                return ""
+                
+        except ImportError as imp_error:
+            logger.error(f"Required library not found: {str(imp_error)}")
+            logger.error("Please install: pip install PyMuPDF opencv-python Pillow pytesseract")
+            return ""
         except Exception as e:
-            logger.error(f"PDF metin çıkarma hatası: {e}")
+            logger.error(f"PDF text extraction error: {str(e)}")
             return ""
 
     def _process_electrical_symbols(self, text: str) -> str:
@@ -180,31 +225,174 @@ class AdvancedElectricCircuitAnalyzer:
         return text
 
     def _normalize_electrical_text(self, text: str) -> str:
-        """Normalize electrical terms"""
+        """Normalize electrical terms and measurements"""
         unit_map = {
             r'([0-9]+)\s*[vV]\b': r'\1 volt',
             r'([0-9]+)\s*[aA]\b': r'\1 amp',
             r'([0-9]+)\s*[wW]\b': r'\1 watt',
             r'([0-9]+)\s*[hH][zZ]\b': r'\1 hertz',
-            r'([0-9]+)\s*Ω': r'\1 ohm'
+            r'([0-9]+)\s*Ω': r'\1 ohm',
+            r'([0-9]+)\s*[kK][vV][aA]': r'\1 kva',
+            r'([0-9]+)\s*[mM][aA]': r'\1 milliamp',
+            r'([0-9]+)\s*[µuU][fF]': r'\1 microfarad',
+            r'([0-9]+)\s*[pP][fF]': r'\1 picofarad',
+            r'([0-9]+)\s*[mM][hH]': r'\1 millihenry'
         }
+        
         for pattern, replacement in unit_map.items():
             text = re.sub(pattern, replacement, text)
+        
         text = text.replace('—', '-').replace('"', '"').replace('"', '"')
+        text = text.replace('´', "'")
         text = re.sub(r'[^\x00-\x7F\u00C0-\u00FF\u0100-\u017F\u0180-\u024F]+', ' ', text)
         return text.strip()
 
     def extract_images_from_pdf(self, pdf_path: str) -> List[Any]:
-        """Extract images from PDF - simplified for Azure"""
-        return []  # Simplified - OCR yapılmayacak
+        """Extract images from PDF for symbol recognition"""
+        try:
+            import fitz
+            import io
+            
+            images = []
+            pdf_document = fitz.open(pdf_path)
+            
+            for page_num in range(pdf_document.page_count):
+                try:
+                    page = pdf_document[page_num]
+                    
+                    zoom = 2.0
+                    mat = fitz.Matrix(zoom, zoom)
+                    try:
+                        pix = page.get_pixmap(matrix=mat, alpha=False)
+                    except:
+                        try:
+                            pix = page.get_pixmap(zoom=zoom, alpha=False)
+                        except:
+                            logger.warning(f"Could not get pixmap for page {page_num + 1}")
+                            continue
+                    
+                    img_data = pix.tobytes("png")
+                    img = Image.open(io.BytesIO(img_data))
+                    img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+                    gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+                    binary = cv2.adaptiveThreshold(
+                        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                        cv2.THRESH_BINARY, 11, 2
+                    )
+                    denoised = cv2.fastNlMeansDenoising(binary)
+                    
+                    image_data = {
+                        'data': cv2.imencode('.png', denoised)[1].tobytes(),
+                        'size': (denoised.shape[1], denoised.shape[0]),
+                        'format': 'png',
+                        'page': page_num
+                    }
+                    images.append(image_data)
+                    
+                    logger.info(f"Successfully extracted image from page {page_num + 1}")
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to process page {page_num + 1}: {e}")
+                    continue
+            
+            pdf_document.close()
+            return images
+            
+        except Exception as e:
+            logger.error(f"Image extraction error: {e}")
+            return []
 
     def perform_ocr_on_images(self, images: List[Any]) -> List[str]:
-        """Perform OCR - simplified"""
-        return []
+        """Perform OCR on extracted images"""
+        try:
+            ocr_results = []
+            for img_data in images:
+                try:
+                    nparr = np.frombuffer(img_data['data'], np.uint8)
+                    img_cv = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
+                    
+                    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+                    img_cv = clahe.apply(img_cv)
+                    img_cv = cv2.fastNlMeansDenoising(img_cv)
+                    _, binary = cv2.threshold(img_cv, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                    
+                    img_pil = Image.fromarray(binary)
+                    
+                    custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,-_/\\()[]{}+=<>~!@#$%^&*⏚⊥Ω∆±→←↑↓~≈⎓⌁∿⚡'
+                    
+                    text = pytesseract.image_to_string(img_pil, config=custom_config)
+                    text = self._normalize_electrical_text(text)
+                    
+                    if 'page' in img_data:
+                        text = f"[Page {img_data['page'] + 1}] {text}"
+                    
+                    ocr_results.append(text)
+                    logger.info(f"OCR successful on page {img_data.get('page', 'unknown')}")
+                    
+                except Exception as e:
+                    logger.warning(f"OCR failed: {e}")
+                    continue
+            
+            return ocr_results
+            
+        except Exception as e:
+            logger.error(f"OCR processing error: {e}")
+            return []
 
     def detect_components_in_images(self, images: List[Any], circuit_type: str) -> List[ComponentDetection]:
-        """Detect components - simplified"""
-        return []
+        """Detect electrical components in images"""
+        try:
+            detected_components = []
+            templates = self.component_templates.get(circuit_type, {})
+            
+            for img_data in images:
+                try:
+                    nparr = np.frombuffer(img_data['data'], np.uint8)
+                    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    binary = cv2.adaptiveThreshold(
+                        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                        cv2.THRESH_BINARY, 11, 2
+                    )
+                    
+                    contours, _ = cv2.findContours(
+                        binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                    )
+                    
+                    for contour in contours:
+                        x, y, w, h = cv2.boundingRect(contour)
+                        roi = gray[y:y+h, x:x+w]
+                        
+                        if w < 20 or h < 20:
+                            continue
+                        
+                        for comp_type, labels in templates.items():
+                            for label in labels:
+                                template = np.zeros((50, 100), dtype=np.uint8)
+                                cv2.putText(template, label, (10, 30),
+                                          cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+                                
+                                result = cv2.matchTemplate(roi, template, cv2.TM_CCOEFF_NORMED)
+                                _, confidence, _, _ = cv2.minMaxLoc(result)
+                                
+                                if confidence > 0.8:
+                                    detected_components.append(
+                                        ComponentDetection(
+                                            component_type=comp_type,
+                                            label=label,
+                                            position=(x+w//2, y+h//2),
+                                            confidence=float(confidence),
+                                            bounding_box=(x, y, w, h)
+                                        )
+                                    )
+                except Exception as e:
+                    logger.warning(f"Component detection failed: {e}")
+                    continue
+            
+            return detected_components
+        except Exception as e:
+            logger.error(f"Component detection error: {e}")
+            return []
 
     def determine_circuit_type(self, text: str, images: List[Any]) -> Tuple[str, float]:
         return "electric", 1.0
@@ -214,16 +402,36 @@ class AdvancedElectricCircuitAnalyzer:
         results = {}
         criteria = self.electric_criteria_details.get(category, {})
         
+        combined_text = text
+        if images:
+            ocr_results = self.perform_ocr_on_images(images)
+            combined_text += " " + " ".join(ocr_results)
+        
+        detected_components = self.detect_components_in_images(images, circuit_type)
+        
         for criterion_name, criterion_data in criteria.items():
             pattern = criterion_data["pattern"]
             weight = criterion_data["weight"]
             
-            matches = re.findall(pattern, text, re.IGNORECASE | re.MULTILINE)
+            text_matches = re.findall(pattern, combined_text, re.IGNORECASE | re.MULTILINE)
             
-            if matches:
-                content = f"Text: {str(matches[:3])}"
+            relevant_components = [comp for comp in detected_components 
+                                 if self._is_relevant_component(comp, criterion_name)]
+            
+            if text_matches or relevant_components:
+                content_parts = []
+                if text_matches:
+                    content_parts.append(f"Text: {str(text_matches[:3])}")
+                if relevant_components:
+                    comp_labels = [comp.label for comp in relevant_components[:5]]
+                    content_parts.append(f"Components: {comp_labels}")
+                
+                content = " | ".join(content_parts)
                 found = True
-                score = min(weight * 0.8, len(matches) * (weight * 0.2))
+                
+                text_score = min(weight * 0.8, len(text_matches) * (weight * 0.2))
+                component_score = min(weight * 0.2, len(relevant_components) * (weight * 0.1))
+                score = text_score + component_score
                 score = min(score, weight)
             else:
                 content = "Not found"
@@ -238,10 +446,10 @@ class AdvancedElectricCircuitAnalyzer:
                 max_score=weight,
                 details={
                     "pattern_used": pattern,
-                    "text_matches": len(matches) if matches else 0,
-                    "visual_matches": 0
+                    "text_matches": len(text_matches) if text_matches else 0,
+                    "visual_matches": len(relevant_components)
                 },
-                visual_evidence=[]
+                visual_evidence=relevant_components
             )
         
         return results
@@ -259,7 +467,7 @@ class AdvancedElectricCircuitAnalyzer:
         }
         relevant_types = relevance_map.get(criterion_name, [])
         return component.component_type in relevant_types
-
+    
     def calculate_scores(self, analysis_results: Dict[str, Dict[str, CircuitAnalysisResult]], 
                         circuit_type: str) -> Dict[str, Any]:
         category_scores = {}
@@ -292,7 +500,7 @@ class AdvancedElectricCircuitAnalyzer:
         return {
             "category_scores": category_scores,
             "total_score": round(final_score, 2),
-            "overall_percentage": round((final_score / 100 * 100), 2)
+            "overall_percentage": round(final_score, 2)
         }
 
     def extract_specific_values(self, text: str, circuit_type: str) -> Dict[str, Any]:
@@ -344,10 +552,23 @@ class AdvancedElectricCircuitAnalyzer:
             
             if category_score < 40:
                 recommendations.append(f"❌ {category} bölümü yetersiz (%{category_score:.1f})")
+                missing_criteria = [name for name, result in results.items() if not result.found]
+                if missing_criteria:
+                    recommendations.append(f"  Eksik kriterler: {', '.join(missing_criteria)}")
             elif category_score < 70:
                 recommendations.append(f"⚠️ {category} bölümü geliştirilmeli (%{category_score:.1f})")
             else:
                 recommendations.append(f"✅ {category} bölümü yeterli (%{category_score:.1f})")
+
+        if scores["overall_percentage"] < 70:
+            recommendations.append("\n🚨 GENEL ÖNERİLER:")
+            recommendations.extend([
+                "- Şema IEC veya ANSI standardına uyumlu hale getirilmelidir",
+                "- Elektriksel semboller eksiksiz olmalıdır",
+                "- Bağlantı hatları net gösterilmelidir",
+                "- Bileşenler etiketlenmelidir",
+                "- Voltaj, akım ve güç değerleri belirtilmelidir"
+            ])
 
         return recommendations
 
@@ -383,14 +604,8 @@ class AdvancedElectricCircuitAnalyzer:
 
 
 # ============================================
-# HELPER FUNCTIONS (Server Validasyon)
+# HELPER FUNCTIONS
 # ============================================
-def map_language_code(lang_code):
-    """Dil kodunu tam isme çevir"""
-    lang_mapping = {'tr': 'turkish', 'en': 'english', 'de': 'german', 'fr': 'french', 'es': 'spanish', 'it': 'italian'}
-    return lang_mapping.get(lang_code, 'turkish')
-
-
 def validate_document_server(text):
     """Elektrik doküman validasyonu"""
     critical_terms = [
@@ -415,17 +630,8 @@ def validate_document_server(text):
 def check_strong_keywords_first_pages(filepath):
     """İlk sayfada elektrik özgü kelime kontrolü - OCR"""
     strong_keywords = [
-        "elektrik", 
-        "circuit", 
-        "electrical", 
-        "voltage", 
-        "amper", 
-        "ohm",
-        "enclosure",
-        "wrp-",
-        "light curtain",
-        "contactors",
-        "controller",
+        "elektrik", "circuit", "electrical", "voltage", "amper", "ohm",
+        "enclosure", "wrp-", "light curtain", "contactors", "controller"
     ]
     
     try:
@@ -435,7 +641,7 @@ def check_strong_keywords_first_pages(filepath):
             opencv_image = cv2.cvtColor(np.array(page), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng')
             all_text += text.lower() + " "
         
         found = [kw for kw in strong_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
@@ -449,53 +655,22 @@ def check_strong_keywords_first_pages(filepath):
 def check_excluded_keywords_first_pages(filepath):
     """İlk sayfada excluded keyword kontrolü - OCR"""
     excluded = [
-        # Topraklama raporu (eski strong_keywords)
-        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
-        
-        # Aydınlatma raporu
+        "topraklama direnci", "grounding", "earthing", "60204", "topraklama", "TOPRAKLAMA DİRENCİ",
         "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
-        
-        # HRC raporu
         "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        
-        # Espe raporu  
         "espe",
-        
-        # Hidrolik devre şeması
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
-        
-        # Gürültü ölçüm raporu
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
         "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        
-        # Manuel/kullanma kılavuzu
-        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
-        
-        # LOTO raporu
+        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
         "loto",
-        
-        # LVD raporu
-        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        
-        # AT tip muayene (AT uygunluk beyanı)
+        "lvd", "TOPRAKLAMA SÜREKLİLİK", "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
         "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
-        
-        # İSG periyodik kontrol
         "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        
-        # Pnömatik devre şeması
         "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
-        
-        # Montaj talimatları
         "montaj", "assembly",
-        
-        # Bakım talimatları
-        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
-        
-        # Mekanik titreşim raporu
+        "bakım", "maintenance", "servis", "service", "bakim", "MAINTENCE",
         "titreşim", "vibration", "mekanik",
-        
-        # AT tip inceleme sertifikası
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate"
     ]
     
     try:
@@ -505,7 +680,7 @@ def check_excluded_keywords_first_pages(filepath):
             opencv_image = cv2.cvtColor(np.array(page), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng')
             all_text += text.lower() + " "
         
         found = [kw for kw in excluded if re.search(rf"\b{kw.lower()}\b", all_text)]
@@ -524,7 +699,7 @@ def get_conclusion_message_elektrik(status, percentage):
 
 
 # ============================================
-# FLASK SERVİS KATMANI - CONFIGURATION
+# FLASK APPLICATION
 # ============================================
 app = Flask(__name__)
 
@@ -541,10 +716,6 @@ app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-
-# ============================================
-# FLASK SERVİS KATMANI - API ENDPOINTS
-# ============================================
 @app.route('/api/elektrik-report', methods=['POST'])
 def analyze_elektrik_report():
     """Elektrik Devre Şeması analiz endpoint'i"""
@@ -698,9 +869,6 @@ def index():
     })
 
 
-# ============================================
-# APPLICATION ENTRY POINT (Azure-Friendly)
-# ============================================
 if __name__ == '__main__':
     logger.info("=" * 60)
     logger.info("Elektrik Devre Şeması Analiz Servisi")

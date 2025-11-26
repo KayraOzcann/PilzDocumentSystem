@@ -246,5 +246,214 @@
     },
     "comments": [],
     "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket4",
+    "ticket_id": "at_type_cert_20251126_102503",
+    "document_name": "dirinler-makina-cdsh-11.pdf",
+    "document_type": "AT_TIP_INCELEME_SERTIFIKASI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/dirinler-makina-cdsh-11.pdf",
+    "opening_date": "2025-11-26T10:25:03.652872",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 68.0,
+        "status": "FAIL",
+        "status_tr": "GEÇERSİZ",
+        "total_points": 68.0
+      },
+      "category_scores": {
+        "Başvuru Sahibi/İmalatçı Bilgileri": {
+          "max_score": 20,
+          "percentage": 50.0,
+          "score": 10.0,
+          "status": "FAIL"
+        },
+        "Belge Geçerlilik Bilgileri": {
+          "max_score": 10,
+          "percentage": 70.0,
+          "score": 7.0,
+          "status": "PASS"
+        },
+        "Değerlendirme Sonucu": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Makine Tanımı": {
+          "max_score": 15,
+          "percentage": 53.33,
+          "score": 8.0,
+          "status": "FAIL"
+        },
+        "Onaylanmış Kuruluş Bilgileri": {
+          "max_score": 20,
+          "percentage": 70.0,
+          "score": 14.0,
+          "status": "PASS"
+        },
+        "Uygulanan Hükümler": {
+          "max_score": 15,
+          "percentage": 86.67,
+          "score": 13.0,
+          "status": "PASS"
+        },
+        "İncelenen Tip Tanımı": {
+          "max_score": 10,
+          "percentage": 60.0,
+          "score": 6.0,
+          "status": "FAIL"
+        }
+      },
+      "extracted_values": {
+        "Belge Numarası": "erans",
+        "Direktif Atfı": "2006/42/EC",
+        "Düzenlenme Tarihi": "26.12.2019",
+        "Geçerlilik Süresi": "Bulunamadı",
+        "Kuruluş Kimlik No": "Bulunamadı",
+        "Makine Tipi": "INCELEMESI BELGESI",
+        "Makinenin Ticari Adı": "Bulunamadı",
+        "Model": "Bulunamadı",
+        "Onaylanmış Kuruluş Adresi": "Bulunamadı",
+        "Onaylanmış Kuruluş Adı": "GÖZETİM VE EĞİTİM HİZMETLERİ",
+        "Seri No": "Bulunamadı",
+        "Uygulanan Standartlar": "EN ISO 16092-1:2018, EN ISO 16092-2:2018, EN ISO 13849-1:2015, EN ISO 12100:2010, EN 60204-1:2018",
+        "Yetkili Kişi": "Bulunamadı",
+        "İmalatçı Adresi": "Bulunamadı",
+        "İmalatçı Adı": "Üretici"
+      },
+      "recommendations": [
+        "🚨 KRİTİK EKSİKLİKLER - BELGE GEÇERSİZDİR!",
+        "⚠️ 2006/42/EC Ek IX'a göre aşağıdaki bilgilerden biri eksikse belge geçersizdir:",
+        "  ❌ Onaylanmış Kuruluş Bilgileri: Onaylanmış kuruluşun adresi",
+        "  ❌ Başvuru Sahibi/İmalatçı Bilgileri: İmalatçı veya yetkili temsilcinin tam adresi",
+        "  ❌ Makine Tanımı: Seri numarası veya tanımlamayı sağlayan bilgiler",
+        "  ❌ İncelenen Tip Tanımı: İncelenen tipin ayrıntılı tanımı",
+        "  ❌ Belge Geçerlilik Bilgileri: Yetkili temsilcinin imzası",
+        "",
+        "🚨 Onaylanmış Kuruluş Bilgileri - Kritik Eksikler:",
+        "  ❌ Onaylanmış kuruluşun adresi",
+        "🚨 Başvuru Sahibi/İmalatçı Bilgileri - Kritik Eksikler:",
+        "  ❌ İmalatçı veya yetkili temsilcinin tam adresi",
+        "🚨 Makine Tanımı - Kritik Eksikler:",
+        "  ❌ Seri numarası veya tanımlamayı sağlayan bilgiler",
+        "🚨 İncelenen Tip Tanımı - Kritik Eksikler:",
+        "  ❌ İncelenen tipin ayrıntılı tanımı",
+        "🚨 Belge Geçerlilik Bilgileri - Kritik Eksikler:",
+        "  ❌ Yetkili temsilcinin imzası",
+        "🔴 SONUÇ: BELGE GEÇERSİZDİR",
+        "⚖️ Hukuki Durum: 2006/42/EC Ek IX gereksinimlerini karşılamıyor",
+        "🔧 Acil Eylem: Eksik bilgileri tamamlayarak yeni belge düzenlenmeli"
+      ],
+      "summary": {
+        "conclusion": "AT Tip İnceleme Sertifikası direktife uygun değil (%68)",
+        "is_valid": false,
+        "main_issues": [
+          "Kritik eksik: Onaylanmış Kuruluş Bilgileri: Onaylanmış kuruluşun adresi",
+          "Kritik eksik: Başvuru Sahibi/İmalatçı Bilgileri: İmalatçı veya yetkili temsilcinin tam adresi",
+          "Kritik eksik: Makine Tanımı: Seri numarası veya tanımlamayı sağlayan bilgiler",
+          "Kritik eksik: İncelenen Tip Tanımı: İncelenen tipin ayrıntılı tanımı"
+        ]
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket5",
+    "ticket_id": "titresim_20251126_113046",
+    "document_name": "Coca_Cola_Titresim_Olcum_Raporu.pdf",
+    "document_type": "MEKANIK_TITRESIM_OLCUM_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/Coca_Cola_Titresim_Olcum_Raporu.pdf",
+    "opening_date": "2025-11-26T11:30:46.384203",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 80.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 80.0
+      },
+      "category_scores": {
+        "Değerlendirme, Yorum ve Önlemler": {
+          "max_score": 20,
+          "percentage": 60.0,
+          "score": 12.0,
+          "status": "CONDITIONAL"
+        },
+        "Ekler ve Görseller": {
+          "max_score": 5,
+          "percentage": 60.0,
+          "score": 3.0,
+          "status": "CONDITIONAL"
+        },
+        "Rapor Kimlik Bilgileri": {
+          "max_score": 10,
+          "percentage": 60.0,
+          "score": 6.0,
+          "status": "CONDITIONAL"
+        },
+        "Titreşim Türleri ve Yasal Değerler": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Ölçüm Cihazı ve Kalibrasyon Bilgileri": {
+          "max_score": 10,
+          "percentage": 60.0,
+          "score": 6.0,
+          "status": "CONDITIONAL"
+        },
+        "Ölçüm Metodolojisi ve Uygulanan Standartlar": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Ölçüm Ortam, Makine ve Çalışan Bilgileri": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Ölçüm Sonuçları ve Analizler": {
+          "max_score": 20,
+          "percentage": 90.0,
+          "score": 18.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "a8_degeri": "Bulunamadı",
+        "firma_adi": "Bulunamadı",
+        "olcum_cihazi": "Bulunamadı",
+        "olcum_tarihi": "28.11.2023",
+        "rapor_numarasi": "Bulunamadı",
+        "rapor_tarihi": "Rapor tarihi ayrı belirtilmemiş",
+        "titresim_turu": "El-Kol Titreşimi",
+        "yasal_uygunluk": "UYGUN"
+      },
+      "recommendations": [
+        "❌ RAPOR GEÇERSİZ: Ölçüm tarihi 1 yıldan eski"
+      ],
+      "summary": {
+        "conclusion": "Mekanik titreşim ölçüm raporu TS EN ISO 5349 ve TS ISO 2631 standartlarına uygundur (%80)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
   }
 ]
