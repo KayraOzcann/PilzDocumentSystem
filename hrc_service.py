@@ -118,7 +118,7 @@ class HRCReportAnalyzer:
                 "vucut_bolgesi_limitleri": {"pattern": r"(?i)(?:izin\s*verilen|allowed|permitted|limit|sınır|maksimum\s*izin|maximum\s*allowed|kabul\s*edilebilir|acceptable)[\s\S]*?(?:kuvvet|force|basınç|pressure)", "weight": 6},
                 "asim_risk_isaret": {"pattern": r"(?i)(?:aşım|exceed|over|fazla|limit\s*aş|limit\s*over|risk|tehlike|hazard|warning|uyarı|alert|güvenli\s*değil|not\s*safe|tehlikeli|dangerous)", "weight": 6}
             },
-            "Risk Değerlendirmesi ve Sonuç": {
+           "Risk Değerlendirmesi ve Sonuç": {
                 "risk_seviye_analizi": {"pattern": r"(?i)(?:risk\s*analiz|risk\s*analysis|risk\s*assessment|risk\s*değerlendirme|risk|seviye|level|kategori|category|düşük|low|orta|medium|yüksek|high|değerlendirme|assessment)", "weight": 4},
                 "risk_kabul_edilebilir": {"pattern": r"(?i)(?:kabul\s*edilebilir|acceptable|accept|uygun|suitable|güvenli|safe|güvenlik|safety|onay|approve|red|reject|kabul|uygunluk|compliance)", "weight": 3},
                 "gereken_onlemler": {"pattern": r"(?i)(?:önlem|measure|action|tedbir|hız\s*sınır|speed\s*limit|güvenlik\s*sensör|safety\s*sensor|uç\s*efektör|end\s*effector|koruma|protection|emniyet|security)", "weight": 3}
@@ -456,7 +456,7 @@ def check_strong_keywords_first_pages(filepath):
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
             
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 3 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 3 -l tur+eng')
             all_text += text.lower() + " "
         
         found_keywords = [kw for kw in strong_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
@@ -498,7 +498,7 @@ def check_excluded_keywords_first_pages(filepath):
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
             
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng')
             all_text += text.lower() + " "
         
         found_excluded = [kw for kw in excluded_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]

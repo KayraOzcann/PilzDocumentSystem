@@ -20,12 +20,12 @@ init_db(app)
 # ============================================
 
 # Servis bilgileri
-DOCUMENT_TYPE_CODE = 'lvd_report'  # TODO: Değiştir (örn: 'electric_circuit', 'espe_report')
-DOCUMENT_TYPE_NAME = 'LVD Raporu Analizi'  # TODO: Değiştir
-DOCUMENT_TYPE_DESCRIPTION = 'LVD Raporlarının Analizi'  # TODO: Değiştir
-SERVICE_FILE = 'lvd_service.py'  # TODO: Değiştir
-ENDPOINT = '/api/lvd-report'  # TODO: Değiştir
-ICON = '⚡'  # TODO: Değiştir
+DOCUMENT_TYPE_CODE = 'pneumatic_circuit'  # TODO: Değiştir (örn: 'electric_circuit', 'espe_report')
+DOCUMENT_TYPE_NAME = 'Pnömatik Devre Şeması Analizi'  # TODO: Değiştir
+DOCUMENT_TYPE_DESCRIPTION = 'Pnömatik Devre Şemalarının Analizi'  # TODO: Değiştir
+SERVICE_FILE = 'pnomatic_service.py'  # TODO: Değiştir
+ENDPOINT = '/api/pnomatic-control'  # TODO: Değiştir
+ICON = '💨'  # TODO: Değiştir
 # ============================================
 # TODO: CRITERIA WEIGHTS (Kategoriler + Puanlar)
 # ============================================
@@ -34,12 +34,11 @@ ICON = '⚡'  # TODO: Değiştir
 # Eğer yoksa: {}
 
 criteria_weights_data = {
-            "Genel Rapor Bilgileri": 15,
-            "Ölçüm Metodu ve Standart Referansları": 15,
-            "Ölçüm Sonuç Tablosu": 25,
-            "Uygunluk Değerlendirmesi": 20,
-            "Görsel ve Teknik Dökümantasyon": 10,
-            "Sonuç ve Öneriler": 15
+            "Temel Sistem Bileşenleri": 25,
+            "Pnömatik Semboller ve Vana Sistemleri": 30,
+            "Akış Yönü ve Bağlantı Hatları": 20,
+            "Sistem Bilgileri ve Teknik Parametreler": 15,
+            "Dokümantasyon ve Standart Uygunluk": 10
 }
 
 # ============================================
@@ -53,43 +52,136 @@ criteria_weights_data = {
 # Eğer yoksa: {}
 
 criteria_details_data = {
-            "Genel Rapor Bilgileri": {
-                "proje_adi_numarasi": {"pattern": r"(?:Project\s*(?:Name|No)|Proje\s*(?:Ad[ıi]|No)|Report\s*Title|Document\s*Title|E\d{2}\.\d{3}|C\d{2}\.\d{3}|T\d{2,3}[-.]?\d{3,4})", "weight": 3},
-                "olcum_tarihi": {"pattern": r"(?:Measurement\s*Date|Ölçüm\s*Tarihi|Test\s*Date|Date\s*of\s*(?:Test|Measurement)|Measured\s*on|Tested\s*on|\d{1,2}[./\-]\d{1,2}[./\-]\d{4})", "weight": 3},
-                "rapor_tarihi": {"pattern": r"(?:Report\s*Date|Rapor\s*Tarihi|Issue\s*Date|Document\s*Date|Prepared\s*on|Created\s*on|Date|Tarih|\d{1,2}[./\-]\d{1,2}[./\-]\d{4})", "weight": 3},
-                "tesis_bolge_hat": {"pattern": r"(?:Customer|Müşteri|Client|Facility|Tesis|Plant|Factory|Company|Firma|Toyota|DANONE|Ford|BOSCH)", "weight": 2},
-                "rapor_numarasi": {"pattern": r"(?:Report\s*No|Rapor\s*No|Document\s*No|Belge\s*No|E\d{2}\.\d{3}|C\d{2}\.\d{3}|SM\s*\d+|MCC\d+)", "weight": 2},
-                "revizyon": {"pattern": r"(?:Version|Revizyon|Rev\.?|v)\s*[:=]?\s*(\d+|[A-Z])", "weight": 1},
-                "firma_personel": {"pattern": r"(?:Prepared\s*by|Hazırlayan|Performed\s*by|Ölçümü\s*Yapan|Consultant|Engineer|PILZ)", "weight": 1}
+            "Temel Sistem Bileşenleri": {
+                "hava_kaynagi_ve_hazirlama": {
+                    "pattern": r"(?i)(?:pressure\s*source|hava\s*kaynağı|basınçlı\s*hava|air\s*supply|P\s*=\s*\d+.*?bar|kompresör|compressor|VHS|MS6|SPAN|pneumatic|pnömatik|bar|P\d*|basınç|hava|asansör|elevator|lift|coiltech|press\s*feeding\s*system)",
+                    "weight": 5,
+                    "description": "Hava kaynağı ve hazırlama ünitesi"
+                },
+                "filtre_regulator_lubrikator": {
+                    "pattern": r"(?i)(?:FRL|filtre|filter|regulator|regülatör|lubricator|yağlayıcı|MS6-LFR|MS6-EM1|MS6-EE|kondisyoner|conditioner|air\s*treatment|hava\s*hazırlama|hazırlama|FESTO|festo|data\s*sheet|pneumatic\s*plan)",
+                    "weight": 5,
+                    "description": "Hava hazırlama grubu (FRL)"
+                },
+                "basinc_gosterge_sensoru": {
+                    "pattern": r"(?i)(?:manometre|pressure.*?gauge|gösterge|indicator|PI|PT|PS|basınç.*?sensör|SPAN-B2R|ölçüm|measurement|gauge|ölçer|pressure|basınç|coiltech|doğu\s*pres)",
+                    "weight": 4,
+                    "description": "Basınç gösterge ve sensörleri"
+                },
+                "susturucu_egzoz": {
+                    "pattern": r"(?i)(?:susturucu|muffler|exhaust|egzoz|silencer|⊥|tahliye|MS6-DL|vent|boşaltım|exhaust|R|S|tahliye|pinch\s*roll|doğrultma)",
+                    "weight": 4,
+                    "description": "Susturucu ve egzoz elemanları"
+                },
+                "genel_pnomatik_sistem": {
+                    "pattern": r"(?i)(?:pneumatic|pnömatik|circuit|devre|diagram|diyagram|şema|schema|sistem|system|air|hava|○|□|◇|△|asansör|elevator|lift|P5|VS|version|coiltech|press\s*feeding|açıcı|kavrama|üst\s*baski|alt\s*baski|fren)",
+                    "weight": 7,
+                    "description": "Genel pnömatik sistem varlığı"
+                }
             },
-            "Ölçüm Metodu ve Standart Referansları": {
-                "olcum_cihazi": {"pattern": r"(?:Measuring\s*Instrument|Ölçüm\s*Cihaz[ıi]|Test\s*Equipment|Multimeter|Multimetre|Ohmmeter|Instrument|Equipment|Device|Tester|Fluke|Metrix|Chauvin|Megger|Hioki)", "weight": 6},
-                "kalibrasyon": {"pattern": r"(?:Calibration|Kalibrasyon|Kalibre|Certificate|Sertifika|Cal\s*Date)", "weight": 4},
-                "standartlar": {"pattern": r"(?:EN\s*60204[-\s]*1?|IEC\s*60364|Standard|Standart)", "weight": 5}
+            "Pnömatik Semboller ve Vana Sistemleri": {
+                "silindir_actuator": {
+                    "pattern": r"(?i)(?:silindir|cylinder|piston|actuator|çift.*?etkili|tek.*?etkili|double.*?acting|single.*?acting|C\d+|MGF|═══|▬▬▬|━━━|CYL|SIL|◊|⬟|⬢|üst\s*baski|alt\s*baski|açıcı|kavrama)",
+                    "weight": 8,
+                    "description": "Silindir ve aktüatör sembolleri"
+                },
+                "yon_kontrol_vanalar": {
+                    "pattern": r"(?i)(?:VUVG|Y\d+|V\d+|valf|valve|5/2|4/2|3/2|2/2|yön.*?kontrol|directional.*?control|solenoid|FESTO|□|■|⬜|⬛|vana|kontrol|coiltech|press\s*feeding|fren)",
+                    "weight": 10,
+                    "description": "Yön kontrol vanaları (FESTO VUVG serisi)"
+                },
+                "hiz_kontrol_vanalar": {
+                    "pattern": r"(?i)(?:hız.*?kontrol|speed.*?control|flow.*?control|akış.*?kontrol|throttle|kısıcı|VQZ|FHG|⧨|◈|◇|flow|akış|pinch\s*roll|doğrultma)",
+                    "weight": 6,
+                    "description": "Hız kontrol vanaları"
+                },
+                "basinc_kontrol_vanalar": {
+                    "pattern": r"(?i)(?:basınç.*?kontrol|pressure.*?control|relief|emniyet|PRV|basınç.*?azaltıcı|VHA|relief|basınç|pressure|coiltech|data\s*sheet)",
+                    "weight": 6,
+                    "description": "Basınç kontrol vanaları"
+                }
             },
-            "Ölçüm Sonuç Tablosu": {
-                "sira_numarasi": {"pattern": r"(?:S[ıi]ra\s*(?:No|Numaras[ıi])|^\s*\d+\s)", "weight": 3},
-                "makine_hat_bolge": {"pattern": r"(?:8X45|8X50|8X9J|9J73|8X52|8X60|8X62|8X70)\s*(?:R[1-9])?\s*(?:Hatt[ıi]|Line|Zone|Bölge)", "weight": 3},
-                "olcum_noktasi": {"pattern": r"(?:Robot\s*\d+\.\s*Eksen\s*Motoru|Kalemtraş|Lift\s*and\s*Shift|Motor|Ekipman|Equipment|Device)", "weight": 3},
-                "rlo_degeri": {"pattern": r"(\d+[.,]?\d*)\s*(?:mΩ|mohm|ohm|Ω)", "weight": 5},
-                "yuk_iletken_kesiti": {"pattern": r"(?:4x4|4x2[.,]5|4x6|4x10|Yük\s*İletken|Load\s*Conductor|PE\s*İletken|PE\s*Conductor)", "weight": 4},
-                "referans_degeri": {"pattern": r"(?:500\s*mΩ|500\s*ohm|500\s*Ω|EN\s*60204|IEC\s*60364)", "weight": 3},
-                "uygunluk_durumu": {"pattern": r"(?:UYGUN|OK|PASS|Compliant|Uygun)", "weight": 4},
-                "kesit_uygunlugu": {"pattern": r"(?:UYGUN|OK|PASS|Compliant|Uygun)", "weight": 3}
+            "Akış Yönü ve Bağlantı Hatları": {
+                "hava_besleme_hatlari": {
+                    "pattern": r"(?i)(?:besleme|supply.*?line|hava.*?hattı|ana.*?hat|pressure.*?line|P|feed|input|giriş)",
+                    "weight": 5,
+                    "description": "Hava besleme hatları"
+                },
+                "calisma_hatlari": {
+                    "pattern": r"(?i)(?:A|B|çalışma.*?hattı|working.*?line|port|SV\d+A|SV\d+B|output|çıkış)",
+                    "weight": 5,
+                    "description": "Çalışma hatları (A, B portları)"
+                },
+                "egzoz_tahliye_hatlari": {
+                    "pattern": r"(?i)(?:R|S|EA|EB|egzoz|exhaust|tahliye|drain|vent|return|boşaltım)",
+                    "weight": 3,
+                    "description": "Egzoz ve tahliye hatları"
+                },
+                "yon_oklari_akim_gosterimi": {
+                    "pattern": r"(?i)(?:→|←|↑|↓|⇒|⇐|⇑|⇓|yön|direction|ok|arrow|akış|flow|hat|line)",
+                    "weight": 4,
+                    "description": "Yön okları ve akış gösterimi"
+                },
+                "baglanti_hatlari": {
+                    "pattern": r"(?i)(?:bağlantı|connection|hat|line|pipe|boru|tube|hose)",
+                    "weight": 3,
+                    "description": "Genel bağlantı hatları"
+                }
             },
-            "Uygunluk Değerlendirmesi": {
-                "toplam_olcum_nokta": {"pattern": r"(?:222|220|200|Toplam.*\d+)", "weight": 5},
-                "uygun_nokta_sayisi": {"pattern": r"(?:211|210|UYGUN)", "weight": 5},
-                "uygunsuz_isaretleme": {"pattern": r"\*D\.Y", "weight": 5, "reverse_logic": True},
-                "standart_referans_uygunluk": {"pattern": r"(?:500\s*mΩ|EN\s*60204)", "weight": 5}
+            "Sistem Bilgileri ve Teknik Parametreler": {
+                "calisma_basinci": {
+                    "pattern": r"(?i)(?:P\s*=\s*\d+(?:\.\d+)?.*?bar|\d+(?:\.\d+)?.*?bar|çalışma.*?basınç|working.*?pressure|4-6.*?bar|basınç|pressure|\d+\s*bar|6\s*bar|4\s*bar|pneumatic|pnömatik)",
+                    "weight": 4,
+                    "description": "Çalışma basıncı değerleri"
+                },
+                "hava_tuketimi": {
+                    "pattern": r"(?i)(?:Q\s*=\s*\d+.*?l/min|\d+.*?l/min|hava.*?tüketim|air.*?consumption|flow.*?rate|tüketim|consumption|l/min|flow)",
+                    "weight": 3,
+                    "description": "Hava tüketimi değerleri"
+                },
+                "strok_boyutlari": {
+                    "pattern": r"(?i)(?:strok|stroke|s\s*=\s*\d+.*?mm|\d+.*?mm|boyut|dimension|mesafe|size|mm|cm|asansör.*?mesafe|elevator.*?stroke)",
+                    "weight": 3,
+                    "description": "Strok ve boyut bilgileri"
+                },
+                "vana_tipleri_ozellikler": {
+                    "pattern": r"(?i)(?:VUVG-B14-P53C|normalde.*?kapalı|normalde.*?açık|NC|NO|spring.*?return|yay.*?geri|5/2|4/2|3/2|2/2|FESTO|festo)",
+                    "weight": 3,
+                    "description": "Vana tipleri ve özellikleri"
+                },
+                "teknik_parametreler": {
+                    "pattern": r"(?i)(?:teknik|technical|parametre|parameter|özellik|specification|spec|asansör|elevator|P5|VS|version|sistem|system)",
+                    "weight": 2,
+                    "description": "Genel teknik parametre varlığı"
+                }
             },
-            "Görsel ve Teknik Dökümantasyon": {
-                "cihaz_baglanti_fotografi": {"pattern": r"(?:Cihaz.*Fotoğraf|Bağlant[ıi].*Fotoğraf|Ölçüm.*Cihaz|Photo|Image|Figure|Resim|Görsel)", "weight": 10}
-            },
-            "Sonuç ve Öneriler": {
-                "genel_uygunluk": {"pattern": r"(?:Genel\s*Uygunluk|Sonuç|UYGUN|UYGUNSUZ|Result|Conclusion|Compliant|Non-compliant)", "weight": 8},
-                "standart_atif": {"pattern": r"(?:EN\s*60204|IEC\s*60364|Standart.*Atıf|Standart.*Referans|Standard.*Reference)", "weight": 7}
-        }
+            "Dokümantasyon ve Standart Uygunluk": {
+                "sembol_standartlari": {
+                    "pattern": r"(?i)(?:ISO.*?1219|DIN.*?ISO|pnömatik.*?sembol|pneumatic.*?symbol|standart|standard|ISO|DIN|FESTO|festo)",
+                    "weight": 2,
+                    "description": "Sembol standartları"
+                },
+                "cizim_bilgileri": {
+                    "pattern": r"(?i)(?:çizim.*?tarih|drawing.*?date|tasarım.*?tarih|design.*?date|\d{2}.\d{2}.\d{4}|\d{2}/\d{2}/\d{4}|created|designed|tarih|date|P5|VS|version|V\d+)",
+                    "weight": 2,
+                    "description": "Çizim bilgileri ve tarihler"
+                },
+                "proje_bilgileri": {
+                    "pattern": r"(?i)(?:proje.*?adı|project.*?name|sistem.*?adı|luggage.*?punch|asansör|elevator|toyota|description|açıklama|P5|VS|version)",
+                    "weight": 2,
+                    "description": "Proje bilgileri"
+                },
+                "firma_logo_imza": {
+                    "pattern": r"(?i)(?:ACT|festo|FESTO|müstafa.*?altuntaş|onay.*?tarih|approval|kontrol.*?tarih|check|created.*?by|checked.*?by|approved|firma|company)",
+                    "weight": 2,
+                    "description": "Firma logosu ve imza bilgileri"
+                },
+                "dokumantasyon_genel": {
+                    "pattern": r"(?i)(?:revision|rev|circuit.*?number|customer|müşteri|sheet|size|boyut|asansör|elevator|P5|VS|diagram|diyagram|şema|schema)",
+                    "weight": 2,
+                    "description": "Genel dokümantasyon varlığı"
+                }
+            }
 }     
 
 
@@ -103,213 +195,110 @@ criteria_details_data = {
 # }
 # Eğer yoksa: {}
 pattern_definitions_data = {
-        "check_date_validity": {
-            "olcum_patterns": [
-            # Türkçe formatlar
-            r"(?:Ölçüm\s*Tarihi|Test\s*Tarihi|Ölçüm\s*Yapıldığı\s*Tarih)\s*[:=]\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            r"(?:Ölçüm|Test).*?(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            r"(\d{1,2}[./\-]\d{1,2}[./\-]\d{4}).*?(?:ölçüm|test)",
-            
-            # İngilizce formatlar
-            r"(?:Measurement\s*Date|Test\s*Date|Date\s*of\s*(?:Test|Measurement))\s*[:=]\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            r"(?:Measured\s*on|Tested\s*on)\s*[:=]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            r"(\d{1,2}[./\-]\d{1,2}[./\-]\d{4}).*?(?:measurement|test)",
-            
-            # Genel formatlar
-            r"(\d{4}[./\-]\d{1,2}[./\-]\d{1,2})",
-            r"(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})",
-            r"(\d{1,2}\s+(?:Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık)\s+\d{4})"
-        ],
 
-        # Rapor tarihi arama - çok kapsamlı pattern'lar
-        "rapor_patterns" : [
-            # Türkçe formatlar
-            r"(?:Rapor\s*Tarihi|Belge\s*Tarihi|Hazırlanma\s*Tarihi)\s*[:=]\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            r"(?:Rapor|Belge).*?(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            r"(?:Hazırlayan|Hazırlandı)\s*[:=]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            
-            # İngilizce formatlar
-            r"(?:Report\s*Date|Document\s*Date|Issue\s*Date|Prepared\s*Date)\s*[:=]\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            r"(?:Prepared\s*on|Issued\s*on|Created\s*on)\s*[:=]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            
-            # Genel formatlar
-            r"(?:Date|Tarih)\s*[:=]\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            r"(\d{4}[./\-]\d{1,2}[./\-]\d{1,2})",
-            r"(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})",
-            r"(\d{1,2}\s+(?:Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık)\s+\d{4})"
-            ]
+        "visual_templates": {
+            "pneumatic_cylinders": ["cylinder", "piston", "MGF", "silindir"],
+            "pneumatic_valves": ["VUVG", "valve", "valf", "Y01", "Y02"],
+            "pneumatic_frl": ["FRL", "filtre", "regulator", "MS6"],
+            "pneumatic_connections": ["connection", "T", "junction", "bağlantı"],
+            "flow_arrows": ["arrow", "ok", "→", "←"],
+            "pressure_gauges": ["gauge", "manometer", "PI", "pressure"]
         },
-        "general_patterns": {
-                        "proje_adi_numarasi": [r"(C\d+\.\d+|Proje|Project|SM\s*\d+)"],
-                        "tesis_bolge_hat": [r"(Tesis|Makine|Hat|Bölge|Line)"],
-                        "olcum_cihazi": [r"(Multimetre|Ohmmetre|Ölçüm|Cihaz)"],
-                        "kalibrasyon": [r"(Kalibrasyon|Kalibre|Cert|Sertifika)"],
-                        "standartlar": [r"(EN\s*60204|IEC\s*60364|Standard|Standart)"],
-                        "rlo_degeri": [r"(\d+[.,]?\d*\s*(?:mΩ|mohm|ohm))"],
-                        "uygunluk_durumu": [r"(UYGUN|OK|NOK|Uygun|Değil)"],
-                        "risk_belirtme": [r"(Risk|Tehlike|Uygunsuz|Problem)"],
-                        "genel_uygunluk": [r"(Sonuç|Result|Uygun|Geçer|Pass|Fail)"]
-                    },
-    
-            "value_patterns": {
-            # Proje adı/numarası için kapsamlı pattern'ler
-            "proje_adi": [
-                r"(?:Project\s*Name|Proje\s*Ad[ıi])\s*[:=]\s*([^\n\r]+)",
-                r"(?:Project\s*No|Proje\s*No|Project\s*Number)\s*[:=]\s*([A-Z0-9.-]+)",
-                r"(?:Report\s*Title|Rapor\s*Başl[ıi]ğ[ıi])\s*[:=]\s*([^\n\r]+)",
-                r"(?:Document\s*Title|Belge\s*Başl[ıi]ğ[ıi])\s*[:=]\s*([^\n\r]+)",
-                r"(LVD\s+[Öö]lç[üu]m[^,\n]*)",
-                r"(Topraklama\s+S[üu]reklilik[^,\n]*)",
-                r"(Grounding\s+Continuity[^,\n]*)",
-                r"([A-Z][a-z]+\s*-\s*[A-Z][a-z]+.*?[Öö]lç[üu]m)",
-                r"(E\d{2}\.\d{3}\s*-[^,\n]+)"
-            ],
-            
-            # Rapor numarası için kapsamlı pattern'ler
-            "rapor_numarasi": [
-                r"(?:Report\s*No|Rapor\s*No|Report\s*Number)\s*[:=]\s*([A-Z0-9.-]+)",
-                r"(?:Document\s*No|Belge\s*No)\s*[:=]\s*([A-Z0-9.-]+)",
-                r"(E\d{2}\.\d{3})",
-                r"(C\d{2}\.\d{3})",
-                r"(T\d{2,3}[-.]?\d{3,4})",
-                r"SM\s*(\d+)",
-                r"MCC(\d+)",
-                r"^\s*([A-Z]\d{2,3}[.-]\d{3,4})"
-            ],
-            
-            # Ölçüm cihazı için çok kapsamlı pattern'ler
-            "olcum_cihazi": [
-                r"(?:Measuring\s*Instrument|Ölçüm\s*Cihaz[ıi]|Test\s*Equipment)\s*[:=]\s*([^\n\r]+)",
-                r"(?:Multimeter|Multimetre|Ohmmeter|Ohmmetre)\s*[:=]?\s*([A-Z0-9\s.-]+)",
-                r"(?:Instrument|Cihaz)\s*[:=]\s*([^\n\r]+)",
-                r"(?:Equipment|Ekipman)\s*[:=]\s*([^\n\r]+)",
-                r"(?:Device|Alet)\s*[:=]\s*([^\n\r]+)",
-                r"(?:Tester|Test\s*Cihaz[ıi])\s*[:=]?\s*([A-Z0-9\s.-]+)",
-                r"(Fluke\s*\d+[A-Z]*)",
-                r"(Metrix\s*[A-Z0-9]+)",
-                r"(Chauvin\s*Arnoux\s*[A-Z0-9]+)",
-                r"(Megger\s*[A-Z0-9]+)",
-                r"(Hioki\s*[A-Z0-9]+)",
-                r"([A-Z][a-z]+\s*\d+[A-Z]*)",
-                r"(MΩ\s*metre|mΩ\s*metre|Loop\s*Tester|Continuity\s*Tester)"
-            ],
-            
-            # Tesis/müşteri bilgisi
-            "tesis_adi": [
-                r"(?:Customer|Müşteri|Client)\s*[:=]\s*([^\n\r]+)",
-                r"(?:Facility|Tesis|Plant|Factory)\s*[:=]\s*([^\n\r]+)",
-                r"(?:Company|Firma|Corporation)\s*[:=]\s*([^\n\r]+)",
-                r"(Toyota[^\n\r]*)",
-                r"(DANONE[^\n\r]*)",
-                r"(Ford[^\n\r]*)",
-                r"(BOSCH[^\n\r]*)",
-                r"(?:8X45|8X50|8X9J|9J73)\s*(?:R1|R2|R3)?\s*Hatt[ıi]",
-                r"([A-Z][a-z]+\s+[A-Z][a-z]+\s+(?:Factory|Plant|Facility))"
-            ],
-            
-            # Firma/personel bilgisi
-            "firma_personel": [
-                r"(?:Prepared\s*by|Hazırlayan|Consultant)\s*[:=]\s*([^\n\r]+)",
-                r"(?:Performed\s*by|Ölçümü\s*Yapan)\s*[:=]\s*([^\n\r]+)",
-                r"(?:Company|Firma)\s*[:=]\s*([^\n\r]+)",
-                r"(?:Engineer|Mühendis)\s*[:=]\s*([^\n\r]+)",
-                r"(PILZ[^\n\r]*)",
-                r"([A-Z][a-z]+\s+[A-Z][a-z]+\s+(?:Engineering|Mühendislik))"
-            ],
-            
-            # Tarih pattern'leri - çok kapsamlı
-            "olcum_tarihi": [
-                # Türkçe formatlar
-                r"(?:Ölçüm\s*Tarihi|Test\s*Tarihi|Ölçüm\s*Yapıldığı\s*Tarih)\s*[:=]\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                r"(?:Ölçüm|Test).*?(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                r"Tarih\s*[:=]\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                
-                # İngilizce formatlar
-                r"(?:Measurement\s*Date|Test\s*Date|Date\s*of\s*(?:Test|Measurement))\s*[:=]\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                r"(?:Measured\s*on|Tested\s*on)\s*[:=]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                r"(?:Date|When)\s*[:=]\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                
-                # Çeşitli formatlar
-                r"(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})\s*(?:tarihinde|on|at|de)",
-                r"(\d{4}[./\-]\d{1,2}[./\-]\d{1,2})",
-                r"(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})",
-                r"(\d{1,2}\s+(?:Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık)\s+\d{4})",
-                
-                # Tablo içindeki tarihler
-                r"(?:Measurement|Ölçüm).*?(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                r"(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            ],
-            
-            "rapor_tarihi": [
-                # Türkçe formatlar
-                r"(?:Rapor\s*Tarihi|Belge\s*Tarihi|Hazırlanma\s*Tarihi)\s*[:=]\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                r"(?:Rapor|Belge).*?(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                r"(?:Hazırlayan|Hazırlandı)\s*[:=]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                
-                # İngilizce formatlar  
-                r"(?:Report\s*Date|Document\s*Date|Issue\s*Date|Prepared\s*Date)\s*[:=]\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                r"(?:Prepared\s*on|Issued\s*on|Created\s*on)\s*[:=]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                r"(?:Report|Document).*?(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                
-                # Çeşitli formatlar
-                r"(?:Date|Tarih)\s*[:=]\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                r"(\d{4}[./\-]\d{1,2}[./\-]\d{1,2})",
-                r"(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})",
-                r"(\d{1,2}\s+(?:Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık)\s+\d{4})",
-                
-                # Tablo başlığı veya footer'daki tarihler
-                r"(?:Created|Issued|Published)\s*[:=]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-                r"(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            ]
-        },
+
+        "templates": {
+                    "cylinder": ["═══", "▬▬▬", "━━━", "||", "| |", "I I"],
+                    "valve": ["□", "■", "⬜", "⬛", "◼", "◻"],
+                    "arrow": ["→", "←", "↑", "↓", "▶", "◀", "▲", "▼"],
+                    "connection": ["━", "─", "│", "|", "┃"],
+                    "component": ["●", "○", "◎", "◉", "◊", "◇"]
+                },
 
         "extract_values": {
-            "proje_patterns": [r'(C\d{2}\.\d{3})',
-                r'(E\d{2}\.\d{3})',
-                r'(T\d{2,3}[-\.]?\d{3,4})',
-                r'(\d{4,6})',
-                r'([A-Z]\d{2,3}[.-]\d{3,4})'],
+            "proje_adi": [ r"TOYOTA\s+PROJE\s+ADI[:\s]*([^\n\r]+)",
+            r"LUGGAGE\s+PUNCH",
+            r"Asansör",
+            r"Elevator"],
 
-            "rapor_patterns": [r'SM\s*(\d+)',
-                r'MCC(\d+)',
-                r'Report\s*No[\s:]*([A-Z0-9.-]+)',
-                r'Rapor[\s:]*([A-Z0-9.-]+)'],
+            "tasarim_tarihi": [r"(\d{1,2}[./]\d{1,2}[./]\d{4})"],
 
-            "musteri_patterns": [r'Toyota',
-                r'DANONE',
-                r'Ford',
-                r'BOSCH',
-                r'P&G'],
-            "rlo_patterns": [
-            r"(\d+[.,]?\d*)\s*(?:mΩ|mohm|ohm|Ω)",
-            r"(\d+)\s*(?:4x[2-9](?:[.,]\d+)?|4x4)\s*(?:[2-9](?:[.,]\d+)?|4)\s*500",
-            r"(\d+)\s*(?:mΩ|mohm|ohm|Ω)"
+            "calisma_basinci": [r"(\d+(?:\.\d+)?[-\s]*\d*)\s*bar"],
+
+            "vana_sayisi": [
+            r"(?:VUVG|Y\d+|V\d+|SV\d+)",  # Spesifik vana kodları
+            r"(?:5/2|4/2|3/2|2/2)",        # Vana tipi notasyonları
+            r"(?:valf|valve|vana)",         # Genel vana terimleri
+            r"(?:directional|yön.*?kontrol)", # Kontrol vanaları
+            r"(?:VF|VM|VT|VP)",             # Kısa vana kodları
+            r"(?:sol.*?valf|solenoid.*?valve)", # Solenoid vana
+            r"(?:flow.*?control|akış.*?kontrol)" # Akış kontrol
             ],
 
-            "kesit_patterns": [
-            r"4x4",
-            r"4x2[.,]5", 
-            r"4x6",
-            r"4x10",
-            r"Yük\s*İletken",
-            r"Load\s*Conductor",
-            r"PE\s*İletken",
-            r"PE\s*Conductor"
+            "silindir_sayisi": [
+            r"(?:C\d+|CYL\d*|SIL\d*)",     # Silindir kodları
+            r"(?:silindir|cylinder|piston)", # Genel silindir terimleri
+            r"(?:MGF|actuator)",            # Aktüatör kodları
+            r"(?:double.*?acting|single.*?acting)", # Etkili türleri
+            r"(?:çift.*?etkili|tek.*?etkili)",       # Türkçe etkili türleri
+            r"(?:SIL|CYL|ACT)",             # Kısa kodlar
+            r"(?:pnömatik.*?silindir|pneumatic.*?cylinder)" # Tam tanım
         ],
 
-            "hat_pattern":[r"(8X45|8X50|8X9J|9J73|8X52|8X60|8X62|8X70)\s*(?:R[1-9])?\s*Hatt[ıi]"],
+            "frl_mevcut":[r"(?:FRL|MS6-LFR|FILTRE|REGULATOR)"],
 
-            "high_rlo_patterns": [
-                    r'(\d{3,4})\s*(?:4x[2-9](?:[.,]\d+)?|4x4)\s*(?:[2-9](?:[.,]\d+)?|4)\s*500(\d+)\s*mΩ\s*<\s*500\s*mΩ',
-                    r'(\d{3,4})\s*(?:mΩ|mohm|ohm|Ω)',
-                    r'(\d{3,4})[.,]?\d*\s*(?:mΩ|mohm|ohm|Ω)'
+            "created_by": [
+            r"Created\s+by[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
+            r"Oluşturan[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
+            r"Tasarlayan[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
+            r"Designer[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))"
                 ],
             
-            "hat_patterns2": [
-                                    r'(8X\d+R?\d*)\s*(?:Hatt[ıi]|Line|Zone)?\s*(.*?)(?:\s+\d+)',
-                                    r'(8X\d+R?\d*)\s*(.*?)(?:\s+\d+)',
-                                    r'(Line\s*\d+|Zone\s*\d+)\s*(.*?)(?:\s+\d+)'
-                                ]
+            "checked_by": [
+            r"Checked\s+by[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
+            r"Kontrol\s+eden[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
+            r"Kontrolcü[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))"
+            ],
+
+            "approved_by": [
+            r"Approved\s+by[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
+            r"Onaylayan[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
+            r"Approval[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))"
+            ],
+
+            "date_patterns": [
+            r"(\d{1,2}[./]\d{1,2}[./]\d{4})",
+            r"(\d{4}-\d{1,2}-\d{1,2})"],
+
+            "circuit_number": [
+            r"Circuit\s+Number[:\s]*([A-Z0-9\-\.]+)",
+            r"Devre\s+Numarası[:\s]*([A-Z0-9\-\.]+)",
+            r"Circuit\s+No[:\s]*([A-Z0-9\-\.]+)"],
+
+            "description": [
+            r"Description[:\s]*([A-ZÇĞÜŞİÖ0-9\s]+(?:PNOMATİK|PNEUMATIC|DİYAGRAM|DIAGRAM)[A-ZÇĞÜŞİÖ0-9\s]*)",
+            r"Açıklama[:\s]*([A-ZÇĞÜŞİÖ0-9\s]+(?:PNOMATİK|PNEUMATIC|DİYAGRAM|DIAGRAM)[A-ZÇĞÜŞİÖ0-9\s]*)",
+            r"(PRES\s+PNOMATİK\s+DİYAGRAM\s*\d*)",
+            r"(PNEUMATIC\s+CIRCUIT\s+DIAGRAM\s*\d*)"
+        ],
+         "customer": [
+            r"Customer[:\s]*([A-ZÇĞÜŞİÖ\s]+)",
+            r"Müşteri[:\s]*([A-ZÇĞÜŞİÖ\s]+)",
+            r"Client[:\s]*([A-ZÇĞÜŞİÖ\s]+)"
+        ],
+
+        "revision": [
+            r"Revision[:\s]*(\d+/\d+|\d+)",
+            r"Rev[\.:\s]*(\d+/\d+|\d+)",
+            r"Revizyon[:\s]*(\d+/\d+|\d+)",
+            r"Sheet[:\s]*(\d+/\d+)"
+        ],
+        "iso_standart": [
+            r"(ISO\s*\d+)",
+            r"This\s+circuit\s+diagram\s+was\s+designed\s+on\s+the\s+basis\s+of\s+(ISO\s*\d+)"
+        ],
+        "size": [
+            r"Size[:\s]*([A-Z0-9]+)",
+            r"Boyut[:\s]*([A-Z0-9]+)"
+        ]
         },           
 } 
 
@@ -322,20 +311,21 @@ pattern_definitions_data = {
 # Eğer yoksa: {}
 
 critical_terms = [  
-         # Topraklama süreklilik temel terimleri
-        ["süreklilik", "continuity", "iletkenler", "conductors", "bağlantı", "connection", "devamlılık"],
+        # Pnömatik temel terimleri
+        ["pnömatik", "pnomatik", "pneumatic", "hava", "air", "basınçlı hava", "compressed air"],
         
-        # Kesit uygunluk terimleri
-        ["kesit", "cross section", "iletken kesiti", "conductor cross section", "mm2", "mm²", "kesit uygunluğu"],
+        # Pnömatik bileşenleri ve semboller
+        ["silindir", "cylinder", "valf", "valve", "vana", "frl", "lubricator", "regulator", "filter"],
         
-        # LVD ve standart terimleri
-        ["lvd", "en 60204-1", "60204-1", "60204", "makine güvenliği", "machine safety"],
+        # Pnömatik basınç ve akış terimleri
+        ["basınç", "pressure", "psi", "bar", "debi", "flow", "cfm", "l/min"],
         
-        # Ölçüm ve test terimleri
-        ["ölçüm", "measurement", "test", "ohm", "direnç", "resistance", "milliohm", "mΩ"],
+        # Pnömatik kontrol elemanları
+        ["kontrol", "control", "yön kontrol", "directional control", "hız kontrol", "speed control"],
         
-        # Elektrik güvenlik terimleri
-        ["elektrik güvenliği", "electrical safety", "koruyucu iletken", "protective conductor", "pe", "protective earth"]
+        # ISO standartları ve teknik terimler
+        ["iso 5599", "5599", "iso 1219", "sembol", "symbol", "bağlantı", "connection", "port"]
+    
 ]
 # ============================================
 # TODO: VALIDATION KEYWORDS - STRONG KEYWORDS
@@ -344,13 +334,17 @@ critical_terms = [
 # Eğer yoksa: []
 
 strong_keywords = [
-        "lvd",
-        "TOPRAKLAMA SÜREKLİLİK", 
-        "topraklama süreklilik",
-        "TOPRAKLAMA İLETKENLERİ", "TOPRAKLAMA ILETKENLERI",
-        "topraklama iletkenleri",
-        "topraklama sureklilik",
-        "KESİT UYGUNLUĞU", "kesit uygunlugu", "kesit uygunluğu", "kesıt uygunluğu",
+        "pnömatik",
+        "pnomatik", 
+        "pneumatic",
+        "lubricator",
+        "inflate",
+        "psi",
+        "bar",
+        "regis",
+        "r102",
+        "regulator",
+        "dump valve"
 ]
 
 # ============================================
@@ -363,17 +357,8 @@ excluded_keywords = [
         # Aydınlatma raporu
         "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
         
-        # Hidrolik devre şeması
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
-        
-        # Pnömatik devre şeması
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve",
-        
-        # İSG periyodik kontrol
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        
-        # AT Uygunluk Beyanı (eski strong_keywords AT'den)
-        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
+        # Hidrolik devre şeması (eski strong_keywords hidrolikten)
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
         
         # HRC raporu
         "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
@@ -388,25 +373,34 @@ excluded_keywords = [
         "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
         
         # Manuel/kullanma kılavuzu
-        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
+        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
         
         # LOTO raporu
         "loto",
         
+        # LVD raporu
+        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
+        
+        # AT tip muayene
+        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
+        
+        # İSG periyodik kontrol
+        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
+        
         # Montaj talimatları
         "montaj", "assembly",
+        
+        # EN 60204-1 topraklama raporu
+        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
         
         # Bakım talimatları
         "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
         
         # Mekanik titreşim raporu
-        "titreşim", "vibration", "mekanik",
+        "titreşim", "vibration","TİTREŞİM",
         
         # AT tip inceleme sertifikası
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
-
-        # EN 60204-1 topraklama raporu
-        "topraklama direnci", "grounding", "earthing", "TOPRAKLAMA DİRENCİ",
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate"  
 ]
 
 # ============================================

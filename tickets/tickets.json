@@ -843,5 +843,287 @@
     },
     "comments": [],
     "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket10",
+    "ticket_id": "hrc_20251127_230258",
+    "document_name": "C23.234_-_SD_Conta_Robotu_HRC_Olcumu_Raporu_.pdf",
+    "document_type": "HRC_KUVVET_BASINC_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/C23.234_-_SD_Conta_Robotu_HRC_Olcumu_Raporu_.pdf",
+    "opening_date": "2025-11-27T23:02:58.922258",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 82.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 82.0
+      },
+      "category_scores": {
+        "Ekler ve Kalibrasyon Belgeleri": {
+          "max_score": 5,
+          "percentage": 80.0,
+          "score": 4.0,
+          "status": "PASS"
+        },
+        "Genel Bilgiler": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Kuvvet ve Basınç Ölçüm Sonuçları": {
+          "max_score": 25,
+          "percentage": 64.0,
+          "score": 16.0,
+          "status": "FAIL"
+        },
+        "Risk Değerlendirmesi ve Sonuç": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Sınır Değerlerle Karşılaştırma": {
+          "max_score": 20,
+          "percentage": 70.0,
+          "score": 14.0,
+          "status": "PASS"
+        },
+        "Test Koşulları ve Senaryo Tanımı": {
+          "max_score": 10,
+          "percentage": 80.0,
+          "score": 8.0,
+          "status": "PASS"
+        },
+        "Ölçüm Noktaları ve Metodoloji": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Öneriler ve Önlemler": {
+          "max_score": 5,
+          "percentage": 100.0,
+          "score": 5.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "olcum_cihazi": "PROB ms Set 9A000012",
+        "robot_modeli": "GRX-10iA",
+        "test_tarihi": "17.05.2024"
+      },
+      "recommendations": [
+        "✅ HRC Kuvvet-Basınç Raporu GEÇERLİ (Toplam: %82.0)",
+        "🟢 Genel Bilgiler bölümü yeterli (%100.0)",
+        "🟢 Test Koşulları ve Senaryo Tanımı bölümü yeterli (%80.0)",
+        "🟢 Ölçüm Noktaları ve Metodoloji bölümü yeterli (%100.0)",
+        "🟡 Kuvvet ve Basınç Ölçüm Sonuçları bölümü geliştirilmeli (%64.0)",
+        "🟢 Sınır Değerlerle Karşılaştırma bölümü yeterli (%70.0)",
+        "🟢 Risk Değerlendirmesi ve Sonuç bölümü yeterli (%100.0)",
+        "🟢 Öneriler ve Önlemler bölümü yeterli (%100.0)",
+        "🟢 Ekler ve Kalibrasyon Belgeleri bölümü yeterli (%80.0)"
+      ],
+      "summary": {
+        "conclusion": "HRC kuvvet-basınç raporu EN ISO 10218 ve ISO/TS 15066 standartlarına uygundur (%82)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket11",
+    "ticket_id": "hrc_20251127_230911",
+    "document_name": "C19.082_-_PG_HRC_Olcum_Raporu_v1.pdf",
+    "document_type": "HRC_KUVVET_BASINC_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/C19.082_-_PG_HRC_Olcum_Raporu_v1.pdf",
+    "opening_date": "2025-11-27T23:09:11.146198",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 83.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 83.0
+      },
+      "category_scores": {
+        "Ekler ve Kalibrasyon Belgeleri": {
+          "max_score": 5,
+          "percentage": 60.0,
+          "score": 3.0,
+          "status": "FAIL"
+        },
+        "Genel Bilgiler": {
+          "max_score": 10,
+          "percentage": 90.0,
+          "score": 9.0,
+          "status": "PASS"
+        },
+        "Kuvvet ve Basınç Ölçüm Sonuçları": {
+          "max_score": 25,
+          "percentage": 52.0,
+          "score": 13.0,
+          "status": "FAIL"
+        },
+        "Risk Değerlendirmesi ve Sonuç": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Sınır Değerlerle Karşılaştırma": {
+          "max_score": 20,
+          "percentage": 100.0,
+          "score": 20.0,
+          "status": "PASS"
+        },
+        "Test Koşulları ve Senaryo Tanımı": {
+          "max_score": 10,
+          "percentage": 90.0,
+          "score": 9.0,
+          "status": "PASS"
+        },
+        "Ölçüm Noktaları ve Metodoloji": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Öneriler ve Önlemler": {
+          "max_score": 5,
+          "percentage": 80.0,
+          "score": 4.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "olcum_cihazi": "PROB ms Set 94000012",
+        "robot_modeli": "UR10e",
+        "test_tarihi": "10.06.2020"
+      },
+      "recommendations": [
+        "✅ HRC Kuvvet-Basınç Raporu GEÇERLİ (Toplam: %83.0)",
+        "🟢 Genel Bilgiler bölümü yeterli (%90.0)",
+        "🟢 Test Koşulları ve Senaryo Tanımı bölümü yeterli (%90.0)",
+        "🟢 Ölçüm Noktaları ve Metodoloji bölümü yeterli (%100.0)",
+        "🟡 Kuvvet ve Basınç Ölçüm Sonuçları bölümü geliştirilmeli (%52.0)",
+        "🟢 Sınır Değerlerle Karşılaştırma bölümü yeterli (%100.0)",
+        "🟢 Risk Değerlendirmesi ve Sonuç bölümü yeterli (%100.0)",
+        "🟢 Öneriler ve Önlemler bölümü yeterli (%80.0)",
+        "🟡 Ekler ve Kalibrasyon Belgeleri bölümü geliştirilmeli (%60.0)"
+      ],
+      "summary": {
+        "conclusion": "HRC kuvvet-basınç raporu EN ISO 10218 ve ISO/TS 15066 standartlarına uygundur (%83)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket12",
+    "ticket_id": "hrc_20251127_232032",
+    "document_name": "C19.082_-_PG_HRC_Olcum_Raporu_v1.pdf",
+    "document_type": "HRC_KUVVET_BASINC_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/C19.082_-_PG_HRC_Olcum_Raporu_v1.pdf",
+    "opening_date": "2025-11-27T23:20:32.497334",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 83.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 83.0
+      },
+      "category_scores": {
+        "Ekler ve Kalibrasyon Belgeleri": {
+          "max_score": 5,
+          "percentage": 60.0,
+          "score": 3.0,
+          "status": "FAIL"
+        },
+        "Genel Bilgiler": {
+          "max_score": 10,
+          "percentage": 90.0,
+          "score": 9.0,
+          "status": "PASS"
+        },
+        "Kuvvet ve Basınç Ölçüm Sonuçları": {
+          "max_score": 25,
+          "percentage": 52.0,
+          "score": 13.0,
+          "status": "FAIL"
+        },
+        "Risk Değerlendirmesi ve Sonuç": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Sınır Değerlerle Karşılaştırma": {
+          "max_score": 20,
+          "percentage": 100.0,
+          "score": 20.0,
+          "status": "PASS"
+        },
+        "Test Koşulları ve Senaryo Tanımı": {
+          "max_score": 10,
+          "percentage": 90.0,
+          "score": 9.0,
+          "status": "PASS"
+        },
+        "Ölçüm Noktaları ve Metodoloji": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Öneriler ve Önlemler": {
+          "max_score": 5,
+          "percentage": 80.0,
+          "score": 4.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "olcum_cihazi": "PROB ms Set 94000012",
+        "robot_modeli": "UR10e",
+        "test_tarihi": "10.06.2020"
+      },
+      "recommendations": [
+        "✅ HRC Kuvvet-Basınç Raporu GEÇERLİ (Toplam: %83.0)",
+        "🟢 Genel Bilgiler bölümü yeterli (%90.0)",
+        "🟢 Test Koşulları ve Senaryo Tanımı bölümü yeterli (%90.0)",
+        "🟢 Ölçüm Noktaları ve Metodoloji bölümü yeterli (%100.0)",
+        "🟡 Kuvvet ve Basınç Ölçüm Sonuçları bölümü geliştirilmeli (%52.0)",
+        "🟢 Sınır Değerlerle Karşılaştırma bölümü yeterli (%100.0)",
+        "🟢 Risk Değerlendirmesi ve Sonuç bölümü yeterli (%100.0)",
+        "🟢 Öneriler ve Önlemler bölümü yeterli (%80.0)",
+        "🟡 Ekler ve Kalibrasyon Belgeleri bölümü geliştirilmeli (%60.0)"
+      ],
+      "summary": {
+        "conclusion": "HRC kuvvet-basınç raporu EN ISO 10218 ve ISO/TS 15066 standartlarına uygundur (%83)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
   }
 ]
