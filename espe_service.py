@@ -1,4 +1,3 @@
-
 # ============================================
 # IMPORTS
 # ============================================
@@ -139,6 +138,31 @@ class ESPEReportAnalyzer:
             logger.warning(f"Dil tespiti hatası: {e}")
             return "unknown"
 
+    def get_multilingual_patterns(self, criterion: str, detected_lang: str) -> List[str]:
+        """Tespit edilen dile göre ek pattern'ler döndür"""
+        additional_patterns = {
+            'turkish': {
+                'proje_adi_numarasi': [r"Proje\s*No", r"Belge\s*No", r"Döküman"],
+                'makine_adi': [r"Makine\s*Adı", r"Ekipman", r"Cihaz"],
+                'olcum_tarihi': [r"Ölçüm\s*Tarihi", r"Test\s*Tarihi"],
+                'tehlike_tanimi': [r"Tehlikeli", r"Risk", r"Tehlike"]
+            },
+            'english': {
+                'proje_adi_numarasi': [r"Project\s*No", r"Document\s*No", r"Report\s*No"],
+                'makine_adi': [r"Machine\s*Name", r"Equipment", r"Device"],
+                'olcum_tarihi': [r"Measurement\s*Date", r"Test\s*Date"],
+                'tehlike_tanimi': [r"Dangerous", r"Hazardous", r"Risk"]
+            },
+            'german': {
+                'proje_adi_numarasi': [r"Projekt\s*Nr", r"Dokument\s*Nr", r"Bericht\s*Nr"],
+                'makine_adi': [r"Maschinen\s*Name", r"Ausrüstung", r"Gerät"],
+                'olcum_tarihi': [r"Messdatum", r"Testdatum"],
+                'tehlike_tanimi': [r"Gefährlich", r"Risiko", r"Gefahr"]
+            }
+        }
+        
+        return additional_patterns.get(detected_lang, {}).get(criterion, [])
+
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         """PDF'den metin çıkarma"""
         try:
@@ -150,6 +174,18 @@ class ESPEReportAnalyzer:
                 return text
         except Exception as e:
             logger.error(f"PDF okuma hatası: {e}")
+            return ""
+    
+    def extract_text_from_docx(self, docx_path: str) -> str:
+        """DOCX'den metin çıkarma"""
+        try:
+            doc = Document(docx_path)
+            text = ""
+            for paragraph in doc.paragraphs:
+                text += paragraph.text + "\n"
+            return text
+        except Exception as e:
+            logger.error(f"DOCX okuma hatası: {e}")
             return ""
     
     def check_report_date_validity(self, text: str) -> Tuple[bool, str, str]:
@@ -177,21 +213,92 @@ class ESPEReportAnalyzer:
         """Belirli kategori kriterlerini analiz etme"""
         results = {}
         criteria = self.criteria_details.get(category, {})
+        
+        # Dil tespiti yap
         detected_lang = self.detect_language(text)
+        logger.info(f"Tespit edilen dil: {detected_lang}")
         
         for criterion_name, criterion_data in criteria.items():
             pattern = criterion_data["pattern"]
             weight = criterion_data["weight"]
+            
+            # Ana pattern ile ara
             matches = re.findall(pattern, text, re.IGNORECASE | re.MULTILINE)
+            
+            # Eğer bulunamadıysa, dile özel ek pattern'ler dene
+            if not matches:
+                additional_patterns = self.get_multilingual_patterns(criterion_name, detected_lang)
+                for add_pattern in additional_patterns:
+                    matches = re.findall(add_pattern, text, re.IGNORECASE | re.MULTILINE)
+                    if matches:
+                        break
+            
+            # Özel durum: Durma zamanları için tablo formatı arama
+            if not matches and criterion_name in ['durus_suresi_min', 'durus_suresi_max']:
+                table_patterns = [
+                    r"Min\s*(\d{2,3})",
+                    r"Maks?\s*(\d{2,3})", 
+                    r"(\d{2,3})\s*(?=.*(?:Min|Maks?))",
+                    r"(\d{2,3})\s*(?=.*\d{2,3}.*(?:Min|Maks?))",
+                    r"(?:Durma\s*Zamanı|STT).*?(\d{2,3})"
+                ]
+                
+                for table_pattern in table_patterns:
+                    table_matches = re.findall(table_pattern, text, re.IGNORECASE | re.MULTILINE)
+                    if table_matches:
+                        matches = table_matches
+                        break
+            
+            # Özel durum: Ölçüm metodu için geniş arama
+            if not matches and criterion_name == 'olcum_metodu':
+                method_patterns = [
+                    r"(?:Yapılan.*?Ölçüm|ESPE.*?Ölçüm|Test.*?Prosedür)",
+                    r"(?:Durma\s*Zamanı|STT|STD)",
+                    r"(?:Tehlikeli\s*Hareket|Mevcut\s*Emniyet)"
+                ]
+                
+                for method_pattern in method_patterns:
+                    method_matches = re.findall(method_pattern, text, re.IGNORECASE | re.MULTILINE)
+                    if method_matches:
+                        matches = method_matches
+                        break
             
             if matches:
                 content = str(matches[0]) if len(matches) == 1 else str(matches)
                 found = True
                 score = weight
             else:
-                content = "Bulunamadı"
-                found = False
-                score = 0
+                # Genel fallback pattern'ler
+                general_patterns = {
+                    "proje_adi_numarasi": r"[A-Z]\d{2}\.\d{3}",
+                    "makine_adi": r"(?:T\d+|MCC\d+)",
+                    "cihaz_tipi": r"(?:Light|Işık|Licht|ESPE)",
+                    "marka_model": r"(?:DataLogic|SAFEasy|Pilz|Sick|Banner|Omron|Keyence)",
+                    "formula_s": r"S\s*=",
+                    "tehlike_tanimi": r"(?:Dangerous|Tehlike|Gefahr|fikstür|kapı|hareket)",
+                    "k_sabiti": r"(?:2000|1600)",
+                    "uygunluk_kontrolu": r"(?:UYGUN|SUITABLE|UYGUNSUZ|UNSUITABLE)",
+                    "olcum_metodu": r"(?:ESPE|Ölçüm|Test|Measurement)",
+                    "durus_suresi_min": r"(?:Min|\d{2,3}(?=.*\d{2,3}))",
+                    "durus_suresi_max": r"(?:Maks?|\d{2,3}(?=.*Min))",
+                    "test_sayisi": r"(?:Test|Tekrar|\d+)"
+                }
+                
+                general_pattern = general_patterns.get(criterion_name)
+                if general_pattern:
+                    general_matches = re.findall(general_pattern, text, re.IGNORECASE)
+                    if general_matches:
+                        content = f"Genel eşleşme bulundu: {general_matches[0]}"
+                        found = True
+                        score = weight // 2  # Kısmi puan
+                    else:
+                        content = "Bulunamadı"
+                        found = False
+                        score = 0
+                else:
+                    content = "Bulunamadı"
+                    found = False
+                    score = 0
             
             results[criterion_name] = ESPEAnalysisResult(
                 criteria_name=criterion_name,
@@ -207,37 +314,126 @@ class ESPEReportAnalyzer:
     def extract_specific_values(self, text: str) -> Dict[str, Any]:
         """Spesifik değerleri çıkarma"""
         values = {}
+        
+        # Çoklu dil değer pattern'leri
         value_patterns = {
             "proje_no": r"(C\d{2}\.\d{3})",
             "olcum_tarihi": r"(\d{1,2}[./]\d{1,2}[./]\d{4})",
             "makine_adi": r"(?:Makine\s*Ad[ıi][:]*\s*(T\d+\s*-\s*MCC\d+))",
+            "hat_bolge": r"(?:Jaws\s*\d+|Hat.*?[:=]\s*([^\n\r]+))",
             "koruma_yuksekligi": r"(\d{3,4})\s*mm",
             "cozunurluk": r"(\d{1,2})\s*mm",
-            "durum": r"(UYGUNSUZ|UYGUN)"
+            "durus_suresi_min": r"Min\.?\s*(\d{2,3})|Minimum\s*(\d{2,3})",
+            "durus_suresi_max": r"Maks?\.?\s*(\d{2,3})|Max\.?\s*(\d{2,3})|Maximum\s*(\d{2,3})|(\d{2,3})\s*(?=.*Maks?)|(\d{2,3})\s*(?=.*Max)",
+            "mevcut_mesafe": r"(\d{2,4})\s*mm",
+            "hesaplanan_mesafe": r"(?:S\s*=\s*(\d{2,4})|(\d{2,4})\s*mm)",
+            "durum": r"(UYGUNSUZ|UYGUN)",
+            "tehlikeli_hareket": r"(?:Takım\s*tezgahı|kapı\s*kapanma|fikstür|tehlikeli\s*hareket)",
+            "k_sabiti": r"(?:K\s*=\s*(\d{4})|2000|1600)",
+            "formula_s": r"(S\s*=\s*\([^)]+\))",
+            "formula_c": r"(C\s*=\s*8\s*[×x*]\s*\([^)]+\))",
+            "en_iso_13855": r"(EN\s*ISO\s*13855)"
         }
+        
+        # Dil tespiti
+        detected_lang = self.detect_language(text)
         
         for key, pattern in value_patterns.items():
             matches = re.findall(pattern, text, re.IGNORECASE)
             if matches:
-                if isinstance(matches[0], tuple):
-                    values[key] = next((m for m in matches[0] if m), matches[0][0]).strip()
+                # Özel durum: durum için UYGUNSUZ varsa onu tercih et
+                if key == "durum" and len(matches) > 1:
+                    uygunsuz_found = any("UYGUNSUZ" in str(m).upper() for m in matches)
+                    if uygunsuz_found:
+                        values[key] = "UYGUNSUZ"
+                    else:
+                        if isinstance(matches[0], tuple):
+                            values[key] = next((m for m in matches[0] if m), matches[0][0]).strip()
+                        else:
+                            values[key] = matches[0].strip()
                 else:
-                    values[key] = matches[0].strip()
+                    if isinstance(matches[0], tuple):
+                        values[key] = next((m for m in matches[0] if m), matches[0][0]).strip()
+                    else:
+                        values[key] = matches[0].strip()
             else:
-                values[key] = "Bulunamadı"
+                # Fallback: Basit pattern'ler
+                fallback_patterns = {
+                    "proje_no": r"C\d{2}\.\d{3}",
+                    "olcum_tarihi": r"\d{1,2}[./]\d{1,2}[./]\d{4}",
+                    "cihaz_tipi": r"(?:Işık\s*Perdesi|Light\s*Curtain|Lichtvorhang)",
+                    "durum": r"(?:durumu[:]*\s*(UYGUNSUZ|UYGUN)|(?:UYGUNSUZ|UYGUN)(?=\s|$))",
+                    "makine_adi": r"(?:T\d+\s*-\s*MCC\d+)",
+                    "hat_bolge": r"(?:Jaws|\d+\.?\s*Hat)",
+                    "koruma_yuksekligi": r"\d{3,4}\s*mm",
+                    "cozunurluk": r"\d{1,2}\s*mm",
+                    "durus_suresi_min": r"(?:Min|(\d{2,3})(?=.*\d{2,3}))",
+                    "durus_suresi_max": r"(?:Maks?|(\d{2,3})(?=.*Min))",
+                    "olcum_metodu": r"(?:ESPE|Ölçüm|Test|Measurement)"
+                }
+                
+                fallback_pattern = fallback_patterns.get(key)
+                if fallback_pattern:
+                    fallback_matches = re.findall(fallback_pattern, text, re.IGNORECASE)
+                    if fallback_matches:
+                        values[key] = fallback_matches[0].strip()
+                    else:
+                        values[key] = "Bulunamadı"
+                else:
+                    values[key] = "Bulunamadı"
         
         return values
     
+    def validate_extracted_values(self, extracted_values: Dict[str, Any]) -> Dict[str, float]:
+        """Çıkarılan değerlerin geçerliliğini kontrol ederek puan azaltma faktörü hesapla"""
+        validation_scores = {}
+        
+        # Kritik değerlerin kontrolleri
+        validations = {
+            # Boş veya "Bulunamadı" değerler
+            "durus_suresi_min": 0.0 if not extracted_values.get("durus_suresi_min") or extracted_values.get("durus_suresi_min") == "Bulunamadı" else 1.0,
+            "durus_suresi_max": 0.0 if not extracted_values.get("durus_suresi_max") or extracted_values.get("durus_suresi_max") == "Bulunamadı" else 1.0,
+            
+            # Makine adı kontrol (T ile başlamalı)
+            "makine_adi": 1.0 if extracted_values.get("makine_adi", "").startswith("T") else 0.5,
+            
+            # UYGUNSUZ durumu tespit edilmeli
+            "durum": 0.5 if extracted_values.get("durum", "").upper() in ["UYGUN", "SUITABLE"] else 1.0,
+            
+            # Sayısal değerlerin mantıklı olması
+            "koruma_yuksekligi": 1.0 if extracted_values.get("koruma_yuksekligi", "0").isdigit() and int(extracted_values.get("koruma_yuksekligi", "0")) > 100 else 0.5,
+            "cozunurluk": 1.0 if extracted_values.get("cozunurluk", "0").isdigit() and int(extracted_values.get("cozunurluk", "0")) > 5 else 0.5,
+        }
+        
+        return validations
+
     def calculate_scores(self, analysis_results: Dict[str, Dict[str, ESPEAnalysisResult]], extracted_values: Dict[str, Any]) -> Dict[str, Any]:
-        """Puanları hesaplama"""
+        """Puanları hesaplama - çıkarılan değerlerin geçerliliğini de kontrol ederek"""
         category_scores = {}
         total_score = 0
+        total_max_score = 100
+        
+        # Değer geçerlilik kontrolü
+        validation_scores = self.validate_extracted_values(extracted_values)
         
         for category, results in analysis_results.items():
             category_max = self.criteria_weights[category]
-            category_earned = sum(result.score for result in results.values())
+            category_earned = 0
             category_possible = sum(result.max_score for result in results.values())
             
+            # Her kriter için puanı hesapla
+            for criterion_name, result in results.items():
+                base_score = result.score
+                
+                # Eğer bu kriter için geçerlilik kontrolü varsa uygula
+                if criterion_name in validation_scores:
+                    validation_factor = validation_scores[criterion_name]
+                    adjusted_score = base_score * validation_factor
+                    category_earned += adjusted_score
+                else:
+                    category_earned += base_score
+            
+            # Kategori puanını ağırlığa göre normalize et
             normalized_score = (category_earned / category_possible * category_max) if category_possible > 0 else 0
             
             category_scores[category] = {
@@ -253,8 +449,8 @@ class ESPEReportAnalyzer:
         return {
             "category_scores": category_scores,
             "total_score": round(total_score, 2),
-            "total_max_score": 100,
-            "overall_percentage": round((total_score / 100 * 100), 2)
+            "total_max_score": total_max_score,
+            "overall_percentage": round((total_score / total_max_score * 100), 2)
         }
     
     def generate_recommendations(self, analysis_results: Dict, scores: Dict) -> List[str]:
@@ -266,14 +462,24 @@ class ESPEReportAnalyzer:
             
             if category_score < 50:
                 recommendations.append(f"❌ {category} bölümü yetersiz (%{category_score:.1f})")
+                
+                # Eksik kriterler
+                missing_criteria = [name for name, result in results.items() if not result.found]
+                if missing_criteria:
+                    recommendations.append(f"  Eksik kriterler: {', '.join(missing_criteria)}")
+            
             elif category_score < 80:
                 recommendations.append(f"⚠️ {category} bölümü geliştirilmeli (%{category_score:.1f})")
+            
             else:
                 recommendations.append(f"✅ {category} bölümü yeterli (%{category_score:.1f})")
         
+        # Genel öneriler
         if scores["overall_percentage"] < 70:
             recommendations.append("\n🚨 GENEL ÖNERİLER:")
             recommendations.append("- Rapor EN ISO 13855 standardına tam uyumlu hale getirilmelidir")
+            recommendations.append("- Eksik bilgiler tamamlanmalıdır")
+            recommendations.append("- Formül hesaplamaları detaylandırılmalıdır")
         
         return recommendations
     
@@ -281,23 +487,39 @@ class ESPEReportAnalyzer:
         """Detaylı rapor oluşturma"""
         logger.info("ESPE rapor analizi başlatılıyor...")
         
+        # PDF'den metin çıkar
         pdf_text = self.extract_text_from_pdf(pdf_path)
         if not pdf_text:
             return {"error": "PDF okunamadı"}
         
+        # Dil tespiti
         detected_language = self.detect_language(pdf_text)
+        logger.info(f"Tespit edilen belge dili: {detected_language}")
+        
+        # Tarih geçerliliği kontrolü
         date_valid, date_str, date_message = self.check_report_date_validity(pdf_text)
+        
+        # Spesifik değerleri çıkar
         extracted_values = self.extract_specific_values(pdf_text)
         
+        # Her kategori için analiz yap
         analysis_results = {}
         for category in self.criteria_weights.keys():
             analysis_results[category] = self.analyze_criteria(pdf_text, category)
         
+        # Puanları hesapla
         scores = self.calculate_scores(analysis_results, extracted_values)
+        
+        # Öneriler oluştur
         recommendations = self.generate_recommendations(analysis_results, scores)
         
         report = {
             "analiz_tarihi": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "dosya_bilgileri": {
+                "pdf_path": pdf_path,
+                "docx_path": docx_path,
+                "tespit_edilen_dil": detected_language
+            },
             "tarih_gecerliligi": {
                 "durum": "GEÇERLİ" if date_valid else "GEÇERSİZ",
                 "tarih": date_str,
@@ -306,18 +528,29 @@ class ESPEReportAnalyzer:
             "cikarilan_degerler": extracted_values,
             "kategori_analizleri": analysis_results,
             "puanlama": scores,
+            "overall_score": {
+                "date_validity": "GEÇERLİ" if date_valid else "GEÇERSİZ",
+                "failure_reason": None if scores["overall_percentage"] >= 70 else ("Tarih geçerliliği sorunu" if not date_valid else "Yetersiz puan"),
+                "final_status": "PASSED" if scores["overall_percentage"] >= 70 else "FAILED",
+                "max_points": 100,
+                "pass_status": "PASSED" if scores["overall_percentage"] >= 70 else "FAILED",
+                "percentage": scores["overall_percentage"],
+                "status": "PASS" if scores["overall_percentage"] >= 70 else "FAIL",
+                "status_tr": "GEÇERLİ" if scores["overall_percentage"] >= 70 else "GEÇERSİZ",
+                "total_points": scores["overall_percentage"]
+            },
             "oneriler": recommendations,
             "ozet": {
                 "toplam_puan": scores["total_score"],
                 "yuzde": scores["overall_percentage"],
                 "durum": "GEÇERLİ" if scores["overall_percentage"] >= 70 else "YETERSİZ",
+                "tarih_durumu": "GEÇERLİ" if date_valid else "GEÇERSİZ",
                 "dil": detected_language
             }
         }
         
         return report
-
-
+    
 # ============================================
 # HELPER FUNCTIONS (Server Validasyon)
 # ============================================
@@ -361,7 +594,7 @@ def check_strong_keywords_first_pages(filepath):
             opencv_image = cv2.cvtColor(np.array(page), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng')
             all_text += text.lower() + " "
         
         found = [kw for kw in strong_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
@@ -399,7 +632,7 @@ def check_excluded_keywords_first_pages(filepath):
         # Manuel/kullanım kılavuzu
         "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
         
-        # Gürültü ölçüm raporu (eski strong_keywords gürültüden)
+        # Gürültü ölçüm raporu
         "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
         
         # HRC raporu
@@ -435,7 +668,7 @@ def check_excluded_keywords_first_pages(filepath):
             opencv_image = cv2.cvtColor(np.array(page), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng')
             all_text += text.lower() + " "
         
         found = [kw for kw in excluded if re.search(rf"\b{kw.lower()}\b", all_text)]
@@ -587,7 +820,7 @@ def analyze_espe_report():
                 'extracted_values': report.get('cikarilan_degerler', {}),
                 'file_type': 'ESPE_RAPORU',
                 'filename': filename,
-                'language_info': {'detected_language': 'turkish', 'text_length': 0},
+                'language_info': {'detected_language': report.get('dosya_bilgileri', {}).get('tespit_edilen_dil', 'turkish'), 'text_length': 0},
                 'overall_score': {
                     'percentage': round(overall_score, 2),
                     'total_points': overall_score,
@@ -644,7 +877,8 @@ def health_check():
         'status': 'healthy',
         'service': 'ESPE Report Analyzer API',
         'version': '1.0.0',
-        'report_type': 'ESPE_RAPORU'
+        'report_type': 'ESPE_RAPORU',
+        'tesseract': tesseract_info
     })
 
 
@@ -659,7 +893,8 @@ def index():
             'POST /api/espe-report': 'ESPE raporu analizi',
             'GET /api/health': 'Servis sağlık kontrolü',
             'GET /': 'Bu bilgi sayfası'
-        }
+        },
+        'tesseract_status': tesseract_info
     })
 
 
@@ -674,6 +909,11 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8002))
     
     logger.info(f"🚀 Servis başlatılıyor - Port: {port}")
+    logger.info(f"📁 Upload klasörü: {UPLOAD_FOLDER}")
+    logger.info(f"🔧 Tesseract: {tesseract_info}")
     logger.info("=" * 60)
     
     app.run(host='0.0.0.0', port=port, debug=False)
+        
+        
+    

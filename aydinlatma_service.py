@@ -90,48 +90,48 @@ class LightingReportAnalyzer:
         
         self.criteria_details = {
             "Genel Rapor Bilgileri": {
-                "proje_adi_numarasi": {"pattern": r"(?:Proje\s*Ad[ıi]|Project\s*Name|Proje\s*No|Project\s*Number)", "weight": 2},
-                "olcum_rapor_tarihleri": {"pattern": r"(?:Ölçüm\s*Tarih|Measurement\s*Date|Rapor\s*Tarih|Report\s*Date|\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4})", "weight": 2},
-                "tesis_bolge_alan": {"pattern": r"(?:Tesis|Facility|Fabrika|Factory|Ofis|Office|Bina|Building)", "weight": 1},
-                "rapor_no_revizyon": {"pattern": r"(?:Rapor\s*No|Report\s*No|Rev|Revizyon|Version)", "weight": 2},
-                "olcumu_yapan_firma": {"pattern": r"(?:Ölçümü\s*Yapan|Measured\s*By|Firma|Company)", "weight": 1},
-                "onay_imza": {"pattern": r"(?:Onay|Approval|İmza|Signature|Sorumlu|Yetkili)", "weight": 2}
+                "proje_adi_numarasi": {"pattern": r"(?:Proje\s*Ad[ıi]|Project\s*Name|Proje\s*No|Project\s*Number|Proje\s*Kodu|Project\s*Code|İş\s*No|Job\s*Number|Sipariş\s*No|Order\s*Number)", "weight": 2},
+                "olcum_rapor_tarihleri": {"pattern": r"(?:Ölçüm\s*Tarih|Measurement\s*Date|Rapor\s*Tarih|Report\s*Date|Test\s*Tarih|Test\s*Date|Analiz\s*Tarih|Analysis\s*Date|Değerlendirme\s*Tarih|\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4}|\d{2,4}[\/\.\-]\d{1,2}[\/\.\-]\d{1,2})", "weight": 2},
+                "tesis_bolge_alan": {"pattern": r"(?:Tesis|Facility|Fabrika|Factory|Ofis|Office|Bina|Building|İş\s*yeri|Workplace|Alan|Area|Bölge|Zone|Konum|Location|Adres|Address|Mekân|Space)", "weight": 1},
+                "rapor_no_revizyon": {"pattern": r"(?:Rapor\s*No|Report\s*No|Rapor\s*Numaras[ıi]|Report\s*Number|Rev|Revizyon|Revision|Ver|Version|Sürüm|Döküman\s*No|Document\s*No)", "weight": 2},
+                "olcumu_yapan_firma": {"pattern": r"(?:Ölçümü\s*Yapan|Measured\s*By|Test\s*Yapan|Tested\s*By|Firma|Company|Şirket|Corporation|Kurum|Institution|Organizasyon|Organization|Muayene\s*Kuruluş)", "weight": 1},
+                "onay_imza": {"pattern": r"(?:Onay|Approval|İmza|Signature|Onaylayan|Approved\s*By|İmzalayan|Signed\s*By|Sorumlu|Responsible|Yetkili|Authorized|Mühür|Stamp|Seal)", "weight": 2}
             },
             "Ölçüm Metodu ve Standart Referansları": {
-                "olcum_cihazi": {"pattern": r"(?:Lüksmetre|Luxmeter|Lux\s*Meter|Işık\s*Ölçer|Light\s*Meter|Model|Seri\s*No)", "weight": 4},
-                "kalibrasyon_bilgi": {"pattern": r"(?:Kalibrasyon|Calibration|Sertifika|Certificate|Geçerlilik)", "weight": 3},
-                "olcum_yontemi": {"pattern": r"(?:Ölçüm\s*Yöntem|Measurement\s*Method|Prosedür|Methodology|Ortlama)", "weight": 4},
-                "standartlar": {"pattern": r"(?:TS\s*EN\s*12464|ISO\s*8995|İş\s*Sağlığ[ıi]|Standart|Norm)", "weight": 4}
+                "olcum_cihazi": {"pattern": r"(?:Lüksmetre|Luxmeter|Lux\s*Meter|Işık\s*Ölçer|Light\s*Meter|Işıklılık\s*Ölçer|Luminance\s*Meter|Fotometre|Photometer|Cihaz\s*Marka|Device\s*Brand|Model|Seri\s*No|Serial\s*Number)", "weight": 4},
+                "kalibrasyon_bilgi": {"pattern": r"(?:Kalibrasyon|Calibration|Sertifika|Certificate|Akreditasyon|Accreditation|Geçerlilik|Validity|Son\s*Kalibrasyon|Last\s*Calibration|Kalibre|Calibrated)", "weight": 3},
+                "olcum_yontemi": {"pattern": r"(?:Ölçüm\s*Yöntem|Measurement\s*Method|Test\s*Yöntem|Test\s*Method|Prosedür|Procedure|Metodoloji|Methodology|Ortlama|Average|Dört\s*Nokta|Four\s*Point|Grid|Izgara)", "weight": 4},
+                "standartlar": {"pattern": r"(?:TS\s*EN\s*12464|ISO\s*8995|İş\s*Sağlığ[ıi]|Work\s*Safety|Occupational\s*Health|Standart|Standard|Norm|Specification|Tüzük|Regulation|Yönetmelik|Directive)", "weight": 4}
             },
             "Ölçüm Sonuç Tablosu": {
-                "tablo_yapisi": {"pattern": r"(?:Tablo|Table|Liste|List|Sıra\s*No|Row\s*No)", "weight": 5},
-                "calisma_alani": {"pattern": r"(?:Çalışma\s*Alan[ıi]|Work\s*Area|Bölge\s*Ad[ıi]|Konum|Nokta)", "weight": 4},
-                "olculen_degerler": {"pattern": r"(?:Lüks|Lux|lx|Aydınlatma\s*Şiddet|Illumination|Light\s*Level|Ölçülen)", "weight": 8},
-                "hedeflenen_degerler": {"pattern": r"(?:Hedeflenen|Target|İstenen|Gerekli|Minimum|Standart)", "weight": 4},
-                "uygunluk_durumu": {"pattern": r"(?:Uygun|Suitable|Uygunsuz|Not\s*Suitable|PASS|FAIL|OK|NOK)", "weight": 4}
+                "tablo_yapisi": {"pattern": r"(?:Tablo|Table|Liste|List|Sıra\s*No|Row\s*No|S[ıi]ra|Order|Numara|Number|Index|Çizelge|Chart|Matris|Matrix)", "weight": 5},
+                "calisma_alani": {"pattern": r"(?:Çalışma\s*Alan[ıi]|Work\s*Area|İş\s*Alan[ıi]|Work\s*Zone|Bölge\s*Ad[ıi]|Area\s*Name|Konum|Location|Nokta|Point|Pozisyon|Position)", "weight": 4},
+                "olculen_degerler": {"pattern": r"(?:Lüks|Lux|lx|Aydınlatma\s*Şiddet|Illumination|Light\s*Level|Işık\s*Seviye|Light\s*Intensity|Ölçülen|Measured|Mevcut|Current|Actual)", "weight": 8},
+                "hedeflenen_degerler": {"pattern": r"(?:Hedeflenen|Target|İstenen|Desired|Gerekli|Required|Minimum|Standart|Standard|Önerilen|Recommended|Limit|Thresh)", "weight": 4},
+                "uygunluk_durumu": {"pattern": r"(?:Uygun|Suitable|Conform|Uygunsuz|Not\s*Suitable|Non[\\-\\s]*Conform|Geçerli|Valid|Geçersiz|Invalid|PASS|FAIL|OK|NOK)", "weight": 4}
             },
             "Uygunluk Değerlendirmesi": {
-                "toplu_degerlendirme": {"pattern": r"(?:Genel\s*Değerlendirme|Overall\s*Evaluation|Özet|Summary|Sonuç)", "weight": 5},
-                "limit_disi_degerler": {"pattern": r"(?:Limit\s*Dış[ıi]|Out\s*of\s*Limit|Uygunsuz|Eksik|Fazla)", "weight": 5},
-                "risk_belirtme": {"pattern": r"(?:Risk|Tehlike|Hazard|Göz\s*Yorgunluk|Verimlilik|Güvenlik)", "weight": 5},
-                "duzeltici_faaliyet": {"pattern": r"(?:Düzeltici\s*Faaliyet|Corrective\s*Action|İyileştirme|Öneri)", "weight": 5}
+                "toplu_degerlendirme": {"pattern": r"(?:Genel\s*Değerlendirme|General\s*Assessment|Toplu\s*Değerlendirme|Overall\s*Evaluation|Özet|Summary|Sonuç|Result|Analiz|Analysis)", "weight": 5},
+                "limit_disi_degerler": {"pattern": r"(?:Limit\s*Dış[ıi]|Out\s*of\s*Limit|Standart\s*Dış[ıi]|Non[\\-\\s]*Standard|Uygunsuz|Non[\\-\\s]*Compliant|Eksik|Insufficient|Fazla|Excessive|Aş[ıi]r[ıi]|Over)", "weight": 5},
+                "risk_belirtme": {"pattern": r"(?:Risk|Tehlike|Hazard|Göz\s*Yorgunluk|Eye\s*Fatigue|Verimlilik|Productivity|Güvenlik|Safety|Dikkat\s*Dağ[ıi]n[ıi]kl[ıi]|Distraction)", "weight": 5},
+                "duzeltici_faaliyet": {"pattern": r"(?:Düzeltici\s*Faaliyet|Corrective\s*Action|İyileştirme|Improvement|Öneri|Recommendation|Çözüm|Solution|Aksiyon|Action|Tedbir|Measure)", "weight": 5}
             },
             "Görsel ve Teknik Dokümantasyon": {
-                "alan_fotograflari": {"pattern": r"(?:Fotoğraf|Photo|Görsel|Visual|Resim|Image)", "weight": 1},
-                "cihaz_fotograflari": {"pattern": r"(?:Cihaz\s*Fotoğraf|Device\s*Photo|Ölçüm\s*Cihaz)", "weight": 1},
-                "kroki_sema": {"pattern": r"(?:Kroki|Sketch|Şema|Schema|Plan|Layout|Çizim)", "weight": 1},
-                "armatur_teknik": {"pattern": r"(?:Armatür|Fixture|Lamba|Lamp|LED|Fotometrik|Lümen)", "weight": 2}
+                "alan_fotograflari": {"pattern": r"(?:Fotoğraf|Photo|Görsel|Visual|Resim|Picture|Image|Şekil|Figure|Çekim|Shot)", "weight": 1},
+                "cihaz_fotograflari": {"pattern": r"(?:Cihaz\s*Fotoğraf|Device\s*Photo|Alet\s*Fotoğraf|Equipment\s*Photo|Ölçüm\s*Cihaz|Measurement\s*Device)", "weight": 1},
+                "kroki_sema": {"pattern": r"(?:Kroki|Sketch|Şema|Schema|Plan|Layout|Çizim|Drawing|Diyagram|Diagram|Harita|Map|Yerleşim|Placement)", "weight": 1},
+                "armatur_teknik": {"pattern": r"(?:Armatür|Fixture|Lamba|Lamp|LED|Fotometrik|Photometric|Lümen|Lumen|lm|Wat|Watt|W|Işık\s*Ak[ıi]s[ıi]|Luminous\s*Flux|Verim|Efficacy)", "weight": 2}
             },
             "Ölçüm Cihazı Bilgileri": {
-                "cihaz_detay": {"pattern": r"(?:Marka|Brand|Model|Tip|Type|Seri|Serial|Kalibrasyon)", "weight": 5},
-                "cihaz_ozellikleri": {"pattern": r"(?:Hassasiyet|Accuracy|Precision|Range|Aralık|Çözünürlük)", "weight": 3},
-                "cihaz_durumu": {"pattern": r"(?:Durum|Status|Çalışır|Working|Aktif|Geçerli|Uygun)", "weight": 2}
+                "cihaz_detay": {"pattern": r"(?:Marka|Brand|Model|Tip|Type|Seri|Serial|SN|S/N|Üretici|Manufacturer|Kalibrasyon|Calibration)", "weight": 5},
+                "cihaz_ozellikleri": {"pattern": r"(?:Hassasiyet|Accuracy|Precision|Doğruluk|Range|Aralık|Ölçüm\s*Aral[ıi]ğ[ıi]|Measurement\s*Range|Çözünürlük|Resolution)", "weight": 3},
+                "cihaz_durumu": {"pattern": r"(?:Durum|Status|Çalışır|Working|Aktif|Active|Geçerli|Valid|Uygun|Suitable|Kullan[ıi]labilir|Usable)", "weight": 2}
             },
             "Sonuç ve Öneriler": {
-                "genel_uygunluk": {"pattern": r"(?:Genel\s*Sonuç|Overall\s*Result|Uygun|Suitable|PASS|FAIL)", "weight": 4},
-                "standart_atif": {"pattern": r"(?:Standart|Standard|TS\s*EN|ISO|Referans|Uygunluk)", "weight": 3},
-                "iyilestirme_onerileri": {"pattern": r"(?:İyileştirme|Improvement|Öneri|Recommendation|Aksiyon)", "weight": 4},
-                "tekrar_olcum": {"pattern": r"(?:Tekrar\s*Ölçüm|Re[\\-\\s]*Measurement|Periyot|Period|Kontrol)", "weight": 4}
+                "genel_uygunluk": {"pattern": r"(?:Genel\s*Sonuç|Overall\s*Result|Uygun|Suitable|Uygunsuz|Non[\\-\\s]*Suitable|Geçerli|Valid|Geçersiz|Invalid|PASS|FAIL|Başar[ıi]l[ıi]|Successful)", "weight": 4},
+                "standart_atif": {"pattern": r"(?:Standart|Standard|TS\s*EN|ISO|Referans|Reference|Atıf|Citation|Uygunluk|Compliance|Conformity)", "weight": 3},
+                "iyilestirme_onerileri": {"pattern": r"(?:İyileştirme|Improvement|Öneri|Recommendation|Aksiyon|Action|Tedbir|Measure|Çözüm|Solution|Gelişt|Develop)", "weight": 4},
+                "tekrar_olcum": {"pattern": r"(?:Tekrar\s*Ölçüm|Re[\\-\\s]*Measurement|Periyot|Period|S[ıi]kl[ıi]k|Frequency|Süre|Duration|Kontrol|Control|İzleme|Monitoring)", "weight": 4}
             }
         }
     
@@ -153,6 +153,29 @@ class LightingReportAnalyzer:
             logger.warning(f"Dil tespiti başarısız: {e}")
             return 'tr'
     
+    def translate_to_turkish(self, text: str, source_lang: str) -> str:
+        """Metni Türkçe'ye çevir - şimdilik devre dışı"""
+        if source_lang != 'tr':
+            logger.info(f"Tespit edilen dil: {source_lang.upper()} - Çeviri yapılmıyor, orijinal metin kullanılıyor")
+        return text
+    
+    def extract_text_from_file(self, file_path: str) -> str:
+        """Dosya formatına göre metin çıkarma"""
+        file_ext = os.path.splitext(file_path)[1].lower()
+        
+        if file_ext == '.pdf':
+            return self.extract_text_from_pdf(file_path)
+        elif file_ext == '.docx':
+            return self.extract_text_from_docx(file_path)
+        elif file_ext == '.doc':
+            logger.warning("DOC formatı için DOCX'e dönüştürme gerekiyor veya OCR kullanılacak")
+            return self.extract_text_from_docx(file_path)
+        elif file_ext == '.txt':
+            return self.extract_text_from_txt(file_path)
+        else:
+            logger.error(f"Desteklenmeyen dosya formatı: {file_ext}")
+            return ""
+    
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         """PDF'den metin çıkarma"""
         try:
@@ -172,6 +195,7 @@ class LightingReportAnalyzer:
                 
                 all_text = all_text.replace('—', '-')
                 all_text = all_text.replace('"', '"').replace('"', '"')
+                all_text = all_text.replace('´', "'")
                 all_text = re.sub(r'[^\x00-\x7F\u00C0-\u00FF\u0100-\u017F\u0180-\u024F]+', ' ', all_text)
                 all_text = all_text.strip()
                 
@@ -228,7 +252,7 @@ class LightingReportAnalyzer:
         except Exception as e:
             logger.error(f"TXT metin çıkarma hatası: {e}")
             return ""
-    
+
     def analyze_criteria(self, text: str, category: str) -> Dict[str, LightingAnalysisResult]:
         """Kriterleri analiz et"""
         results = {}
@@ -313,7 +337,9 @@ class LightingReportAnalyzer:
         
         # RAPOR NUMARASI
         report_no_patterns = [
-            r"(?i)(?:RAPOR\s*NO|REPORT\s*NO)\s*[:=]?\s*([A-Z0-9\-\/]{3,20})",
+            r"(?i)(?:RAPOR\s*NO|REPORT\s*NO|RAPOR\s*NUMARAS[II])\s*[|\s]*\s*([A-Z0-9\-\/]{3,20})",
+            r"(?i)(?:RAPOR\s*NO|REPORT\s*NO|RAPOR\s*NUMARAS[II]|REPORT\s*NUMBER|DÖKÜMAN\s*NO|DOCUMENT\s*NO)\s*[:=]?\s*([A-Z0-9\-\/]{3,20})",
+            r"(?i)(?:TEST\s*NO|BELGE\s*NO|REFERANS\s*NO|REF\s*NO)\s*[:=]?\s*([A-Z0-9\-\/]{3,20})"
         ]
         
         for pattern in report_no_patterns:
@@ -326,7 +352,10 @@ class LightingReportAnalyzer:
 
         # PROJE ADI
         project_patterns = [
-            r"(?i)(?:PROJE\s*ADI|PROJECT\s*NAME)\s*[:=]?\s*(.*?(?:ÖLÇÜM|TEST|RAPOR|REPORT))",
+            r"(?i)(?:PROJE\s*ADI|PROJECT\s*NAME|PROJE\s*TANIM|PROJECT\s*TITLE)?\s*[:=-]?\s*(?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\s*REV\s*-?\d*\s*\d*\.*\s*BÖLÜM\s*)?[-\s]*(.*?(?:ÖLÇÜM|TEST|RAPOR|REPORT))",
+            r"(?i)[-\s]*([A-ZÇĞİÖŞÜ0-9\s]{5,100}.*?(?:ÖLÇÜM|TEST|RAPOR|REPORT))",
+            r"(?i)(?:PROJE\s*ADI|PROJECT\s*NAME|PROJE\s*TANIM|PROJECT\s*TITLE)\s*[:=-]?\s*[-\s]*(.*?(?:ÖLÇÜM|TEST|RAPOR|REPORT))",
+            r"(?i)(?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\s*REV\s*-?\d*\s*\d*\.*\s*BÖLÜM\s*)[-\s]*(.*?(?:ÖLÇÜM|TEST|RAPOR|REPORT))"
         ]
         
         for pattern in project_patterns:
@@ -340,7 +369,12 @@ class LightingReportAnalyzer:
         
         # ÖLÇÜM TARİHİ
         measurement_date_patterns = [
-            r"(?i)(?:ÖLÇÜM\s*TARİH[İI]?|MEASUREMENT\s*DATE)\s*[:=]\s*(\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4})",
+            r"(?i)(?:ÖLÇÜM\s*TARİH[İI]?\s*\/?\s*SAAT[İI]?)\s*[|\s]*\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})",
+            r"(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})\s*\/?\s*\d{1,2}:\d{1,2}[\-:]\d{1,2}:\d{1,2}",
+            r"(?i)(?:ÖLÇÜM\s*TARİH[İI]?|MEASUREMENT\s*DATE|TEST\s*TARİH[İI]?|TEST\s*DATE)\s*[:=]\s*(\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4})",
+            r"(?i)(?:ÖLÇÜM.*?(?:TARİH|DATE).*?)\s*[|\s]*\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})",
+            r"(?i)(?:ÖLÇÜM\s*YAPILDI[ĞG]I|MEASURED\s*ON)\s*[:=]?\s*(\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4})",
+            r"(?:TARİH[İI]?\s*\/?\s*SAAT[İI]?).*?(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})",
             r"\b(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{4})\b"
         ]
         
@@ -352,7 +386,9 @@ class LightingReportAnalyzer:
         
         # RAPOR TARİHİ
         report_date_patterns = [
-            r"(?i)(?:RAPOR\s*TARİH[İI]?|REPORT\s*DATE)\s*[:=]\s*(\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4})",
+            r"(?i)(?:RAPOR\s*TARİH[İI]?\s*\/?\s*SAAT[İI]?)\s*[|\s]*\s*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})",
+            r"(?i)(?:RAPOR\s*TARİH[İI]?|REPORT\s*DATE|HAZIRLANMA\s*TARİH[İI]?|PREPARED\s*ON|DÜZENLEME\s*TARİH[İI]?)\s*[:=]\s*(\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4})",
+            r"(?i)(?:BELGE|DÖKÜMAN|DOCUMENT).*?TARİH[İI]?.*?(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})"
         ]
         
         for pattern in report_date_patterns:
@@ -366,7 +402,11 @@ class LightingReportAnalyzer:
 
         # ÖLÇÜM CİHAZI
         device_patterns = [
-            r"(?i)(?:LÜKSMETRE|LUXMETER|LUX\s*METER)\s*[:=]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9\s\.\-]{2,50})",
+            r"(?i)(?:LÜKSMETRE|LUXMETER|LUX\s*METER)\s*[:=]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9\s\.\-]{2,50}(?=\s*(?:\d{4,}|Seri|No|Nolu|$)))",
+            r"(?i)(?:MARKA|BRAND)\s*[:=]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9\s\.\-]{2,30})(?:.*?(?:MODEL|TİP|TYPE)\s*[:=]?\s*([A-ZÇĞİÖŞÜ0-9\-]{1,30}))?",
+            r"(?i)(?:CİHAZ|DEVICE|ALET|INSTRUMENT)\s*[:=]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9\s\.\-]{2,50}(?=\s*(?:\d{4,}|Seri|No|Nolu|$)))",
+            r"(?i)([A-ZÇĞİÖŞÜ0-9]+(?:\s+[A-ZÇĞİÖŞÜ0-9]+){0,3}\s+(?:LUXMETER|LUX\s*METER|LÜKSMETRE)(?=\s*(?:\d{4,}|Seri|No|Nolu|$)))",
+            r"(?i)(?:IŞIK\s*ŞİDDETİ\s*ÖLÇÜM\s*CİHAZI)\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9\s\.\-]{2,50}(?=\s*(?:\d{4,}|Seri|No|Nolu|$)))"
         ]
         
         for pattern in device_patterns:
@@ -379,7 +419,11 @@ class LightingReportAnalyzer:
         
         # TESİS ADI
         facility_patterns = [
-            r"(?i)(?:TESİS\s*ADI|FACILITY\s*NAME|FABRİKA|FACTORY)\s*[:=]?\s*([A-ZÇĞİÖŞÜ0-9][A-ZÇĞİÖŞÜ0-9\.\&\s\-]{3,60})",
+            r"(?<!\w)([A-ZÇĞİÖŞÜ][A-Za-zÇĞİÖŞÜçğıöşü\s\.\&]{2,50}?(?:A\.Ş|LTD\.?\s*ŞTİ|SANAYİ|TİCARET|İÇECEK|GIDA|TEKSTİL|OTOMOTİV|İNŞAAT|MAKİNA|COMPANY|CORP|CORPORATION|INC|INCORPORATED)\.?)(?!\w)",
+            r"(?i)(?:TESİS\s*ADI|FACILITY\s*NAME|FABRİKA|FACTORY)\s*[:\-]?\s*([A-ZÇĞİÖŞÜ0-9][A-ZÇĞİÖŞÜ0-9\.\&\süçğıöş\-]{3,60})",
+            r"(?i)(?:İŞ\s*YERİ|WORKPLACE|KURULUŞ|COMPANY)\s*[:\-]?\s*([A-ZÇĞİÖŞÜ0-9][A-ZÇĞİÖŞÜ0-9\.\&\süçğıöş\-]{3,60})",
+            r"(?i)([A-ZÇĞİÖŞÜ0-9][A-ZÇĞİÖŞÜ0-9\.\&\süçğıöş\-]{3,60})\s+(?:TESİS|FABRİKA|FACTORY|PLANT)",
+            r"(?i)([A-ZÇĞİÖŞÜ0-9][A-ZÇĞİÖŞÜ0-9\-\s\.&]*?(?:A\.Ş|LTD\.?\s*ŞTİ|SANAYİ|TİCARET)[A-ZÇĞİÖŞÜ0-9\-\s\.&]*)",
         ]
 
         for pattern in facility_patterns:
@@ -394,26 +438,152 @@ class LightingReportAnalyzer:
         
         # GENEL UYGUNLUK
         compliance_patterns = [
-            r"(?i)\b(UYGUN|SUITABLE|PASS)\b",
-            r"(?i)\b(UYGUNSUZ|NOT\s*SUITABLE|FAIL)\b",
+            r"(?i)\b(UYGUN|SUITABLE|CONFORM|GEÇERLİ|VALID|PASS)\b",
+            r"(?i)\b(UYGUNSUZ|NOT\s*SUITABLE|NON[\\-\\s]*CONFORM|GEÇERSİZ|INVALID|FAIL)\b",
+            r"(?i)(?:GENEL\s*SONUÇ|OVERALL\s*RESULT|SONUÇ|RESULT)\s*[:=]?\s*(UYGUN|UYGUNSUZ|SUITABLE|NOT\s*SUITABLE|PASS|FAIL|GEÇERLİ|GEÇERSİZ)"
         ]
         
         for pattern in compliance_patterns:
             match = re.search(pattern, text)
             if match:
                 result = match.group(1).strip().upper()
-                if result in ["UYGUN", "SUITABLE", "PASS"]:
+                if result in ["UYGUN", "SUITABLE", "CONFORM", "GEÇERLİ", "VALID", "PASS"]:
                     values["genel_uygunluk"] = "UYGUN"
-                elif result in ["UYGUNSUZ", "NOT SUITABLE", "FAIL"]:
+                elif result in ["UYGUNSUZ", "NOT SUITABLE", "NON-CONFORM", "GEÇERSİZ", "INVALID", "FAIL"]:
                     values["genel_uygunluk"] = "UYGUNSUZ"
                 break
         
         return values
 
-    def generate_recommendations(self, analysis_results: Dict, scores: Dict) -> List[str]:
+    def check_date_validity(self, measurement_date: str, report_date: str) -> Tuple[bool, str]:
+        """Ölçüm ve rapor tarihlerini bugünkü tarih ile kontrol et (1 yıl kuralı)"""
+        if measurement_date == "Bulunamadı" and report_date == "Bulunamadı":
+            return False, "Ne ölçüm ne de rapor tarihi bulunamadı"
+        
+        dates_to_check = []
+        
+        if measurement_date != "Bulunamadı":
+            dates_to_check.append(("Ölçüm", measurement_date))
+        
+        if report_date != "Bulunamadı" and report_date != "Rapor tarihi ayrı belirtilmemiş":
+            dates_to_check.append(("Rapor", report_date))
+        
+        if not dates_to_check:
+            return False, "Geçerli tarih bulunamadı"
+        
+        try:
+            date_formats = ['%d/%m/%Y', '%d.%m.%Y', '%d-%m-%Y', '%d/%m/%y', '%d.%m.%y', '%d-%m-%y']
+            today = datetime.now()
+            
+            for date_type, date_str in dates_to_check:
+                parsed_date = None
+                for fmt in date_formats:
+                    try:
+                        parsed_date = datetime.strptime(date_str, fmt)
+                        break
+                    except:
+                        continue
+                
+                if not parsed_date:
+                    return False, f"{date_type} tarihi formatı tanınmadı ({date_str})"
+                
+                if parsed_date.year < 1950:
+                    parsed_date = parsed_date.replace(year=parsed_date.year + 2000)
+                
+                diff = abs((today - parsed_date).days)
+                
+                if diff > 365:
+                    return False, f"{date_type} tarihi 1 yıldan eski ({diff} gün önce - {date_str})"
+            
+            checked_dates = [f"{dt[0]}: {dt[1]}" for dt in dates_to_check]
+            return True, f"Tüm tarihler geçerli - {', '.join(checked_dates)}"
+            
+        except Exception as e:
+            return False, f"Tarih kontrolü yapılamadı - {e}"
+
+    def generate_improvement_actions(self, analysis_results: Dict, scores: Dict) -> List[str]:
+        """Dinamik iyileştirme önerileri oluştur"""
+        actions = []
+        
+        sorted_categories = sorted(scores["category_scores"].items(), key=lambda x: x[1]["percentage"])
+        
+        category_actions = {
+            "Genel Rapor Bilgileri": [
+                "Proje adı ve numarasını netleştiriniz",
+                "Ölçüm ve rapor tarihlerini açıkça belirtiniz",
+                "Tesis/bölge/alan bilgilerini detaylandırınız",
+                "Rapor numarası ve revizyon bilgisini ekleyiniz",
+                "Ölçümü yapan firma ve personel bilgilerini yazınız",
+                "Raporu hazırlayanın onay/imzasını alınız"
+            ],
+            "Ölçüm Metodu ve Standart Referansları": [
+                "Ölçüm cihazının marka, model ve seri numarasını belirtiniz",
+                "Cihaz kalibrasyon bilgilerini ve sertifikalarını ekleyiniz",
+                "Ölçüm yöntemini detaylandırınız (dört nokta ortalaması vb.)",
+                "TS EN 12464-1, ISO 8995 gibi standart referanslarını ekleyiniz"
+            ],
+            "Ölçüm Sonuç Tablosu": [
+                "Ölçüm sonuç tablosunu sıra no ile düzenleyiniz",
+                "Çalışma alanı/bölge adlarını açıkça tanımlayınız",
+                "Ölçülen aydınlatma şiddeti değerlerini (lüks) eksiksiz yazınız",
+                "Hedeflenen aydınlatma şiddeti değerlerini belirtiniz",
+                "Her nokta için uygunluk durumunu (UYGUN/UYGUN DEĞİL) belirtiniz"
+            ],
+            "Uygunluk Değerlendirmesi": [
+                "Tüm ölçüm noktalarının genel değerlendirmesini yapınız",
+                "Limit dışı değerlerin listesini çıkarınız",
+                "Yetersiz/aşırı aydınlatmanın risklerini belirtiniz",
+                "Somut düzeltici faaliyet önerileri sununuz"
+            ],
+            "Görsel ve Teknik Dokümantasyon": [
+                "Ölçüm yapılan alan fotoğraflarını ekleyiniz",
+                "Ölçüm cihazı fotoğraflarını çekiniz",
+                "Ölçüm noktaları kroki veya şemasını hazırlayınız",
+                "Armatür teknik belgelerini (fotometrik raporlar) ekleyiniz"
+            ],
+            "Ölçüm Cihazı Bilgileri": [
+                "Cihaz marka, model, seri no detaylarını tam olarak yazınız",
+                "Cihaz hassasiyet, doğruluk, ölçüm aralığı özelliklerini belirtiniz",
+                "Cihazın çalışır durumda olduğunu teyit ediniz"
+            ],
+            "Sonuç ve Öneriler": [
+                "Genel uygunluk sonucunu (UYGUN/UYGUNSUZ) açıkça belirtiniz",
+                "İlgili standartlara atıf yapınız",
+                "Somut iyileştirme önerilerini listeyiniz",
+                "Tekrar ölçüm periyodu önerisinde bulununuz"
+            ]
+        }
+        
+        for category, score_data in sorted_categories[:5]:
+            if score_data["percentage"] < 70:
+                actions.extend(category_actions.get(category, []))
+        
+        if scores["percentage"] < 50:
+            actions.insert(0, "ÖNCELİK: Rapor yapısını ve içeriğini kapsamlı olarak yeniden düzenleyiniz")
+        
+        return actions
+
+    def generate_recommendations(self, analysis_results: Dict, scores: Dict, date_valid: bool = True, date_message: str = "") -> List[str]:
         """Öneriler oluştur"""
         recommendations = []
         total_percentage = scores["percentage"]
+        
+        if not date_valid:
+            if "Ne ölçüm ne de rapor tarihi bulunamadı" in date_message:
+                recommendations.append("❌ RAPOR GEÇERSİZ: Ne ölçüm ne de rapor tarihi bulunamadı")
+            elif "Ölçüm tarihi formatı tanınmadı" in date_message:
+                recommendations.append("❌ RAPOR GEÇERSİZ: Ölçüm tarihi formatı tanınmadı")
+            elif "Rapor tarihi formatı tanınmadı" in date_message:
+                recommendations.append("❌ RAPOR GEÇERSİZ: Rapor tarihi formatı tanınmadı")
+            elif "Ölçüm tarihi 1 yıldan eski" in date_message:
+                recommendations.append("❌ RAPOR GEÇERSİZ: Ölçüm tarihi 1 yıldan eski")
+            elif "Rapor tarihi 1 yıldan eski" in date_message:
+                recommendations.append("❌ RAPOR GEÇERSİZ: Rapor tarihi 1 yıldan eski")
+            elif "Geçerli tarih bulunamadı" in date_message:
+                recommendations.append("❌ RAPOR GEÇERSİZ: Geçerli tarih bulunamadı")
+            else:
+                recommendations.append(f"❌ RAPOR GEÇERSİZ: {date_message}")
+            return recommendations
         
         if total_percentage >= 70:
             recommendations.append(f"✅ Aydınlatma Ölçüm Raporu GEÇERLİ (Toplam: %{total_percentage:.1f})")
@@ -425,6 +595,9 @@ class LightingReportAnalyzer:
             
             if category_score < 40:
                 recommendations.append(f"🔴 {category} bölümü yetersiz (%{category_score:.1f})")
+                missing_items = [name for name, result in results.items() if not result.found]
+                if missing_items:
+                    recommendations.append(f"   Eksik: {', '.join(missing_items[:3])}")
             elif category_score < 70:
                 recommendations.append(f"🟡 {category} bölümü geliştirilmeli (%{category_score:.1f})")
             else:
@@ -439,21 +612,15 @@ class LightingReportAnalyzer:
         if not os.path.exists(file_path):
             return {"error": f"Dosya bulunamadı: {file_path}"}
         
-        file_ext = os.path.splitext(file_path)[1].lower()
-        
-        if file_ext == '.pdf':
-            text = self.extract_text_from_pdf(file_path)
-        elif file_ext == '.docx':
-            text = self.extract_text_from_docx(file_path)
-        elif file_ext == '.txt':
-            text = self.extract_text_from_txt(file_path)
-        else:
-            return {"error": f"Desteklenmeyen dosya formatı: {file_ext}"}
-        
+        text = self.extract_text_from_file(file_path)
         if not text:
             return {"error": "Dosyadan metin çıkarılamadı"}
         
         detected_lang = self.detect_language(text)
+        
+        if detected_lang != 'tr':
+            logger.info(f"{detected_lang.upper()} dilinden Türkçe'ye çeviriliyor...")
+            text = self.translate_to_turkish(text, detected_lang)
         
         analysis_results = {}
         for category in self.criteria_weights.keys():
@@ -461,64 +628,59 @@ class LightingReportAnalyzer:
         
         scores = self.calculate_scores(analysis_results)
         extracted_values = self.extract_specific_values(text)
-        recommendations = self.generate_recommendations(analysis_results, scores)
         
-        final_status = "PASS" if scores["percentage"] >= 70 else "FAIL"
+        date_valid, date_message = self.check_date_validity(
+            extracted_values.get("olcum_tarihi", "Bulunamadı"),
+            extracted_values.get("rapor_tarihi", "Bulunamadı")
+        )
+        
+        recommendations = self.generate_recommendations(analysis_results, scores, date_valid, date_message)
+        improvement_actions = self.generate_improvement_actions(analysis_results, scores)
+        
+        if not date_valid:
+            final_status = "FAIL"
+            final_percentage = 0
+        else:
+            final_status = "PASS" if scores["percentage"] >= 70 else "FAIL"
+            final_percentage = scores["percentage"]
         
         report = {
             "analiz_tarihi": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "dosya_bilgisi": {
                 "file_path": file_path,
-                "file_type": file_ext,
+                "file_type": os.path.splitext(file_path)[1].lower(),
                 "detected_language": detected_lang
             },
             "cikarilan_degerler": extracted_values,
+            "tarih_gecerlilik": {
+                "valid": date_valid,
+                "message": date_message
+            },
             "kategori_analizleri": analysis_results,
             "puanlama": scores,
             "oneriler": recommendations,
+            "iyilestirme_eylemleri": improvement_actions,
             "ozet": {
-                "toplam_puan": scores["total_score"],
-                "yuzde": scores["percentage"],
+                "toplam_puan": scores["total_score"] if date_valid else 0,
+                "yuzde": final_percentage,
                 "durum": final_status,
-                "rapor_tipi": "AYDINLATMA_OLCUM_RAPORU"
+                "rapor_tipi": "AYDINLATMA_OLCUM_RAPORU",
+                "tarih_gecersiz": not date_valid
             }
         }
         
-        return report
+        return report  
     
 # ============================================
 # HELPER FUNCTIONS (Server Validasyon)
 # ============================================
-def map_language_code(lang_code):
-    """Dil kodunu tam isme çevir"""
-    lang_mapping = {
-        'tr': 'turkish',
-        'en': 'english', 
-        'de': 'german',
-        'fr': 'french',
-        'es': 'spanish',
-        'it': 'italian'
-    }
-    return lang_mapping.get(lang_code, 'turkish')
-
-
 def validate_document_server(text):
     """Server kodunda doküman validasyonu - Aydınlatma için"""
-    
     critical_terms = [
-         # Aydınlatma temel terimleri
         ["aydınlatma", "lighting", "illumination", "ışık", "lumen", "ışık şiddeti"],
-        
-        # Aydınlatma ölçüm birimleri
         ["lux", "cd/m2", "candela", "luminance", "illuminance"],
-        
-        # Aydınlatma standartları
         ["ts en 12464", "en 12464", "12464", "iso 8995", "cibse"],
-        
-        # Aydınlatma ekipmanları
         ["led", "fluorescent", "floresan", "armatur", "luminaire", "ballast"],
-
-        # Aydınlatma türleri/çeşitleri (en az 1 tane olmalı)
         ["genel aydınlatma", "general lighting", "task lighting", "görev aydınlatması", "accent lighting", "emergency lighting", "acil aydınlatma"]
     ]
     
@@ -555,6 +717,7 @@ def check_strong_keywords_first_pages(filepath):
     ]
     
     try:
+        Image.MAX_IMAGE_PIXELS = None
         pages = pdf2image.convert_from_path(filepath, dpi=200, first_page=1, last_page=2)
         
         all_text = ""
@@ -563,7 +726,7 @@ def check_strong_keywords_first_pages(filepath):
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
             
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng')
             all_text += text.lower() + " "
         
         found_keywords = [kw for kw in strong_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
@@ -578,56 +741,26 @@ def check_strong_keywords_first_pages(filepath):
 def check_excluded_keywords_first_pages(filepath):
     """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara"""
     excluded_keywords = [
-        # HRC raporu (eski strong_keywords)
         "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        
-        # Elektrik devre şeması
         "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
-        
-        # Espe raporu  
         "espe",
-        
-        # Hidrolik devre şeması
         "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
-        
-        # Gürültü ölçüm raporu
         "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        
-        # Manuel/kullanma kılavuzu
         "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
-        
-        # LOTO raporu
         "loto",
-        
-        # LVD raporu
         "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        
-        # AT tip muayene (AT uygunluk beyanı)
         "uygunluk", "beyan", "muayene", "conformity", "declaration",
-        
-        # İSG periyodik kontrol
         "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        
-        # Pnömatik devre şeması
         "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
-        
-        # Montaj talimatları
         "montaj", "assembly",
-        
-        # EN 60204-1 topraklama raporu
         "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
-        
-        # Bakım talimatları
         "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
-        
-        # Mekanik titreşim raporu
         "titreşim", "vibration", "mekanik",
-        
-        # AT tip inceleme sertifikası
         "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate"
     ]
     
     try:
+        Image.MAX_IMAGE_PIXELS = None
         pages = pdf2image.convert_from_path(filepath, dpi=200, first_page=1, last_page=2)
         
         all_text = ""
@@ -636,7 +769,7 @@ def check_excluded_keywords_first_pages(filepath):
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
             
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng')
             all_text += text.lower() + " "
         
         found_excluded = [kw for kw in excluded_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
@@ -687,7 +820,7 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -701,21 +834,11 @@ def analyze_aydinlatma_report():
     """Aydınlatma Ölçüm Raporu analiz API endpoint'i - 3 Aşamalı Validasyon"""
     try:
         if 'file' not in request.files:
-            return jsonify({
-                'error': 'No file provided',
-                'message': 'Lütfen analiz edilmek üzere bir aydınlatma raporu sağlayın'
-            }), 400
+            return jsonify({'error': 'No file provided'}), 400
 
         file = request.files['file']
-
-        if file.filename == '':
-            return jsonify({'error': 'No file selected', 'message': 'Lütfen bir dosya seçin'}), 400
-
-        if not allowed_file(file.filename):
-            return jsonify({
-                'error': 'Invalid file type',
-                'message': 'Sadece PDF, DOCX, DOC ve TXT dosyaları kabul edilir'
-            }), 400
+        if file.filename == '' or not allowed_file(file.filename):
+            return jsonify({'error': 'Invalid file'}), 400
 
         try:
             filename = secure_filename(file.filename)
@@ -724,75 +847,47 @@ def analyze_aydinlatma_report():
             logger.info(f"Aydınlatma Ölçüm Raporu kontrol ediliyor: {filename}")
 
             analyzer = LightingReportAnalyzer()
-            
-            logger.info(f"Üç aşamalı aydınlatma kontrolü başlatılıyor: {filename}")
             file_ext = os.path.splitext(filepath)[1].lower()
 
             if file_ext == '.pdf':
                 logger.info("Aşama 1: İlk sayfa aydınlatma özgü kelime kontrolü...")
                 if check_strong_keywords_first_pages(filepath):
-                    logger.info("✅ Aşama 1 geçti - Aydınlatma özgü kelimeler bulundu")
+                    logger.info("✅ Aşama 1 geçti")
                 else:
                     logger.info("Aşama 2: İlk sayfa excluded kelime kontrolü...")
                     if check_excluded_keywords_first_pages(filepath):
-                        logger.info("❌ Aşama 2'de excluded kelimeler bulundu - Aydınlatma değil")
+                        logger.info("❌ Aşama 2'de excluded kelimeler bulundu")
                         try:
                             os.remove(filepath)
                         except:
                             pass
                         return jsonify({
                             'error': 'Invalid document type',
-                            'message': 'Bu dosya aydınlatma raporu değil (farklı rapor türü tespit edildi).',
-                            'details': {
-                                'filename': filename,
-                                'document_type': 'OTHER_REPORT_TYPE',
-                                'required_type': 'AYDINLATMA_OLCUM_RAPORU'
-                            }
+                            'message': 'Bu dosya aydınlatma raporu değil'
                         }), 400
                     else:
-                        logger.info("Aşama 3: Tam doküman critical terms kontrolü...")
+                        logger.info("Aşama 3: Tam doküman kontrolü...")
                         try:
                             with open(filepath, 'rb') as pdf_file:
                                 pdf_reader = PyPDF2.PdfReader(pdf_file)
-                                text = ""
-                                for page in pdf_reader.pages:
-                                    text += page.extract_text() + "\n"
+                                text = "".join(page.extract_text() + "\n" for page in pdf_reader.pages)
                             
-                            if not text or len(text.strip()) < 50:
-                                try:
-                                    os.remove(filepath)
-                                except:
-                                    pass
-                                return jsonify({
-                                    'error': 'Text extraction failed',
-                                    'message': 'Dosyadan yeterli metin çıkarılamadı'
-                                }), 400
-                            
-                            if not validate_document_server(text):
+                            if not text or len(text.strip()) < 50 or not validate_document_server(text):
                                 try:
                                     os.remove(filepath)
                                 except:
                                     pass
                                 return jsonify({
                                     'error': 'Invalid document type',
-                                    'message': 'Yüklediğiniz dosya aydınlatma ölçüm raporu değil!',
-                                    'details': {
-                                        'filename': filename,
-                                        'document_type': 'NOT_AYDINLATMA_REPORT',
-                                        'required_type': 'AYDINLATMA_OLCUM_RAPORU'
-                                    }
+                                    'message': 'Yüklediğiniz dosya aydınlatma ölçüm raporu değil!'
                                 }), 400
-                                
                         except Exception as e:
                             logger.error(f"Aşama 3 hatası: {e}")
                             try:
                                 os.remove(filepath)
                             except:
                                 pass
-                            return jsonify({
-                                'error': 'Analysis failed',
-                                'message': 'Dosya analizi sırasında hata oluştu'
-                            }), 500
+                            return jsonify({'error': 'Analysis failed'}), 500
 
             elif file_ext in ['.docx', '.doc', '.txt']:
                 logger.info(f"DOCX/TXT dosyası için tam doküman kontrolü: {file_ext}")
@@ -802,29 +897,14 @@ def analyze_aydinlatma_report():
                 elif file_ext == '.txt':
                     text = analyzer.extract_text_from_txt(filepath)
                 
-                if not text or len(text.strip()) == 0:
-                    try:
-                        os.remove(filepath)
-                    except:
-                        pass
-                    return jsonify({
-                        'error': 'Text extraction failed',
-                        'message': 'Dosyadan yeterli metin çıkarılamadı'
-                    }), 400
-                
-                if not validate_document_server(text):
+                if not text or len(text.strip()) == 0 or not validate_document_server(text):
                     try:
                         os.remove(filepath)
                     except:
                         pass
                     return jsonify({
                         'error': 'Invalid document type',
-                        'message': 'Yüklediğiniz dosya aydınlatma ölçüm raporu değil!',
-                        'details': {
-                            'filename': filename,
-                            'document_type': 'NOT_AYDINLATMA_REPORT',
-                            'required_type': 'AYDINLATMA_OLCUM_RAPORU'
-                        }
+                        'message': 'Yüklediğiniz dosya aydınlatma ölçüm raporu değil!'
                     }), 400
 
             logger.info(f"Aydınlatma raporu doğrulandı, analiz başlatılıyor: {filename}")
@@ -832,16 +912,11 @@ def analyze_aydinlatma_report():
             
             try:
                 os.remove(filepath)
-                logger.info(f"Uploaded file {filename} cleaned up")
-            except Exception as e:
-                logger.warning(f"Could not remove uploaded file {filename}: {e}")
+            except:
+                pass
 
             if 'error' in report:
-                return jsonify({
-                    'error': 'Analysis failed',
-                    'message': report['error'],
-                    'details': {'filename': filename}
-                }), 400
+                return jsonify({'error': 'Analysis failed', 'message': report['error']}), 400
 
             overall_percentage = report['ozet']['yuzde']
             status = "PASS" if overall_percentage >= 70 else "FAIL"
@@ -900,35 +975,22 @@ def analyze_aydinlatma_report():
                     os.remove(filepath)
             except:
                 pass
-            
             logger.error(f"Analiz hatası: {str(analysis_error)}")
-            return jsonify({
-                'error': 'Analysis failed',
-                'message': f'Aydınlatma raporu analizi sırasında hata oluştu: {str(analysis_error)}',
-                'details': {
-                    'error_type': type(analysis_error).__name__,
-                    'file_processed': filename if 'filename' in locals() else 'unknown'
-                }
-            }), 500
+            return jsonify({'error': 'Analysis failed', 'message': str(analysis_error)}), 500
 
     except Exception as e:
         logger.error(f"API endpoint hatası: {str(e)}")
-        return jsonify({
-            'error': 'Server error',
-            'message': f'Sunucu hatası: {str(e)}'
-        }), 500
+        return jsonify({'error': 'Server error', 'message': str(e)}), 500
+
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Health check endpoint - Aydınlatma için"""
+    """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
         'service': 'Lighting Report Analyzer API',
         'version': '1.0.0',
         'tesseract_available': tesseract_available,
-        'upload_folder': UPLOAD_FOLDER,
-        'max_file_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024),
-        'supported_formats': list(ALLOWED_EXTENSIONS),
         'report_type': 'AYDINLATMA_OLCUM_RAPORU',
         'standard': 'TS EN 12464-1'
     })
@@ -936,7 +998,7 @@ def health_check():
 
 @app.route('/', methods=['GET'])
 def index():
-    """Ana sayfa - API bilgileri - Aydınlatma için"""
+    """API bilgileri"""
     return jsonify({
         'service': 'Lighting Report Analyzer API',
         'version': '1.0.0',
@@ -945,17 +1007,6 @@ def index():
             'POST /api/aydinlatma-report': 'Aydınlatma raporu analizi',
             'GET /api/health': 'Servis sağlık kontrolü',
             'GET /': 'Bu bilgi sayfası'
-        },
-        'usage': {
-            'upload_format': 'multipart/form-data',
-            'file_field': 'file',
-            'supported_types': list(ALLOWED_EXTENSIONS),
-            'max_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
-        },
-        'scoring': {
-            'PASS': '≥70% - TS EN 12464-1 standardına uygun',
-            'CONDITIONAL': '50-69% - Kabul edilebilir',
-            'FAIL': '<50% - Standarda uygun değil'
         }
     })
 
@@ -967,24 +1018,12 @@ if __name__ == '__main__':
     logger.info("=" * 60)
     logger.info("Aydınlatma Ölçüm Raporu Analiz Servisi")
     logger.info("=" * 60)
-    logger.info(f"📁 Upload klasörü: {UPLOAD_FOLDER}")
-    logger.info(f"📊 Desteklenen formatlar: {', '.join(ALLOWED_EXTENSIONS)}")
-    logger.info(f"📏 Maksimum dosya boyutu: {app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB")
-    logger.info(f"🔍 Tesseract OCR: {'Kurulu' if tesseract_available else 'Kurulu değil'}")
-    logger.info("")
-    logger.info("🔗 API Endpoints:")
-    logger.info("  POST /api/aydinlatma-report - Aydınlatma raporu analizi")
-    logger.info("  GET /api/health - Servis sağlık kontrolü")
-    logger.info("  GET / - API bilgileri")
-    logger.info("=" * 60)
     
     port = int(os.environ.get('PORT', 8008))
     
     logger.info(f"🚀 Servis başlatılıyor - Port: {port}")
+    logger.info(f"📁 Upload klasörü: {UPLOAD_FOLDER}")
+    logger.info(f"🔧 Tesseract: {tesseract_info}")
     logger.info("=" * 60)
     
-    app.run(
-        host='0.0.0.0',
-        port=port,
-        debug=False
-    )
+    app.run(host='0.0.0.0', port=port, debug=False)

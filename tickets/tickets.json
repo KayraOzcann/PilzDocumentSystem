@@ -455,5 +455,393 @@
     },
     "comments": [],
     "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket6",
+    "ticket_id": "espe_20251127_103258",
+    "document_name": "E21.207_-_Chin_Fong_-_Arka_Taraf_Isk_Perdesi_ESPE_Raporu_V0_1.pdf",
+    "document_type": "ESPE_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/E21.207_-_Chin_Fong_-_Arka_Taraf_Isk_Perdesi_ESPE_Raporu_V0_1.pdf",
+    "opening_date": "2025-11-27T10:32:58.160068",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 80.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 80.0
+      },
+      "category_scores": {
+        "Genel Rapor Bilgileri": {
+          "max_points": 10,
+          "normalized_score": 8.0,
+          "percentage": 80.0,
+          "points_earned": 8.0,
+          "status": "PASS"
+        },
+        "Görsel ve Teknik Dökümantasyon": {
+          "max_points": 5,
+          "normalized_score": 5.0,
+          "percentage": 100.0,
+          "points_earned": 5,
+          "status": "PASS"
+        },
+        "Güvenlik Mesafesi Hesabı": {
+          "max_points": 25,
+          "normalized_score": 25.0,
+          "percentage": 100.0,
+          "points_earned": 25,
+          "status": "PASS"
+        },
+        "Koruma Cihazı (ESPE) Bilgileri": {
+          "max_points": 10,
+          "normalized_score": 10.0,
+          "percentage": 100.0,
+          "points_earned": 10.0,
+          "status": "PASS"
+        },
+        "Makine Duruş Performansı Ölçümü": {
+          "max_points": 25,
+          "normalized_score": 25.0,
+          "percentage": 100.0,
+          "points_earned": 25.0,
+          "status": "PASS"
+        },
+        "Sonuç ve Öneriler": {
+          "max_points": 10,
+          "normalized_score": 7.0,
+          "percentage": 70.0,
+          "points_earned": 7,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "cozunurluk": "90",
+        "durum": "uygun",
+        "durus_suresi_max": "70",
+        "durus_suresi_min": "120",
+        "en_iso_13855": "EN ISO 13855",
+        "formula_c": "C = 8 x ( d - 14 )",
+        "formula_s": "S = (2000 x T)",
+        "hat_bolge": "Sakarya Fabrikası",
+        "hesaplanan_mesafe": "1190",
+        "k_sabiti": "",
+        "koruma_yuksekligi": "1190",
+        "makine_adi": "Bulunamadı",
+        "mevcut_mesafe": "1190",
+        "olcum_tarihi": "10.03.2024",
+        "proje_no": "Bulunamadı",
+        "tehlikeli_hareket": "Tehlikeli hareket"
+      },
+      "recommendations": [
+        "✅ Genel Rapor Bilgileri bölümü yeterli (%80.0)",
+        "✅ Koruma Cihazı (ESPE) Bilgileri bölümü yeterli (%100.0)",
+        "✅ Makine Duruş Performansı Ölçümü bölümü yeterli (%100.0)",
+        "✅ Güvenlik Mesafesi Hesabı bölümü yeterli (%100.0)",
+        "✅ Görsel ve Teknik Dökümantasyon bölümü yeterli (%100.0)",
+        "⚠️ Sonuç ve Öneriler bölümü geliştirilmeli (%70.0)"
+      ],
+      "summary": {
+        "conclusion": "ESPE raporu standartlara uygun (%80)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket7",
+    "ticket_id": "noise_20251127_110747",
+    "document_name": "C20.140_-_FORD_-_Gurultu_Olcum_Raporu_V0_2.pdf",
+    "document_type": "GURULTU_OLCUM_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/C20.140_-_FORD_-_Gurultu_Olcum_Raporu_V0_2.pdf",
+    "opening_date": "2025-11-27T11:07:47.193027",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 72.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 72.0
+      },
+      "category_scores": {
+        "Değerlendirme ve Yorum": {
+          "max_score": 10,
+          "percentage": 0.0,
+          "score": 0.0,
+          "status": "FAIL"
+        },
+        "Ekler ve Görseller": {
+          "max_score": 5,
+          "percentage": 0.0,
+          "score": 0.0,
+          "status": "FAIL"
+        },
+        "Rapor Kimlik Bilgileri": {
+          "max_score": 15,
+          "percentage": 66.7,
+          "score": 10.0,
+          "status": "FAIL"
+        },
+        "Ölçüm Cihazı Bilgileri": {
+          "max_score": 15,
+          "percentage": 86.7,
+          "score": 13.0,
+          "status": "PASS"
+        },
+        "Ölçüm Metodolojisi": {
+          "max_score": 20,
+          "percentage": 80.0,
+          "score": 16.0,
+          "status": "PASS"
+        },
+        "Ölçüm Sonuçları": {
+          "max_score": 20,
+          "percentage": 90.0,
+          "score": 18.0,
+          "status": "PASS"
+        },
+        "Ölçüm Yapılan Ortam ve Ekipman Bilgileri": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "cihaz_ayari": "Hızlı",
+        "cihaz_marka": "PCE Gürültü",
+        "cihaz_model": "PCE-322A",
+        "firma_adi": "FORD OTOSAN",
+        "kalibrasyon_tarihi": "Kalibrasyon Tarihi:",
+        "lpa_deger": "Bulunamadı",
+        "lpc_deger": "Bulunamadı",
+        "makine_adi": "8X9J Otomatik",
+        "max_deger": "Bulunamadı",
+        "min_deger": "Bulunamadı",
+        "nokta_sayisi": "Bulunamadı",
+        "olcum_suresi": "1 dakika",
+        "olcum_tarihi": "Bulunamadı",
+        "olcum_yapan": "Yapan:",
+        "proje_adi": "1 Adet 8X9J",
+        "rapor_no": "C20.140",
+        "seri_no": "Seri Numarası:",
+        "standart": "EN ISO 4871",
+        "yetkili": "Savaş Şahan"
+      },
+      "recommendations": [
+        "⚠️ Rapor Kimlik Bilgileri bölümü geliştirilmeli (%66.7)",
+        "✅ Ölçüm Yapılan Ortam ve Ekipman Bilgileri bölümü yeterli (%100.0)",
+        "✅ Ölçüm Cihazı Bilgileri bölümü yeterli (%86.7)",
+        "✅ Ölçüm Metodolojisi bölümü yeterli (%80.0)",
+        "✅ Ölçüm Sonuçları bölümü yeterli (%90.0)",
+        "❌ Değerlendirme ve Yorum bölümü yetersiz (%0.0)",
+        "❌ Ekler ve Görseller bölümü yetersiz (%0.0)"
+      ],
+      "summary": {
+        "conclusion": "Gürültü ölçüm raporu standartlara uygun (%72)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket8",
+    "ticket_id": "lvd_20251127_163100",
+    "document_name": "E21.207_-_Toyota_-_Chifong_LVD_Olcum_.pdf",
+    "document_type": "LVD_TOPRAKLAMA_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/E21.207_-_Toyota_-_Chifong_LVD_Olcum_.pdf",
+    "opening_date": "2025-11-27T16:31:00.712929",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 92.86,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 92.86
+      },
+      "category_scores": {
+        "Genel Rapor Bilgileri": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15,
+          "status": "PASS"
+        },
+        "Görsel ve Teknik Dökümantasyon": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10,
+          "status": "PASS"
+        },
+        "Sonuç ve Öneriler": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15,
+          "status": "PASS"
+        },
+        "Uygunluk Değerlendirmesi": {
+          "max_score": 20,
+          "percentage": 100.0,
+          "score": 20,
+          "status": "PASS"
+        },
+        "Ölçüm Metodu ve Standart Referansları": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15,
+          "status": "PASS"
+        },
+        "Ölçüm Sonuç Tablosu": {
+          "max_score": 28,
+          "percentage": 71.43,
+          "score": 20,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "detected_language": "tr",
+        "firma_personel": "Pilz Servisleri Baturhan Paksoy Pilz Emniyet Otomasyon Ürünleri ve Hizmetleri Tic. Ltd. Şti. Kayışdağı Mah. Dudullu Yolu Cad. Mecnun Sok. No:7 Duru Plaza, Ataşehir -İstanbul , Türkiye",
+        "genel_sonuc": "0 NOKTA UYGUNSUZ",
+        "language_name": "Türkçe",
+        "musteri": "Toyota",
+        "olcum_cihazi": "EN 60204",
+        "proje_adi": "Belge Numarası: Versiyon: Tarih: Toyota Otomotiv Sanayi Türkiye A.Ş. Murat Çalıcı Toyota Caddesi No:2 54580 Arifiye, Sakarya 0 532 608 98 59 Murat.CALICI@toyotatr.com Pilz Bilgileri Baturhan Paksoy Pilz Emniyet Otomasyon Ürünleri ve Hizmetleri Tic. Ltd. Şti. Kayışdağı Mah. Dudullu Yolu Cad. Mecnun Sok. No:7 Duru Plaza, Ataşehir - İstanbul , Türkiye 0542 305 17 70 b.paksoy@pilz.com.tr E21.207BELGE BİLGİLERİ E21.207Makine Adı : Chin Fong Pres 0 18.04.2023 İmza BPA KBOİsim Baturhan Paksoy Kemal Burak Okyay Kalibrasyon Tarihi:Çok Fonksiyonlu Ölçüm Cihazı GOSSEN METRAWATT M506A CE5767790017 29.03.2023Cihazın Adı: İmalatçı: Tip: Seri Numarası:",
+        "proje_no": "E21.207",
+        "rapor_numarasi": "Bulunamadı",
+        "revizyon": "v0",
+        "rlo_max": "Bulunamadı",
+        "rlo_min": "Bulunamadı",
+        "rlo_ortalama": "Bulunamadı",
+        "tesis_adi": "Toyota Otomotiv Sanayi Türkiye A.Ş. Murat Çalıcı Toyota Caddesi No:2 54580 Arifiye, Sakarya 0 532 608 98 59 Murat.CALICI@toyotatr.com Pilz Bilgileri Baturhan Paksoy Pilz Emniyet Otomasyon Ürünleri ve Hizmetleri Tic. Ltd. Şti. Kayışdağı Mah. Dudullu Yolu Cad. Mecnun Sok. No:7 Duru Plaza, Ataşehir - İstanbul , Türkiye 0542 305 17 70 b.paksoy@pilz.com.tr E21.207BELGE BİLGİLERİ E21.207Makine Adı : Chin Fong Pres 0 18.04.2023 İmza BPA KBOİsim Baturhan Paksoy Kemal Burak Okyay Kalibrasyon Tarihi:Çok Fonksiyonlu Ölçüm Cihazı GOSSEN METRAWATT M506A CE5767790017 29.03.2023Cihazın Adı: İmalatçı: Tip: Seri Numarası:",
+        "toplam_olcum_nokta": 0,
+        "uygun_nokta_sayisi": 0,
+        "uygunsuz_olcumler": []
+      },
+      "recommendations": [
+        "✅ Rapor çok iyi durumda, tüm kriterler karşılanmış."
+      ],
+      "summary": {
+        "conclusion": "LVD topraklama raporu EN 60204-1 standardına uygun ve elektrik güvenlik gereksinimlerini karşılamaktadır (%93)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket9",
+    "ticket_id": "lvd_20251127_170105",
+    "document_name": "E21.207_-_Toyota_-_Chifong_LVD_Olcum_.pdf",
+    "document_type": "LVD_TOPRAKLAMA_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/E21.207_-_Toyota_-_Chifong_LVD_Olcum_.pdf",
+    "opening_date": "2025-11-27T17:01:05.066782",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 92.86,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 92.86
+      },
+      "category_scores": {
+        "Genel Rapor Bilgileri": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Görsel ve Teknik Dökümantasyon": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Sonuç ve Öneriler": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Uygunluk Değerlendirmesi": {
+          "max_score": 20,
+          "percentage": 100.0,
+          "score": 20.0,
+          "status": "PASS"
+        },
+        "Ölçüm Metodu ve Standart Referansları": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Ölçüm Sonuç Tablosu": {
+          "max_score": 25,
+          "percentage": 71.43,
+          "score": 17.86,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "firma_personel": "Pilz Servisleri",
+        "genel_sonuc": "1 NOKTA UYGUNSUZ",
+        "makine_hatlari": "Bulunamadı",
+        "musteri": "Toyota",
+        "olcum_cihazi": "EN 60204",
+        "olcum_tarihi": "18.04.2023",
+        "proje_adi": "Belge Numarası:",
+        "proje_no": "E21.207",
+        "rapor_numarasi": "Bulunamadı",
+        "rapor_tarihi": "18.04.2023",
+        "revizyon": "v0",
+        "rlo_max": "Bulunamadı",
+        "rlo_min": "Bulunamadı",
+        "rlo_ortalama": "Bulunamadı",
+        "tesis_adi": "Toyota Otomotiv Sanayi Türkiye A.Ş.",
+        "toplam_olcum_nokta": 1,
+        "uygun_nokta_sayisi": 0,
+        "uygunsuz_olcumler": []
+      },
+      "recommendations": [
+        "✅ Genel Rapor Bilgileri bölümü yeterli (%100.0)",
+        "✅ Ölçüm Metodu ve Standart Referansları bölümü yeterli (%100.0)",
+        "⚠️ Ölçüm Sonuç Tablosu bölümü geliştirilmeli (%71.4)",
+        "✅ Uygunluk Değerlendirmesi bölümü yeterli (%100.0)",
+        "✅ Görsel ve Teknik Dökümantasyon bölümü yeterli (%100.0)",
+        "✅ Sonuç ve Öneriler bölümü yeterli (%100.0)",
+        "\n✅ RAPOR BAŞARILI",
+        "- Tüm gerekli kriterler sağlanmıştır",
+        "- Rapor standarltara uygun olarak hazırlanmıştır"
+      ],
+      "summary": {
+        "conclusion": "LVD topraklama raporu EN 60204-1 standardına uygun ve elektrik güvenlik gereksinimlerini karşılamaktadır (%93)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
   }
 ]

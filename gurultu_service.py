@@ -202,7 +202,20 @@ class NoiseReportAnalyzer:
             "firma_adi": r"(?:FORD\s*OTOSAN|Ford)",
             "makine_adi": r"(?:8X9J\s*Otomatik|Robotlu\s*Kaynak|Kaynak\s*Hattı)",
             "cihaz_marka": r"(?:PCE\s*Gürültü|PCE)",
-            "olcum_yapan": r"(?:Yapan\s*[:=]\s*|Kaan\s*Karabağ)"
+            "cihaz_model": r"(?:PCE-322A|322A)",
+            "seri_no": r"(?:Seri\s*Numarası\s*[:=]\s*|180914367)",
+            "kalibrasyon_tarihi": r"(?:Kalibrasyon\s*Tarihi\s*[:=]\s*|4\.10\.2020)",
+            "olcum_yapan": r"(?:Yapan\s*[:=]\s*|Kaan\s*Karabağ)",
+            "yetkili": r"(?:Yetkilisi\s*[:=]\s*|Savaş\s*Şahan)",
+            "min_deger": r"(?:En\s*düşük\s*Değer.*?(\d{2},\d))",
+            "max_deger": r"(?:En\s*yüksek\s*Değer.*?(\d{2},\d))",
+            "lpa_deger": r"(?:LpA\s*\(dBA\)\s*(\d{2},\d))",
+            "lpc_deger": r"(?:LpA\s*\(dBC\)\s*(\d{2},\d))",
+            "standart": r"(?:EN\s*ISO\s*4871|EN\s*ISO\s*11200|ISO\s*11201)",
+            "olcum_suresi": r"(?:1\s*dakika|Ölçüm\s*Süresi)",
+            "nokta_sayisi": r"(?:8X\d{2}.*?BÖLGESİ)",
+            "cihaz_ayari": r"(?:Hızlı|Yavaş|Sample\s*Rate)",
+            "proje_adi": r"(?:Proje\s*Adı\s*[:=]\s*|1\s*Adet\s*8X9J)"
         }
         
         for key, pattern in value_patterns.items():

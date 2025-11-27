@@ -419,32 +419,6 @@ class VibrationReportAnalyzer:
         
         return values
 
-    def validate_vibration_document(self, text: str) -> bool:
-        """Dokümanın mekanik titreşim ölçüm raporu olup olmadığını kontrol et"""
-        
-        vibration_keywords = [
-            "titreşim", "vibration", "ivme", "acceleration", "mekanik", "mechanical",
-            "el-kol", "hand-arm", "hav", "bütün vücut", "whole body", "wbv",
-            "ölçüm", "measurement", "test", "analiz", "analysis", "değerlendirme", "assessment",
-            "ivmeölçer", "accelerometer", "titreşim ölçer", "vibration meter", "sensör", "sensor",
-            "maruziyet", "exposure", "eylem değeri", "action value", "sınır değeri", "limit value",
-            "iso 5349", "iso 2631", "ts en", "standart", "standard",
-            "m/s2", "a(8)", "günlük maruziyet", "daily exposure",
-            "rapor", "report", "değerlendirme", "evaluation", "sonuç", "result"
-        ]
-        
-        found_keywords = 0
-        found_words = []
-        
-        for keyword in vibration_keywords:
-            if re.search(rf"\b{keyword}\b", text, re.IGNORECASE):
-                found_keywords += 1
-                found_words.append(keyword)
-                
-        logger.info(f"Doküman validasyonu: {found_keywords} anahtar kelime bulundu: {found_words[:10]}")
-        
-        return found_keywords >= 3
-
     def check_date_validity(self, measurement_date: str, report_date: str) -> Tuple[bool, str]:
         """Ölçüm ve rapor tarihlerini bugünkü tarih ile kontrol et (1 yıl kuralı)"""
         
@@ -579,13 +553,6 @@ class VibrationReportAnalyzer:
         if detected_lang != 'tr':
             logger.info(f"{detected_lang.upper()} dilinden Türkçe'ye çeviriliyor...")
             text = self.translate_to_turkish(text, detected_lang)
-        
-        if not self.validate_vibration_document(text):
-            return {
-                "error": "YANLIŞ DOKÜMAN: Bu dosya mekanik titreşim ölçüm raporu değil!",
-                "document_type": "UNKNOWN",
-                "suggestion": "Lütfen geçerli bir mekanik titreşim ölçüm raporu yükleyiniz."
-            }
         
         analysis_results = {}
         for category in self.criteria_weights.keys():
