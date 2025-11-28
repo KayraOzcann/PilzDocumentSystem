@@ -20,12 +20,12 @@ init_db(app)
 # ============================================
 
 # Servis bilgileri
-DOCUMENT_TYPE_CODE = 'pneumatic_circuit'  # TODO: Değiştir (örn: 'electric_circuit', 'espe_report')
-DOCUMENT_TYPE_NAME = 'Pnömatik Devre Şeması Analizi'  # TODO: Değiştir
-DOCUMENT_TYPE_DESCRIPTION = 'Pnömatik Devre Şemalarının Analizi'  # TODO: Değiştir
-SERVICE_FILE = 'pnomatic_service.py'  # TODO: Değiştir
-ENDPOINT = '/api/pnomatic-control'  # TODO: Değiştir
-ICON = '💨'  # TODO: Değiştir
+DOCUMENT_TYPE_CODE = 'assembly_instructions'  # TODO: Değiştir (örn: 'electric_circuit', 'espe_report')
+DOCUMENT_TYPE_NAME = 'Montaj Talimatları Analizi'  # TODO: Değiştir
+DOCUMENT_TYPE_DESCRIPTION = 'Montaj Talimatlarının Analizi'  # TODO: Değiştir
+SERVICE_FILE = 'montaj_service.py'  # TODO: Değiştir
+ENDPOINT = '/api/assembly-instructions'  # TODO: Değiştir
+ICON = '🔨'  # TODO: Değiştir
 # ============================================
 # TODO: CRITERIA WEIGHTS (Kategoriler + Puanlar)
 # ============================================
@@ -34,11 +34,14 @@ ICON = '💨'  # TODO: Değiştir
 # Eğer yoksa: {}
 
 criteria_weights_data = {
-            "Temel Sistem Bileşenleri": 25,
-            "Pnömatik Semboller ve Vana Sistemleri": 30,
-            "Akış Yönü ve Bağlantı Hatları": 20,
-            "Sistem Bilgileri ve Teknik Parametreler": 15,
-            "Dokümantasyon ve Standart Uygunluk": 10
+            "Genel Bilgiler": 10,
+            "Giriş ve Amaç": 5,
+            "Güvenlik Bilgileri": 15,
+            "Ürün Tanıtımı": 10,
+            "Kurulum ve Montaj Bilgileri": 15,
+            "Kullanım Talimatları": 20,
+            "Bakım ve Temizlik": 10,
+            "Arıza Giderme": 15
 }
 
 # ============================================
@@ -52,137 +55,51 @@ criteria_weights_data = {
 # Eğer yoksa: {}
 
 criteria_details_data = {
-            "Temel Sistem Bileşenleri": {
-                "hava_kaynagi_ve_hazirlama": {
-                    "pattern": r"(?i)(?:pressure\s*source|hava\s*kaynağı|basınçlı\s*hava|air\s*supply|P\s*=\s*\d+.*?bar|kompresör|compressor|VHS|MS6|SPAN|pneumatic|pnömatik|bar|P\d*|basınç|hava|asansör|elevator|lift|coiltech|press\s*feeding\s*system)",
-                    "weight": 5,
-                    "description": "Hava kaynağı ve hazırlama ünitesi"
-                },
-                "filtre_regulator_lubrikator": {
-                    "pattern": r"(?i)(?:FRL|filtre|filter|regulator|regülatör|lubricator|yağlayıcı|MS6-LFR|MS6-EM1|MS6-EE|kondisyoner|conditioner|air\s*treatment|hava\s*hazırlama|hazırlama|FESTO|festo|data\s*sheet|pneumatic\s*plan)",
-                    "weight": 5,
-                    "description": "Hava hazırlama grubu (FRL)"
-                },
-                "basinc_gosterge_sensoru": {
-                    "pattern": r"(?i)(?:manometre|pressure.*?gauge|gösterge|indicator|PI|PT|PS|basınç.*?sensör|SPAN-B2R|ölçüm|measurement|gauge|ölçer|pressure|basınç|coiltech|doğu\s*pres)",
-                    "weight": 4,
-                    "description": "Basınç gösterge ve sensörleri"
-                },
-                "susturucu_egzoz": {
-                    "pattern": r"(?i)(?:susturucu|muffler|exhaust|egzoz|silencer|⊥|tahliye|MS6-DL|vent|boşaltım|exhaust|R|S|tahliye|pinch\s*roll|doğrultma)",
-                    "weight": 4,
-                    "description": "Susturucu ve egzoz elemanları"
-                },
-                "genel_pnomatik_sistem": {
-                    "pattern": r"(?i)(?:pneumatic|pnömatik|circuit|devre|diagram|diyagram|şema|schema|sistem|system|air|hava|○|□|◇|△|asansör|elevator|lift|P5|VS|version|coiltech|press\s*feeding|açıcı|kavrama|üst\s*baski|alt\s*baski|fren)",
-                    "weight": 7,
-                    "description": "Genel pnömatik sistem varlığı"
-                }
+            "Genel Bilgiler": {
+                "kilavuz_adi_kod": {"pattern": r"(?:Kılavuz|Manual|Guide|Kullan[ıi]m\s*K[ıi]lavuzu|User\s*Manual|Operating\s*Manual)", "weight": 5},
+                "urun_modeli": {"pattern": r"(?:Ürün|Product|Model|Seri\s*No|Serial\s*Number|Part\s*Number)", "weight": 3},
+                "revizyon_bilgisi": {"pattern": r"(?:Revizyon|Revision|Rev\.?|Version|v)\s*[:=]?\s*(\d+|[A-Z])", "weight": 2}
             },
-            "Pnömatik Semboller ve Vana Sistemleri": {
-                "silindir_actuator": {
-                    "pattern": r"(?i)(?:silindir|cylinder|piston|actuator|çift.*?etkili|tek.*?etkili|double.*?acting|single.*?acting|C\d+|MGF|═══|▬▬▬|━━━|CYL|SIL|◊|⬟|⬢|üst\s*baski|alt\s*baski|açıcı|kavrama)",
-                    "weight": 8,
-                    "description": "Silindir ve aktüatör sembolleri"
-                },
-                "yon_kontrol_vanalar": {
-                    "pattern": r"(?i)(?:VUVG|Y\d+|V\d+|valf|valve|5/2|4/2|3/2|2/2|yön.*?kontrol|directional.*?control|solenoid|FESTO|□|■|⬜|⬛|vana|kontrol|coiltech|press\s*feeding|fren)",
-                    "weight": 10,
-                    "description": "Yön kontrol vanaları (FESTO VUVG serisi)"
-                },
-                "hiz_kontrol_vanalar": {
-                    "pattern": r"(?i)(?:hız.*?kontrol|speed.*?control|flow.*?control|akış.*?kontrol|throttle|kısıcı|VQZ|FHG|⧨|◈|◇|flow|akış|pinch\s*roll|doğrultma)",
-                    "weight": 6,
-                    "description": "Hız kontrol vanaları"
-                },
-                "basinc_kontrol_vanalar": {
-                    "pattern": r"(?i)(?:basınç.*?kontrol|pressure.*?control|relief|emniyet|PRV|basınç.*?azaltıcı|VHA|relief|basınç|pressure|coiltech|data\s*sheet)",
-                    "weight": 6,
-                    "description": "Basınç kontrol vanaları"
-                }
+            "Giriş ve Amaç": {
+                "kilavuz_amaci": {"pattern": r"(?:Amaç|Purpose|Objective|Bu\s*k[ıi]lavuz|This\s*manual|Introduction|Giriş)", "weight": 3},
+                "kapsam": {"pattern": r"(?:Kapsam|Scope|Coverage|Bu\s*dokuman|This\s*document)", "weight": 2}
             },
-            "Akış Yönü ve Bağlantı Hatları": {
-                "hava_besleme_hatlari": {
-                    "pattern": r"(?i)(?:besleme|supply.*?line|hava.*?hattı|ana.*?hat|pressure.*?line|P|feed|input|giriş)",
-                    "weight": 5,
-                    "description": "Hava besleme hatları"
-                },
-                "calisma_hatlari": {
-                    "pattern": r"(?i)(?:A|B|çalışma.*?hattı|working.*?line|port|SV\d+A|SV\d+B|output|çıkış)",
-                    "weight": 5,
-                    "description": "Çalışma hatları (A, B portları)"
-                },
-                "egzoz_tahliye_hatlari": {
-                    "pattern": r"(?i)(?:R|S|EA|EB|egzoz|exhaust|tahliye|drain|vent|return|boşaltım)",
-                    "weight": 3,
-                    "description": "Egzoz ve tahliye hatları"
-                },
-                "yon_oklari_akim_gosterimi": {
-                    "pattern": r"(?i)(?:→|←|↑|↓|⇒|⇐|⇑|⇓|yön|direction|ok|arrow|akış|flow|hat|line)",
-                    "weight": 4,
-                    "description": "Yön okları ve akış gösterimi"
-                },
-                "baglanti_hatlari": {
-                    "pattern": r"(?i)(?:bağlantı|connection|hat|line|pipe|boru|tube|hose)",
-                    "weight": 3,
-                    "description": "Genel bağlantı hatları"
-                }
+            "Güvenlik Bilgileri": {
+                "genel_guvenlik": {"pattern": r"(?:Güvenlik|Safety|Güvenlik\s*Uyar[ıi]s[ıi]|Safety\s*Warning|UYARI|WARNING|DİKKAT|CAUTION)", "weight": 4},
+                "tehlikeler": {"pattern": r"(?:Tehlike|Hazard|Risk|Tehlikeli|Dangerous|Yaralanma|Injury)", "weight": 4},
+                "guvenlik_prosedur": {"pattern": r"(?:Prosedür|Procedure|Güvenlik\s*Prosedür|Safety\s*Procedure|Uyulmas[ıi]\s*gereken)", "weight": 3},
+                "kkd_gerekliligi": {"pattern": r"(?:KKD|PPE|Personal\s*Protective|Koruyucu\s*Donanım|Protective\s*Equipment|Eldiven|Glove|Gözlük|Goggle|Koruyucu\s*Alet)", "weight": 4}
             },
-            "Sistem Bilgileri ve Teknik Parametreler": {
-                "calisma_basinci": {
-                    "pattern": r"(?i)(?:P\s*=\s*\d+(?:\.\d+)?.*?bar|\d+(?:\.\d+)?.*?bar|çalışma.*?basınç|working.*?pressure|4-6.*?bar|basınç|pressure|\d+\s*bar|6\s*bar|4\s*bar|pneumatic|pnömatik)",
-                    "weight": 4,
-                    "description": "Çalışma basıncı değerleri"
-                },
-                "hava_tuketimi": {
-                    "pattern": r"(?i)(?:Q\s*=\s*\d+.*?l/min|\d+.*?l/min|hava.*?tüketim|air.*?consumption|flow.*?rate|tüketim|consumption|l/min|flow)",
-                    "weight": 3,
-                    "description": "Hava tüketimi değerleri"
-                },
-                "strok_boyutlari": {
-                    "pattern": r"(?i)(?:strok|stroke|s\s*=\s*\d+.*?mm|\d+.*?mm|boyut|dimension|mesafe|size|mm|cm|asansör.*?mesafe|elevator.*?stroke)",
-                    "weight": 3,
-                    "description": "Strok ve boyut bilgileri"
-                },
-                "vana_tipleri_ozellikler": {
-                    "pattern": r"(?i)(?:VUVG-B14-P53C|normalde.*?kapalı|normalde.*?açık|NC|NO|spring.*?return|yay.*?geri|5/2|4/2|3/2|2/2|FESTO|festo)",
-                    "weight": 3,
-                    "description": "Vana tipleri ve özellikleri"
-                },
-                "teknik_parametreler": {
-                    "pattern": r"(?i)(?:teknik|technical|parametre|parameter|özellik|specification|spec|asansör|elevator|P5|VS|version|sistem|system)",
-                    "weight": 2,
-                    "description": "Genel teknik parametre varlığı"
-                }
+            "Ürün Tanıtımı": {
+                "urun_tanimi": {"pattern": r"(?:Ürün\s*Tan[ıi]m[ıi]|Product\s*Description|Genel\s*Tan[ıi]m|General\s*Description)", "weight": 3},
+                "teknik_ozellikler": {"pattern": r"(?:Teknik\s*Özellik|Technical\s*Specification|Specification|Özellik|Feature)", "weight": 3},
+                "bilesenler": {"pattern": r"(?:Bileşen|Component|Parça|Part|Liste|List|İçerik|Content)", "weight": 2},
+                "gorseller": {"pattern": r"(?:Görsel|Image|Resim|Picture|Şekil|Figure|Fotoğraf|Photo)", "weight": 2}
             },
-            "Dokümantasyon ve Standart Uygunluk": {
-                "sembol_standartlari": {
-                    "pattern": r"(?i)(?:ISO.*?1219|DIN.*?ISO|pnömatik.*?sembol|pneumatic.*?symbol|standart|standard|ISO|DIN|FESTO|festo)",
-                    "weight": 2,
-                    "description": "Sembol standartları"
-                },
-                "cizim_bilgileri": {
-                    "pattern": r"(?i)(?:çizim.*?tarih|drawing.*?date|tasarım.*?tarih|design.*?date|\d{2}.\d{2}.\d{4}|\d{2}/\d{2}/\d{4}|created|designed|tarih|date|P5|VS|version|V\d+)",
-                    "weight": 2,
-                    "description": "Çizim bilgileri ve tarihler"
-                },
-                "proje_bilgileri": {
-                    "pattern": r"(?i)(?:proje.*?adı|project.*?name|sistem.*?adı|luggage.*?punch|asansör|elevator|toyota|description|açıklama|P5|VS|version)",
-                    "weight": 2,
-                    "description": "Proje bilgileri"
-                },
-                "firma_logo_imza": {
-                    "pattern": r"(?i)(?:ACT|festo|FESTO|müstafa.*?altuntaş|onay.*?tarih|approval|kontrol.*?tarih|check|created.*?by|checked.*?by|approved|firma|company)",
-                    "weight": 2,
-                    "description": "Firma logosu ve imza bilgileri"
-                },
-                "dokumantasyon_genel": {
-                    "pattern": r"(?i)(?:revision|rev|circuit.*?number|customer|müşteri|sheet|size|boyut|asansör|elevator|P5|VS|diagram|diyagram|şema|schema)",
-                    "weight": 2,
-                    "description": "Genel dokümantasyon varlığı"
-                }
+            "Kurulum ve Montaj Bilgileri": {
+                "kurulum_oncesi": {"pattern": r"(?:Kurulum\s*Öncesi|Before\s*Installation|Hazırl[ıi]k|Preparation|Ön\s*hazırl[ıi]k)", "weight": 4},
+                "montaj_talimatlari": {"pattern": r"(?:Montaj|Installation|Assembly|Ad[ıi]m|Step|Talimat|Instruction)", "weight": 4},
+                "gerekli_aletler": {"pattern": r"(?:Alet|Tool|Malzeme|Material|Gerekli|Required|Equipment)", "weight": 3},
+                "kurulum_kontrolu": {"pattern": r"(?:Kontrol|Check|Test|Doğrula|Verify|Kurulum\s*Sonras[ıi]|After\s*Installation)", "weight": 4}
+            },
+            "Kullanım Talimatları": {
+                "calistirma": {"pattern": r"(?:Çal[ıi]şt[ıi]rma|Start|Operation|Açma|Turn\s*On|Power\s*On)", "weight": 5},
+                "kullanim_kilavuzu": {"pattern": r"(?:Kullan[ıi]m|Usage|Use|Operating|Ad[ıi]m\s*ad[ıi]m|Step\s*by\s*step)", "weight": 5},
+                "calisma_modlari": {"pattern": r"(?:Mod|Mode|Ayar|Setting|Çal[ıi]şma\s*Mod|Operating\s*Mode)", "weight": 5},
+                "kullanim_ipuclari": {"pattern": r"(?:İpucu|Tip|Öneri|Recommendation|Doğru\s*kullan[ıi]m|Proper\s*use)", "weight": 5}
+            },
+            "Bakım ve Temizlik": {
+                "duzenli_bakim": {"pattern": r"(?:Bak[ıi]m|Maintenance|Düzenli|Regular|Periyodik|Periodic)", "weight": 3},
+                "temizlik_yontemleri": {"pattern": r"(?:Temizlik|Cleaning|Temizle|Clean|Hijyen|Hygiene)", "weight": 3},
+                "parca_degisimi": {"pattern": r"(?:Parça\s*Değiş|Part\s*Replace|Yedek\s*Parça|Spare\s*Part|Değiştir|Replace)", "weight": 4}
+            },
+            "Arıza Giderme": {
+                "sorun_cozumleri": {"pattern": r"(?:Sorun|Problem|Ar[ıi]za|Fault|Troubleshoot|Çözüm|Solution)", "weight": 5},
+                "hata_kodlari": {"pattern": r"(?:Hata\s*Kod|Error\s*Code|Kod|Code|Alarm|Uyar[ıi]\s*Lambas[ıi]|Warning\s*Light)", "weight": 5},
+                "teknik_destek": {"pattern": r"(?:Teknik\s*Destek|Technical\s*Support|Destek|Support|İletişim|Contact|Tel|Phone|E-?mail)", "weight": 3},
+                "teknik_cizimler": {"pattern": r"(?:Çizim|Drawing|Şema|Scheme|Diyagram|Diagram|Plan)", "weight": 2}
             }
-}     
+        }   
 
 
 # ============================================
@@ -196,110 +113,15 @@ criteria_details_data = {
 # Eğer yoksa: {}
 pattern_definitions_data = {
 
-        "visual_templates": {
-            "pneumatic_cylinders": ["cylinder", "piston", "MGF", "silindir"],
-            "pneumatic_valves": ["VUVG", "valve", "valf", "Y01", "Y02"],
-            "pneumatic_frl": ["FRL", "filtre", "regulator", "MS6"],
-            "pneumatic_connections": ["connection", "T", "junction", "bağlantı"],
-            "flow_arrows": ["arrow", "ok", "→", "←"],
-            "pressure_gauges": ["gauge", "manometer", "PI", "pressure"]
-        },
-
-        "templates": {
-                    "cylinder": ["═══", "▬▬▬", "━━━", "||", "| |", "I I"],
-                    "valve": ["□", "■", "⬜", "⬛", "◼", "◻"],
-                    "arrow": ["→", "←", "↑", "↓", "▶", "◀", "▲", "▼"],
-                    "connection": ["━", "─", "│", "|", "┃"],
-                    "component": ["●", "○", "◎", "◉", "◊", "◇"]
-                },
-
         "extract_values": {
-            "proje_adi": [ r"TOYOTA\s+PROJE\s+ADI[:\s]*([^\n\r]+)",
-            r"LUGGAGE\s+PUNCH",
-            r"Asansör",
-            r"Elevator"],
+            "manual_namei": [r"(?:Kullan[ıi]m\s*K[ıi]lavuzu|User\s*Manual|Operating\s*Manual|Manual)",
+            r"(?:Guide|K[ıi]lavuz|Handbook)"],
 
-            "tasarim_tarihi": [r"(\d{1,2}[./]\d{1,2}[./]\d{4})"],
+            "product_model": [r"(?:Model|Product|Ürün)\s*(?:No|Number)?\s*[:\-]?\s*([A-Z0-9\-\.]{3,20})",
+            r"(?:Type|Tip|Model)\s*[:\-]?\s*([A-Z0-9\-\.]{3,20})"],
 
-            "calisma_basinci": [r"(\d+(?:\.\d+)?[-\s]*\d*)\s*bar"],
-
-            "vana_sayisi": [
-            r"(?:VUVG|Y\d+|V\d+|SV\d+)",  # Spesifik vana kodları
-            r"(?:5/2|4/2|3/2|2/2)",        # Vana tipi notasyonları
-            r"(?:valf|valve|vana)",         # Genel vana terimleri
-            r"(?:directional|yön.*?kontrol)", # Kontrol vanaları
-            r"(?:VF|VM|VT|VP)",             # Kısa vana kodları
-            r"(?:sol.*?valf|solenoid.*?valve)", # Solenoid vana
-            r"(?:flow.*?control|akış.*?kontrol)" # Akış kontrol
-            ],
-
-            "silindir_sayisi": [
-            r"(?:C\d+|CYL\d*|SIL\d*)",     # Silindir kodları
-            r"(?:silindir|cylinder|piston)", # Genel silindir terimleri
-            r"(?:MGF|actuator)",            # Aktüatör kodları
-            r"(?:double.*?acting|single.*?acting)", # Etkili türleri
-            r"(?:çift.*?etkili|tek.*?etkili)",       # Türkçe etkili türleri
-            r"(?:SIL|CYL|ACT)",             # Kısa kodlar
-            r"(?:pnömatik.*?silindir|pneumatic.*?cylinder)" # Tam tanım
-        ],
-
-            "frl_mevcut":[r"(?:FRL|MS6-LFR|FILTRE|REGULATOR)"],
-
-            "created_by": [
-            r"Created\s+by[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Oluşturan[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Tasarlayan[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Designer[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))"
-                ],
-            
-            "checked_by": [
-            r"Checked\s+by[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Kontrol\s+eden[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Kontrolcü[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))"
-            ],
-
-            "approved_by": [
-            r"Approved\s+by[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Onaylayan[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Approval[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))"
-            ],
-
-            "date_patterns": [
-            r"(\d{1,2}[./]\d{1,2}[./]\d{4})",
-            r"(\d{4}-\d{1,2}-\d{1,2})"],
-
-            "circuit_number": [
-            r"Circuit\s+Number[:\s]*([A-Z0-9\-\.]+)",
-            r"Devre\s+Numarası[:\s]*([A-Z0-9\-\.]+)",
-            r"Circuit\s+No[:\s]*([A-Z0-9\-\.]+)"],
-
-            "description": [
-            r"Description[:\s]*([A-ZÇĞÜŞİÖ0-9\s]+(?:PNOMATİK|PNEUMATIC|DİYAGRAM|DIAGRAM)[A-ZÇĞÜŞİÖ0-9\s]*)",
-            r"Açıklama[:\s]*([A-ZÇĞÜŞİÖ0-9\s]+(?:PNOMATİK|PNEUMATIC|DİYAGRAM|DIAGRAM)[A-ZÇĞÜŞİÖ0-9\s]*)",
-            r"(PRES\s+PNOMATİK\s+DİYAGRAM\s*\d*)",
-            r"(PNEUMATIC\s+CIRCUIT\s+DIAGRAM\s*\d*)"
-        ],
-         "customer": [
-            r"Customer[:\s]*([A-ZÇĞÜŞİÖ\s]+)",
-            r"Müşteri[:\s]*([A-ZÇĞÜŞİÖ\s]+)",
-            r"Client[:\s]*([A-ZÇĞÜŞİÖ\s]+)"
-        ],
-
-        "revision": [
-            r"Revision[:\s]*(\d+/\d+|\d+)",
-            r"Rev[\.:\s]*(\d+/\d+|\d+)",
-            r"Revizyon[:\s]*(\d+/\d+|\d+)",
-            r"Sheet[:\s]*(\d+/\d+)"
-        ],
-        "iso_standart": [
-            r"(ISO\s*\d+)",
-            r"This\s+circuit\s+diagram\s+was\s+designed\s+on\s+the\s+basis\s+of\s+(ISO\s*\d+)"
-        ],
-        "size": [
-            r"Size[:\s]*([A-Z0-9]+)",
-            r"Boyut[:\s]*([A-Z0-9]+)"
-        ]
-        },           
+            "safety_warnings_count": [r"(?:UYARI|WARNING|DİKKAT|CAUTION|Güvenlik)"],
+        }           
 } 
 
 # ============================================
@@ -311,21 +133,17 @@ pattern_definitions_data = {
 # Eğer yoksa: {}
 
 critical_terms = [  
-        # Pnömatik temel terimleri
-        ["pnömatik", "pnomatik", "pneumatic", "hava", "air", "basınçlı hava", "compressed air"],
+         # Montaj temel terimleri (en az 1 tane olmalı)
+        ["montaj", "assembly", "kurulum", "installation", "talimat", "instruction", "kılavuz", "manual"],
         
-        # Pnömatik bileşenleri ve semboller
-        ["silindir", "cylinder", "valf", "valve", "vana", "frl", "lubricator", "regulator", "filter"],
+        # Adımlar/Prosedür terimleri (en az 1 tane olmalı)  
+        ["adım", "step", "prosedür", "procedure", "sıralama", "sequence", "önce", "before", "sonra", "after"],
         
-        # Pnömatik basınç ve akış terimleri
-        ["basınç", "pressure", "psi", "bar", "debi", "flow", "cfm", "l/min"],
+        # Araçlar/Malzemeler terimleri (mutlaka olmalı)
+        ["araç", "tool", "malzeme", "material", "gerekli", "required", "parça", "part", "bileşen", "component"],
         
-        # Pnömatik kontrol elemanları
-        ["kontrol", "control", "yön kontrol", "directional control", "hız kontrol", "speed control"],
-        
-        # ISO standartları ve teknik terimler
-        ["iso 5599", "5599", "iso 1219", "sembol", "symbol", "bağlantı", "connection", "port"]
-    
+        # Güvenlik/Uyarı terimleri (en az 1 tane olmalı)
+        ["güvenlik", "safety", "uyarı", "warning", "dikkat", "caution", "tehlike", "danger", "önlem", "precaution"]
 ]
 # ============================================
 # TODO: VALIDATION KEYWORDS - STRONG KEYWORDS
@@ -334,17 +152,17 @@ critical_terms = [
 # Eğer yoksa: []
 
 strong_keywords = [
-        "pnömatik",
-        "pnomatik", 
-        "pneumatic",
-        "lubricator",
-        "inflate",
-        "psi",
-        "bar",
-        "regis",
-        "r102",
-        "regulator",
-        "dump valve"
+        "montaj",
+        "assembly",
+        "kurulum",
+        "installation",
+        "talimat",
+        "instruction",
+        "kılavuz",
+        "manual",
+        "kılavuzu",
+        "kılavuzun",
+        "kullanma",
 ]
 
 # ============================================
@@ -354,12 +172,6 @@ strong_keywords = [
 # Eğer yoksa: []
 
 excluded_keywords = [
-        # Aydınlatma raporu
-        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
-        
-        # Hidrolik devre şeması (eski strong_keywords hidrolikten)
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
-        
         # HRC raporu
         "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
         
@@ -369,11 +181,11 @@ excluded_keywords = [
         # Espe raporu  
         "espe",
         
+        # Hidrolik devre şeması
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
+        
         # Gürültü ölçüm raporu
         "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        
-        # Manuel/kullanma kılavuzu
-        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
         
         # LOTO raporu
         "loto",
@@ -381,26 +193,29 @@ excluded_keywords = [
         # LVD raporu
         "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
         
-        # AT tip muayene
-        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
+        # AT tip muayene (AT uygunluk beyanı)
+        "uygunluk", "beyan", "muayene", "conformity", "declaration",
         
         # İSG periyodik kontrol
         "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
         
-        # Montaj talimatları
-        "montaj", "assembly",
+        # Pnömatik devre şeması
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
         
         # EN 60204-1 topraklama raporu
         "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
         
         # Bakım talimatları
-        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
+        "bakım", "maintenance", "servis", "service", "bakim", "MAINTENCE",
         
         # Mekanik titreşim raporu
-        "titreşim", "vibration","TİTREŞİM",
+        "titreşim", "vibration", "mekanik",
         
         # AT tip inceleme sertifikası
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate"  
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
+
+        # Aydınlatma
+        "aydınlatma", "lighting",  "illumination",  "lux",  "lümen",  "lumen",  "ts en 12464",  "en 12464", "ışık",  "ışık şiddeti"  
 ]
 
 # ============================================

@@ -24,10 +24,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Azure için Tesseract path'leri (Azure'da otomatik bulunur)
-try:
+"""try:
     pytesseract.pytesseract.tesseract_cmd = os.environ.get('TESSERACT_CMD', 'tesseract')
 except:
-    pass
+    pass"""
 
 @dataclass
 class ComponentDetection:

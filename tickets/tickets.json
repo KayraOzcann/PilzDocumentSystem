@@ -1125,5 +1125,97 @@
     },
     "comments": [],
     "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket13",
+    "ticket_id": "montaj_20251128_104605",
+    "document_name": "INSTALLATION_AND_SAFETY_MANUAL-TH-06-15-1041.pdf",
+    "document_type": "MONTAJ_TALIMATLARI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/INSTALLATION_AND_SAFETY_MANUAL-TH-06-15-1041.pdf",
+    "opening_date": "2025-11-28T10:46:05.411635",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 96.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 96.0
+      },
+      "category_scores": {
+        "Arıza Giderme": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Bakım ve Temizlik": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Genel Bilgiler": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Giriş ve Amaç": {
+          "max_score": 5,
+          "percentage": 100.0,
+          "score": 5.0,
+          "status": "PASS"
+        },
+        "Güvenlik Bilgileri": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Kullanım Talimatları": {
+          "max_score": 20,
+          "percentage": 100.0,
+          "score": 20.0,
+          "status": "PASS"
+        },
+        "Kurulum ve Montaj Bilgileri": {
+          "max_score": 15,
+          "percentage": 73.33,
+          "score": 11.0,
+          "status": "PASS"
+        },
+        "Ürün Tanıtımı": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "contact_info": "Bulunamadı",
+        "manual_name": "MANUAL",
+        "manufacturer": "Bulunamadı",
+        "product_model": "chart...............",
+        "revision_info": "Bulunamadı",
+        "safety_warnings_count": 16
+      },
+      "recommendations": [
+        "🔍 Eksik kritik kriterler:",
+        "  • Kurulum ve Montaj Bilgileri: kurulum_oncesi",
+        "✅ Montaj talimatları yüksek kalitede ve standartlara uygun"
+      ],
+      "summary": {
+        "conclusion": "Montaj talimatları yüksek kalitede ve standartlara uygun (%96)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
   }
 ]

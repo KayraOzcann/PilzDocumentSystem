@@ -17,7 +17,7 @@ init_db(app)
 # ============================================
 # TODO: AYNI SERVİS KODUNU BURAYA DA YAZIN
 # ============================================
-SERVICE_CODE = 'pneumatic_circuit'  # TODO: migrate_service_template.py ile aynı olmalı!
+SERVICE_CODE = 'assembly_instructions'  # TODO: migrate_service_template.py ile aynı olmalı!
 
 print("\n" + "=" * 80)
 print(f"{SERVICE_CODE.upper()} - MİGRATION KONTROL")
@@ -253,4 +253,4 @@ with app.app_context():
     else:
         print("✅ MİGRATION BAŞARILI!")
         print("=" * 80)
-    print()
+        print()
