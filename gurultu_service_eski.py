@@ -7,7 +7,6 @@ Bu dosya şunları içerir:
 1. NoiseReportAnalyzer sınıfı (noise_report_checker.py)
 2. Flask API servisi (server4.py)
 3. Azure-friendly konfigürasyon
-4. Database entegrasyonu (TAM BAĞIMLI - Flashback yok)
 
 Endpoint: POST /api/noise-report
 Health Check: GET /api/health
@@ -33,18 +32,6 @@ import pytesseract
 
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
-
-# ============================================
-# DATABASE IMPORTS (YENİ)
-# ============================================
-from flask import current_app
-from database import db, init_db
-from db_loader import load_service_config
-
-# ============================================
-# CONFIG IMPORT (YENİ)
-# ============================================
-from config import Config
 
 # ============================================
 # LOGGING CONFIGURATION
@@ -81,32 +68,70 @@ class NoiseAnalysisResult:
 # ============================================
 class NoiseReportAnalyzer:
     
-    def __init__(self, app=None):
-        """Gürültü Ölçüm Raporu analiz sistemi başlatılıyor - Sadece Database'den yükleme"""
-        logger.info("Gürültü Ölçüm Raporu analiz sistemi başlatılıyor...")
+    def __init__(self):
+        self.criteria_weights = {
+            "Rapor Kimlik Bilgileri": 15,
+            "Ölçüm Yapılan Ortam ve Ekipman Bilgileri": 15,
+            "Ölçüm Cihazı Bilgileri": 15,
+            "Ölçüm Metodolojisi": 20,
+            "Ölçüm Sonuçları": 20,
+            "Değerlendirme ve Yorum": 10,
+            "Ekler ve Görseller": 5
+        }
         
-        if not app:
-            raise ValueError("❌ Flask app context gerekli! Analyzer'ı app ile başlatın: NoiseReportAnalyzer(app=app)")
-        
-        with app.app_context():
-            config = load_service_config('noise_report')
-            
-            # DB'den yüklenen veriler
-            self.criteria_weights = config.get('criteria_weights', {})
-            self.criteria_details = config.get('criteria_details', {})
-            self.pattern_definitions = config.get('pattern_definitions', {})
-            self.validation_keywords = config.get('validation_keywords', {})
-            self.category_actions = config.get('category_actions', {})
-            
-            # Kritik verilerin varlığını kontrol et
-            if not self.criteria_weights:
-                raise ValueError("❌ DB'den criteria_weights yüklenemedi!")
-            if not self.validation_keywords:
-                raise ValueError("❌ DB'den validation_keywords yüklenemedi!")
-            
-            logger.info(f"✅ Veritabanından yüklendi: {len(self.criteria_weights)} kategori")
-            logger.info(f"✅ Validation keywords: {len(self.validation_keywords)} tip")
-            logger.info(f"✅ Pattern definitions: {len(self.pattern_definitions)} grup")
+        self.criteria_details = {
+            "Rapor Kimlik Bilgileri": {
+                "rapor_numarasi": {"pattern": r"(?:Rapor\s*No\s*[:=]\s*|Belge\s*Numarası\s*[:=]\s*|C\d{2}\.\d{3})", "weight": 3},
+                "rapor_tarihi": {"pattern": r"(?:Rapor\s*)?Tarihi?\s*[:=]\s*(\d{2}[./]\d{2}[./]\d{4})", "weight": 2},
+                "olcum_tarihi": {"pattern": r"(?:Ölçüm\s*Tarihi|İnceleme\s*Tarihi)\s*[:=]?\s*(\d{2}[./]\d{2}[./]\d{4})", "weight": 3},
+                "hazirlayan_kurulus": {"pattern": r"(?:Pilz\s*Servisleri|Pilz\s*Emniyet|Hazırlayan)", "weight": 2},
+                "olcum_yapan_uzman": {"pattern": r"(?:Yapan\s*[:=]\s*|Kaan\s*Karabağ|Savaş\s*Şahan)", "weight": 3},
+                "uzman_imza": {"pattern": r"(?:İmza|Yetkilisi)", "weight": 2}
+            },
+            "Ölçüm Yapılan Ortam ve Ekipman Bilgileri": {
+                "firma_adi": {"pattern": r"(?:FORD\s*OTOSAN|Ford|Otosan)", "weight": 3},
+                "firma_adresi": {"pattern": r"(?:Denizevler\s*Mah|Gölcük/Kocaeli|Ali\s*Uçar\s*Cad)", "weight": 2},
+                "ortam_tanimi": {"pattern": r"(?:Otomatik\s*Robotlu\s*Kaynak|Kaynak\s*Hattı|fabrika|atölye)", "weight": 3},
+                "makine_adi": {"pattern": r"(?:8X9J\s*Otomatik|Robotlu\s*Kaynak|Kaynak\s*Hattı)", "weight": 3},
+                "makine_konumu": {"pattern": r"(?:8X\d{2}\s*LH|8X\d{2}\s*RH|BÖLGESİ)", "weight": 2},
+                "cevresel_kosullar": {"pattern": r"(?:Sıcaklık|Nem|Rüzgar|kapalı\s*ortam)", "weight": 2}
+            },
+            "Ölçüm Cihazı Bilgileri": {
+                "cihaz_marka": {"pattern": r"(?:PCE\s*Gürültü|PCE)", "weight": 3},
+                "cihaz_model": {"pattern": r"(?:PCE-322A|322A)", "weight": 3},
+                "seri_numarasi": {"pattern": r"(?:Seri\s*Numarası\s*[:=]\s*|180914367)", "weight": 3},
+                "kalibrasyon_tarihi": {"pattern": r"(?:Kalibrasyon\s*Tarihi\s*[:=]\s*|4\.10\.2020)", "weight": 3},
+                "mikrofon_bilgileri": {"pattern": r"(?:mikrofon|aksesuar)", "weight": 2},
+                "cihaz_ayarlari": {"pattern": r"(?:Hızlı|Yavaş|Sample\s*Rate|50ms|100ms)", "weight": 1}
+            },
+            "Ölçüm Metodolojisi": {
+                "uygulanan_standart": {"pattern": r"(?:ISO\s*11201|ISO\s*9612|ISO\s*3744|EN\s*ISO\s*4871|EN\s*ISO\s*11200)", "weight": 5},
+                "olcum_turu": {"pattern": r"(?:emission\s*sound\s*pressure|Time-averaged|LpA|LpC)", "weight": 3},
+                "olcum_yukseklik": {"pattern": r"(?:yükseklik|height)", "weight": 2},
+                "olcum_noktalari": {"pattern": r"(?:8X\d{2}\s*LH|8X\d{2}\s*RH|Ölçüm\s*Noktası)", "weight": 5},
+                "olcum_suresi": {"pattern": r"(?:1\s*dakika|Ölçüm\s*Süresi)", "weight": 3},
+                "arka_plan_gurultu": {"pattern": r"(?:arka\s*plan|background)", "weight": 2}
+            },
+            "Ölçüm Sonuçları": {
+                "ses_basinc_seviyesi": {"pattern": r"(?:LpA\s*\(dBA\)|LpA\s*\(dBC\)|dB\(A\)|dB\(C\))", "weight": 5},
+                "laeeq_degeri": {"pattern": r"(?:LAeq|L\s*peqT|Time-averaged)", "weight": 4},
+                "lmax_lmin": {"pattern": r"(?:En\s*düşük\s*Değer|En\s*yüksek\s*Değer|Lmax|Lmin)", "weight": 3},
+                "lcpeak_degeri": {"pattern": r"(?:LCpeak|LpC\s*peak|Peak\s*sound)", "weight": 3},
+                "nokta_degerleri": {"pattern": r"(?:7[0-9],\d|9[0-9],\d)", "weight": 3},
+                "maruziyet_suresi": {"pattern": r"(?:T\s*=|çalışma\s*süresi|8\s*saat)", "weight": 2}
+            },
+            "Değerlendirme ve Yorum": {
+                "yasal_sinirlar": {"pattern": r"(?:85\s*dB|87\s*dB|yasal\s*sınır)", "weight": 3},
+                "risk_degerlendirme": {"pattern": r"(?:risk\s*değerlendirme|maruziyet\s*risk)", "weight": 2},
+                "onlemler": {"pattern": r"(?:kulaklık|izolasyon|perdeleme|önlem)", "weight": 3},
+                "lex_8h": {"pattern": r"(?:LEX,8h|günlük\s*gürültü|8\s*saatlik)", "weight": 2}
+            },
+            "Ekler ve Görseller": {
+                "ortam_krokisi": {"pattern": r"(?:kroki|çizim|plan)", "weight": 2},
+                "fotograflar": {"pattern": r"(?:fotoğraf|görsel|resim)", "weight": 2},
+                "kalibrasyon_sertifika": {"pattern": r"(?:kalibrasyon\s*sertifika|sertifika)", "weight": 1}
+            }
+        }
     
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         try:
@@ -121,14 +146,10 @@ class NoiseReportAnalyzer:
             return ""
     
     def check_report_date_validity(self, text: str) -> Tuple[bool, str, str]:
-        """Rapor tarihini kontrol et - DB'den pattern'ler ile"""
-        # DB'den date extraction patterns al
-        date_patterns = self.pattern_definitions.get('date_extraction', {}).get('date_patterns', [])
-        
-
-        if not date_patterns:
-            logger.error("❌ DB'den date_patterns yüklenemedi!")
-            return False, "", "Tarih pattern'leri bulunamadı"
+        date_patterns = [
+            r"(?:Ölçüm\s*Tarihi|İnceleme)\s*[:=]?\s*(\d{2}[./]\d{2}[./]\d{4})",
+            r"(\d{2}[./]\d{2}[./]\d{4})"
+        ]
         
         for pattern in date_patterns:
             matches = re.findall(pattern, text)
@@ -142,11 +163,9 @@ class NoiseReportAnalyzer:
                     return is_valid, date_str, f"Rapor tarihi: {date_str} {'(GEÇERLİ)' if is_valid else '(GEÇERSİZ - 1 yıldan eski)'}"
                 except ValueError:
                     continue
-                
         return False, "", "Rapor tarihi bulunamadı"
     
     def analyze_criteria(self, text: str, category: str) -> Dict[str, NoiseAnalysisResult]:
-        """Kriterleri analiz et - DB'den pattern'ler ile"""
         results = {}
         criteria = self.criteria_details.get(category, {})
         
@@ -176,33 +195,39 @@ class NoiseReportAnalyzer:
         return results
     
     def extract_specific_values(self, text: str) -> Dict[str, Any]:
-        """Gürültü raporuna özgü değerleri çıkar - DB'den pattern'leri kullanarak"""
         values = {}
+        value_patterns = {
+            "rapor_no": r"(?:Belge\s*Numarası\s*[:=]\s*|C\d{2}\.\d{3})",
+            "olcum_tarihi": r"(?:İnceleme\s*Tarihi\s*[:=]?\s*)?(\d{2}[./]\d{2}[./]\d{4})",
+            "firma_adi": r"(?:FORD\s*OTOSAN|Ford)",
+            "makine_adi": r"(?:8X9J\s*Otomatik|Robotlu\s*Kaynak|Kaynak\s*Hattı)",
+            "cihaz_marka": r"(?:PCE\s*Gürültü|PCE)",
+            "cihaz_model": r"(?:PCE-322A|322A)",
+            "seri_no": r"(?:Seri\s*Numarası\s*[:=]\s*|180914367)",
+            "kalibrasyon_tarihi": r"(?:Kalibrasyon\s*Tarihi\s*[:=]\s*|4\.10\.2020)",
+            "olcum_yapan": r"(?:Yapan\s*[:=]\s*|Kaan\s*Karabağ)",
+            "yetkili": r"(?:Yetkilisi\s*[:=]\s*|Savaş\s*Şahan)",
+            "min_deger": r"(?:En\s*düşük\s*Değer.*?(\d{2},\d))",
+            "max_deger": r"(?:En\s*yüksek\s*Değer.*?(\d{2},\d))",
+            "lpa_deger": r"(?:LpA\s*\(dBA\)\s*(\d{2},\d))",
+            "lpc_deger": r"(?:LpA\s*\(dBC\)\s*(\d{2},\d))",
+            "standart": r"(?:EN\s*ISO\s*4871|EN\s*ISO\s*11200|ISO\s*11201)",
+            "olcum_suresi": r"(?:1\s*dakika|Ölçüm\s*Süresi)",
+            "nokta_sayisi": r"(?:8X\d{2}.*?BÖLGESİ)",
+            "cihaz_ayari": r"(?:Hızlı|Yavaş|Sample\s*Rate)",
+            "proje_adi": r"(?:Proje\s*Adı\s*[:=]\s*|1\s*Adet\s*8X9J)"
+        }
         
-        # DB'den extract_values pattern'lerini al
-        extract_patterns = self.pattern_definitions.get('extract_values', {})
-        
-        if not extract_patterns:
-            logger.warning("⚠️ DB'den extract_values pattern'leri yüklenemedi!")
-            return {}
-        
-        # Her field için pattern'leri dene
-        for key, patterns_list in extract_patterns.items():
-            found = False
-            for pattern in patterns_list:
-                matches = re.findall(pattern, text, re.IGNORECASE)
-                if matches:
-                    values[key] = matches[0].strip()
-                    found = True
-                    break
-            
-            if not found:
+        for key, pattern in value_patterns.items():
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                values[key] = matches[0].strip()
+            else:
                 values[key] = "Bulunamadı"
         
         return values
     
     def calculate_scores(self, analysis_results: Dict[str, Dict[str, NoiseAnalysisResult]]) -> Dict[str, Any]:
-        """Puanları hesapla"""
         category_scores = {}
         total_score = 0
         
@@ -230,18 +255,8 @@ class NoiseReportAnalyzer:
             "overall_percentage": round((total_score / 100 * 100), 2)
         }
     
-    def generate_recommendations(self, analysis_results: Dict, scores: Dict, date_valid: bool = True, date_message: str = "") -> List[str]:
-        """Öneriler oluştur"""
+    def generate_recommendations(self, analysis_results: Dict, scores: Dict) -> List[str]:
         recommendations = []
-
-        # TARİH KONTROLÜ - Eğer tarih geçersizse SADECE BUNU GÖR
-        if not date_valid:
-            recommendations.append(f"❌ {date_message}")
-            return recommendations  # ← DİĞER ÖNERİLERİ ATLAT!
-
-        # TARİH KONTROLÜ 
-        if not date_valid:
-            recommendations.append(f"❌ {date_message}")
         
         for category, results in analysis_results.items():
             category_score = scores["category_scores"][category]["percentage"]
@@ -260,7 +275,6 @@ class NoiseReportAnalyzer:
         return recommendations
     
     def generate_detailed_report(self, pdf_path: str, docx_path: str = None) -> Dict[str, Any]:
-        """Detaylı rapor oluştur"""
         logger.info("Gürültü ölçüm raporu analizi başlatılıyor...")
         
         pdf_text = self.extract_text_from_pdf(pdf_path)
@@ -275,7 +289,7 @@ class NoiseReportAnalyzer:
             analysis_results[category] = self.analyze_criteria(pdf_text, category)
         
         scores = self.calculate_scores(analysis_results)
-        recommendations = self.generate_recommendations(analysis_results, scores, date_valid, date_message)
+        recommendations = self.generate_recommendations(analysis_results, scores)
         
         report = {
             "analiz_tarihi": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -302,39 +316,42 @@ class NoiseReportAnalyzer:
 # ============================================
 # HELPER FUNCTIONS (Server Validasyon)
 # ============================================
-def validate_document_server(text, validation_keywords):
-    """Gürültü doküman validasyonu - DB'den gelen keywords ile"""
-    
-    # DB'den gelen critical_terms
-    critical_terms_data = validation_keywords.get('critical_terms', [])
-    
-    if not critical_terms_data:
-        logger.error("❌ DB'den critical_terms yüklenemedi!")
-        raise ValueError("Critical terms bulunamadı - DB kontrolü gerekli")
-    
-    # Liste formatına dönüştür
-    critical_terms = []
-    for item in critical_terms_data:
-        if isinstance(item, dict) and 'keywords' in item:
-            critical_terms.append(item['keywords'])
-        elif isinstance(item, list):
-            critical_terms.append(item)
+def validate_document_server(text):
+    """Gürültü doküman validasyonu"""
+    critical_terms = [
+        # Gürültü temel terimleri
+        ["gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic"],
+        
+        # Ölçüm ve test terimleri
+        ["ölçüm", "measurement", "test", "analiz", "analysis", "ses basıncı", "sound pressure"],
+        
+        # Ses seviyeleri ve parametreler
+        ["dba", "dbc", "leq", "lmax", "lmin", "lcpeak", "lpeak", "ses seviyesi", "sound level"],
+        
+        # Standart ve referanslar
+        ["iso 11201", "iso 9612", "iso 3744", "en iso", "standart", "standard"],
+        
+        # Çevre ve iş sağlığı terimleri
+        ["maruziyet", "exposure", "yasal sınır", "limit", "iş sağlığı", "occupational", "çevresel", "environmental"]
+    ]
     
     category_found = [any(re.search(rf"\b{term}\b", text, re.IGNORECASE) for term in category) for category in critical_terms]
     valid = sum(category_found)
-    logger.info(f"Gürültü validasyon: {valid}/{len(critical_terms)} kategori")
+    logger.info(f"Gürültü validasyon: {valid}/5 kategori")
     return valid >= 4
 
 
-def check_strong_keywords_first_pages(filepath, validation_keywords):
-    """İlk sayfada gürültü özgü kelime kontrolü - OCR - DB'den keywords"""
-    
-    # DB'den strong keywords al
-    strong_keywords = validation_keywords.get('strong_keywords', [])
-    
-    if not strong_keywords:
-        logger.error("❌ DB'den strong_keywords yüklenemedi!")
-        raise ValueError("Strong keywords bulunamadı - DB kontrolü gerekli")
+def check_strong_keywords_first_pages(filepath):
+    """İlk sayfada gürültü özgü kelime kontrolü - OCR"""
+    strong_keywords = [
+        "gürültü",
+        "noise",
+        "ses",
+        "sound",
+        "decibel",
+        "akustik",
+        "acoustic"
+    ]
     
     try:
         Image.MAX_IMAGE_PIXELS = None
@@ -358,15 +375,57 @@ def check_strong_keywords_first_pages(filepath, validation_keywords):
         return False
 
 
-def check_excluded_keywords_first_pages(filepath, validation_keywords):
-    """İlk sayfada excluded keyword kontrolü - OCR - DB'den keywords"""
-    
-    # DB'den excluded keywords al
-    excluded_keywords = validation_keywords.get('excluded_keywords', [])
-    
-    if not excluded_keywords:
-        logger.error("❌ DB'den excluded_keywords yüklenemedi!")
-        raise ValueError("Excluded keywords bulunamadı - DB kontrolü gerekli")
+def check_excluded_keywords_first_pages(filepath):
+    """İlk sayfada excluded keyword kontrolü - OCR"""
+    excluded = [
+        # Aydınlatma raporu
+        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
+        
+        # Hidrolik devre şeması
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
+        
+        # Pnömatik devre şeması
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
+        
+        # İSG periyodik kontrol
+        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
+        
+        # AT Uygunluk Beyanı
+        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
+        
+        # LVD raporu
+        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
+        
+        # LOTO raporu
+        "loto",
+        
+        # Manuel/kullanım kılavuzu
+        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
+        
+        # HRC raporu
+        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
+        
+        # Elektrik devre şeması
+        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
+        
+        # Espe raporu  
+        "espe",
+        
+        # Montaj talimatları
+        "montaj", "assembly",
+        
+        # Bakım talimatları
+        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
+        
+        # Mekanik titreşim raporu
+        "titreşim", "vibration", "mekanik",
+        
+        # AT tip inceleme sertifikası
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
+        
+        # EN 60204-1 topraklama raporu
+        "topraklama direnci", "grounding", "earthing", "60204","topraklama",
+    ]
     
     try:
         Image.MAX_IMAGE_PIXELS = None
@@ -382,7 +441,7 @@ def check_excluded_keywords_first_pages(filepath, validation_keywords):
             text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
             all_text += text.lower() + " "
         
-        found = [kw for kw in excluded_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
+        found = [kw for kw in excluded if re.search(rf"\b{kw.lower()}\b", all_text)]
         logger.info(f"Excluded: {len(found)} kelime bulundu")
         return len(found) >= 1
     except Exception as e:
@@ -427,12 +486,6 @@ tesseract_available, tesseract_info = check_tesseract_installation()
 # ============================================
 app = Flask(__name__)
 
-# Database configuration (YENİ)
-app.config['SQLALCHEMY_DATABASE_URI'] = Config.SQLALCHEMY_DATABASE_URI
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = Config.SQLALCHEMY_TRACK_MODIFICATIONS
-app.config['SQLALCHEMY_ECHO'] = Config.SQLALCHEMY_ECHO
-
-# Upload configuration
 UPLOAD_FOLDER = 'temp_uploads_noise'
 ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
 
@@ -467,18 +520,17 @@ def analyze_noise_report():
             file.save(filepath)
             logger.info(f"Gürültü analizi başlatılıyor: {filename}")
 
-            # Analyzer'ı app ile başlat (DB bağlantısı için)
-            analyzer = NoiseReportAnalyzer(app=app)
+            analyzer = NoiseReportAnalyzer()
             file_ext = os.path.splitext(filepath)[1].lower()
             
             # 3 AŞAMALI KONTROL
             if file_ext == '.pdf':
                 logger.info("Aşama 1: Gürültü özgü kelime kontrolü...")
-                if check_strong_keywords_first_pages(filepath, analyzer.validation_keywords):
+                if check_strong_keywords_first_pages(filepath):
                     logger.info("✅ Aşama 1 geçti")
                 else:
                     logger.info("Aşama 2: Excluded kelime kontrolü...")
-                    if check_excluded_keywords_first_pages(filepath, analyzer.validation_keywords):
+                    if check_excluded_keywords_first_pages(filepath):
                         logger.info("❌ Excluded kelimeler bulundu")
                         try:
                             os.remove(filepath)
@@ -496,7 +548,7 @@ def analyze_noise_report():
                                 pdf_reader = PyPDF2.PdfReader(f)
                                 text = "".join(page.extract_text() + "\n" for page in pdf_reader.pages)
                             
-                            if not text or len(text.strip()) < 50 or not validate_document_server(text, analyzer.validation_keywords):
+                            if not text or len(text.strip()) < 50 or not validate_document_server(text):
                                 try:
                                     os.remove(filepath)
                                 except:
@@ -594,8 +646,7 @@ def health_check():
         'status': 'healthy',
         'service': 'Noise Report Analyzer API',
         'version': '1.0.0',
-        'report_type': 'GURULTU_OLCUM_RAPORU',
-        'database': 'connected'
+        'report_type': 'GURULTU_OLCUM_RAPORU'
     })
 
 
@@ -606,21 +657,12 @@ def index():
         'service': 'Noise Report Analyzer API',
         'version': '1.0.0',
         'description': 'Gürültü ölçüm raporlarını analiz eden REST API servisi',
-        'database': 'PostgreSQL (Dynamic config loading)',
         'endpoints': {
             'POST /api/noise-report': 'Gürültü ölçüm raporu analizi',
             'GET /api/health': 'Servis sağlık kontrolü',
             'GET /': 'Bu bilgi sayfası'
         }
     })
-
-
-# ============================================
-# DATABASE INITIALIZATION (YENİ)
-# ============================================
-with app.app_context():
-    db.init_app(app)
-    logger.info("✅ Database bağlantısı kuruldu")
 
 
 # ============================================
@@ -634,7 +676,6 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8003))
     
     logger.info(f"🚀 Servis başlatılıyor - Port: {port}")
-    logger.info(f"📊 Database: PostgreSQL (Config from DB)")
     logger.info("=" * 60)
     
     app.run(host='0.0.0.0', port=port, debug=False)
