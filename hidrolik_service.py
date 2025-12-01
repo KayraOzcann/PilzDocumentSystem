@@ -1,6 +1,7 @@
 # ============================================
 # HİDROLİK DEVRE ŞEMASI ANALİZ SERVİSİ
 # Standalone Service - Azure App Service Ready
+# Database-driven configuration ile dinamik pattern yönetimi
 # Port: 8011
 # ============================================
 
@@ -24,9 +25,20 @@ import numpy as np
 import fitz  # PyMuPDF
 from docx import Document
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 import pdf2image
+
+# ============================================
+# DATABASE IMPORTS (YENİ)
+# ============================================
+from database import db, init_db
+from db_loader import load_service_config
+
+# ============================================
+# CONFIG IMPORT (YENİ)
+# ============================================
+from config import Config
 
 # ============================================
 # LOGGING CONFIGURATION
@@ -78,59 +90,45 @@ class CircuitAnalysisResult:
 class AdvancedCircuitAnalyzer:
     """Advanced circuit diagram analyzer"""
     
-    def __init__(self):
-        self.hydraulic_criteria_weights = {
-            "Enerji Kaynağı": 25,
-            "Hidrolik Semboller ve Bileşenler": 30,
-            "Akış Yönü ve Bağlantı Hattı": 20,
-            "Sistem Bilgileri ve Etiketler": 15,
-            "Başlık ve Belgelendirme": 10
-        }
+    def __init__(self, app=None):
+        logger.info("Hidrolik Devre Şeması analiz sistemi başlatılıyor...")
         
-        self.hydraulic_criteria_details = {
-            "Enerji Kaynağı": {
-                "basinc_yagi": {"pattern": r"(?i)(?:oil|yağ|ya[gğ]|hydraulic|hidrolik|hidrolic|fluid|hyd|pressur|pressure|basınç|basinc|bas[ıi]n[çc]|main|feeding|system|sistem)", "weight": 8},
-                "basinc_aralik": {"pattern": r"(?i)(?:\d+\s*(?:bar|Bar|BAR|har|bor|MPa|mpa|psi|PSI)(?!\w)|(?:\d+)\s*(?:to|[-–—]|\s)\s*(?:\d+)|pressure|basınç)", "weight": 8},
-                "sivil_guc": {"pattern": r"(?i)(?:liquid|hydraulic|hidrolik|hidrolic|fluid|oil|yağ|ya[gğ]|sıvı|s[ıi]v[ıi]|pressur|feeding|system|sistem|line|hat)", "weight": 5},
-                "yuksek_basinc": {"pattern": r"(?i)(?:(?:high|yüksek|y[üu]ksek|main)\s*(?:pressure|basınç|basinc)|(?:[0-9]{2,4})\s*(?:bar|Bar|BAR|har|MPa|mpa|psi|PSI)|pressure\s*line|main\s*line)", "weight": 4}
-            },
-            "Hidrolik Semboller ve Bileşenler": {
-                "pompa_sembol": {"pattern": r"(?i)(?:pump|pompa|ponpa|feeding|main\s*pump|pressure\s*pump|[PM]\d+|P\s*\d+|lowering\s*pump|motor|engine|drive)", "weight": 7},
-                "motor_sembol": {"pattern": r"(?i)(?:motor|Motor|MOTOR|rotor|drive|engine|M\d+|M\s*\d+|electromotor|30\s*kW|3\s*kW|\d+\s*kW)", "weight": 7},
-                "silindir_sembol": {"pattern": r"(?i)(?:cylinder|silindir|cilinder|piston|actuator|lifting|çift\s*etkili|tek\s*etkili|double\s*acting|single\s*acting|C\d+|CYL|lifting\s*cylinder|16x25|25x4)", "weight": 6},
-                "basinc_valfi": {"pattern": r"(?i)(?:pressure\s*valve|basınç\s*val|valve|valf|relief|safety|control\s*val|accumulator|akümülat|HDA|pressure\s*control|50MBAR)", "weight": 5},
-                "yon_kontrol_valfi": {"pattern": r"(?i)(?:directional|control\s*valve|yön\s*kontrol|4/[23]|3/2|DCV|D[GH][A-Z0-9]+|pilot|spool|valve\s*control|DGAV|DG4V)", "weight": 5}
-            },
-            "Akış Yönü ve Bağlantı Hattı": {
-                "cizgi_borular": {"pattern": r"(?i)(?:line|pipe|boru|hat|çizgi|hose|tube|connection|bağlant|DN\s*\d+|NG\s*\d+|feeding|main|return|circuit|devre)", "weight": 6},
-                "yon_oklari": {"pattern": r"(?i)(?:arrow|direction|yön|ok|flow|akış|discharge|suction|return|dönüş|çıkış|giriş|↑|↓|→|←|▲|▼|▶|◀)", "weight": 6},
-                "pompa_cikis": {"pattern": r"(?i)(?:pump\s*(?:output|discharge|çıkış)|pompa.*?(?:çıkış|çıkışı|output)|pressure\s*line|main\s*line|high\s*pressure|discharge|output|çıkış)", "weight": 4},
-                "tank_donus": {"pattern": r"(?i)(?:tank.*?(?:return|dönüş|dönüşü)|return\s*line|suction|low\s*pressure|reservoir|tahliye|drain|tank\s*line|return|dönüş)", "weight": 4}
-            },
-            "Sistem Bilgileri ve Etiketler": {
-                "bar_basinc": {"pattern": r"(?i)(?:\d+\s*(?:bar|Bar|BAR|har|bor|MPa|mpa|psi|PSI)(?!\w)|p[0-9]:\s*\d+|pt:\s*\d+|p2:\s*\d+|50MBAR)", "weight": 4},
-                "debi_bilgi": {"pattern": r"(?i)(?:\d+(?:\.\d+)?\s*(?:cc/rev|cc/dk|lt/dak|lt/min|l/min|lpm|gpm|L/min|flow)|Hub\s*x\s*\d+|debi|flow\s*rate|\d+\s*cc)", "weight": 4},
-                "guc_bilgi": {"pattern": r"(?i)(?:\d+(?:\.\d+)?\s*(?:kW|KW|kw|HP|hp|W|w)|(?:\d{3,4})\s*(?:rpm|RPM|dev/dak)|30\s*kW|3\s*kW|power|güç|\d+\s*HP)", "weight": 4},
-                "tank_hacmi": {"pattern": r"(?i)(?:V\s*=\s*\d+|(?:\d+)\s*(?:LT|lt|L|l|litre|liter)|tank.*?(?:volume|hacim|hacmi)|reservoir.*?\d+|\d+\s*LT)", "weight": 3}
-            },
-            "Başlık ve Belgelendirme": {
-                "hydraulic_scheme": {"pattern": r"(?i)(?:HYDRAULIC|hydraulic|HİDROLİK|hidrolik|hidrolic|hydro|HYDRO|Hydraulikplan|hydraulikplan|HYDRAULIC\s*PLAN|hydraulic\s*schema)", "weight": 3},
-                "data_sheet": {"pattern": r"(?i)(?:DATA\s*SHEET|data.*?sheet|specification|spec|technical|diagram|şema|schema|plan|drawing|çizim|PLAN|scheme|document|döküman)", "weight": 3},
-                "manifold_plan": {"pattern": r"(?i)(?:MANIFOLD\s*PLAN|manifold|valve\s*block|block|kolektör|collector|central|unit|WEMHÖNER|manufacturer|company|firma)", "weight": 2},
-                "cizim_standardi": {"pattern": r"(?i)(?:ISO\s*1219|standard|standart|DIN|EN|norm|drawing|çizim|technical\s*drawing|VSHY|drawing\s*no)", "weight": 2}
-            }
-        }
-        
-        self.component_templates = {
-            "hydraulic": {
-                "pump": ["P1", "P2", "P3", "PUMP", "POMPA"],
-                "motor": ["M1", "M2", "M3", "MOTOR"],
-                "valve": ["V1", "V2", "V3", "VALVE", "VALF"],
-                "cylinder": ["C1", "C2", "C3", "CYL", "SİLİNDİR"],
-                "tank": ["T1", "T2", "TANK", "TAMBUR"],
-                "filter": ["F1", "F2", "FİLTRE", "FILTER"]
-            }
-        }
+        # Flask app context varsa DB'den yükle, yoksa boş başlat
+        if app:
+            with app.app_context():
+                try:
+                    config = load_service_config('hydraulic_circuit')
+                    
+                    # DB'den yüklenen veriler
+                    self.hydraulic_criteria_weights = config.get('criteria_weights', {})
+                    self.hydraulic_criteria_details = config.get('criteria_details', {})
+                    self.pattern_definitions = config.get('pattern_definitions', {})
+                    self.validation_keywords = config.get('validation_keywords', {})
+                    self.category_actions = config.get('category_actions', {})
+                    
+                    # component_templates pattern_definitions içinde
+                    self.component_templates = self.pattern_definitions.get('hydraulic', {})
+                    
+                    logger.info(f"✅ Veritabanından yüklendi: {len(self.hydraulic_criteria_weights)} kategori")
+                    
+                except Exception as e:
+                    logger.error(f"⚠️ Veritabanından yükleme başarısız: {e}")
+                    logger.warning("⚠️ Fallback: Boş config kullanılıyor")
+                    self.hydraulic_criteria_weights = {}
+                    self.hydraulic_criteria_details = {}
+                    self.pattern_definitions = {}
+                    self.validation_keywords = {}
+                    self.category_actions = {}
+                    self.component_templates = {}
+        else:
+            # Flask app yoksa boş başlat
+            logger.warning("⚠️ Flask app context yok, boş config kullanılıyor")
+            self.hydraulic_criteria_weights = {}
+            self.hydraulic_criteria_details = {}
+            self.pattern_definitions = {}
+            self.validation_keywords = {}
+            self.category_actions = {}
+            self.component_templates = {}
 
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         """Extract text from PDF using PyPDF2 and OCR fallback"""
@@ -349,16 +347,9 @@ class AdvancedCircuitAnalyzer:
         return results
 
     def _is_relevant_component(self, component: ComponentDetection, criterion_name: str) -> bool:
-        """Check if component is relevant"""
-        relevance_map = {
-            "pompa_sembol": ["pump"],
-            "motor_sembol": ["motor"],
-            "silindir_sembol": ["cylinder"],
-            "basinc_valfi": ["valve"],
-            "yon_kontrol_valfi": ["valve"],
-            "tank_sembol": ["tank"],
-            "filtre_sembol": ["filter"]
-        }
+        """Check if component is relevant - DB'den"""
+        # DB'den relevance_map al
+        relevance_map = self.pattern_definitions.get('relevance_map', {})
         relevant_types = relevance_map.get(criterion_name, [])
         return component.component_type in relevant_types
 
@@ -437,7 +428,7 @@ class AdvancedCircuitAnalyzer:
         }
 
     def extract_specific_values(self, text: str, circuit_type: str) -> Dict[str, Any]:
-        """Extract specific values - Enhanced for OCR"""
+        """Extract specific values - Enhanced for OCR - DB'den"""
         values = {
             "proje_no": "Bulunamadı",
             "sistem_tipi": "Bulunamadı",
@@ -450,110 +441,20 @@ class AdvancedCircuitAnalyzer:
             "tambur": "Bulunamadı"
         }
         
-        project_patterns = [
-            r"(?i)(?:2271|VSHY|002204|TH-4|370\s*ton|feintol)",
-            r"(?i)(?:proje|project|job)\s*(?:no|number)?\s*:?\s*([A-Z0-9-]+)",
-            r"(?i)([A-Z]{2,}-\d+-[A-Z0-9-]+)",
-            r"(?i)(TH-\d+|P\+Ânmatik)"
-        ]
-        for pattern in project_patterns:
-            project_match = re.search(pattern, text)
-            if project_match:
-                values["proje_no"] = project_match.group(1) if len(project_match.groups()) > 0 else project_match.group()
-                break
+        # DB'den extract_values pattern'lerini al
+        extract_values = self.pattern_definitions.get('extract_values', {})
         
-        system_patterns = [
-            r"(?i)(?:press\s*feeding\s*system|feeding\s*system|hydraulic\s*system|hidrolik\s*sistem)",
-            r"(?i)(?:accumulator|akümülat|lifting|kaldırma|pressing|pres)",
-            r"(?i)(?:pnömatik|pneumatic|P\+Ânmatik|hidrolik)"
-        ]
-        for pattern in system_patterns:
-            system_match = re.search(pattern, text)
-            if system_match:
-                values["sistem_tipi"] = system_match.group()
-                break
-        
-        date_patterns = [
-            r"(\d{4}[-./]\d{1,2}[-./]\d{1,2})",
-            r"(\d{1,2}[-./]\d{1,2}[-./]\d{4})",
-            r"(\d{1,2}\.\d{1,2}\.\d{4})",
-            r"(\d{4}\s*\d{1,2}\s*\d{1,2})"
-        ]
-        for pattern in date_patterns:
-            date_match = re.search(pattern, text)
-            if date_match:
-                values["tarih"] = date_match.group(1)
-                break
-        
-        unit_patterns = [
-            r"(?i)(?:HİDROLİK\s*ÜNİTE|HYDRAULIC\s*UNIT|hydraulic|hidrolik|hydro)",
-            r"(?i)(?:HDA-\d+|accumulator|akümülat)",
-            r"(?i)(?:pressure.*?control|basınç.*?kontrol)"
-        ]
-        for pattern in unit_patterns:
-            unit_match = re.search(pattern, text)
-            if unit_match:
-                values["hidrolik_unite"] = unit_match.group()
-                break
-        
-        tank_patterns = [
-            r"(?i)(?:V\s*=\s*(\d+)|(\d+)\s*(?:LT|lt|L|l|litre|liter))",
-            r"(?i)(?:tank.*?(\d+).*?(?:lt|l|litre))",
-            r"(?i)(?:(\d+)\s*(?:lt|l)\s*tank)",
-            r"(?i)(?:reservoir.*?(\d+))"
-        ]
-        for pattern in tank_patterns:
-            tank_match = re.search(pattern, text)
-            if tank_match:
-                values["tank_hacmi"] = next((m for m in tank_match.groups() if m), tank_match.group())
-                break
-        
-        power_patterns = [
-            r"(?i)(?:(\d+(?:\.\d+)?)\s*(?:kW|KW|kw))",
-            r"(?i)(?:(\d+(?:\.\d+)?)\s*(?:HP|hp))",
-            r"(?i)(?:motor.*?(\d+(?:\.\d+)?)\s*(?:kW|hp))",
-            r"(?i)(?:power.*?(\d+(?:\.\d+)?)\s*(?:kW|hp))",
-            r"(?i)(30\s*kW|3\s*kW)"
-        ]
-        for pattern in power_patterns:
-            power_match = re.search(pattern, text)
-            if power_match:
-                values["motor_gucu"] = next((m for m in power_match.groups() if m), power_match.group()) if len(power_match.groups()) > 0 else power_match.group()
-                break
-        
-        rpm_patterns = [
-            r"(?i)(?:(\d+)\s*(?:rpm|RPM|dev/dak))",
-            r"(?i)(?:(\d{3,4})\s*(?:rpm|RPM))",
-            r"(?i)(?:devir.*?(\d+))"
-        ]
-        for pattern in rpm_patterns:
-            rpm_match = re.search(pattern, text)
-            if rpm_match:
-                values["devir"] = rpm_match.group(1)
-                break
-        
-        flow_patterns = [
-            r"(?i)(?:(\d+(?:\.\d+)?)\s*(?:lt/dak|l/min|cc/rev|cc/dk|lpm|gpm))",
-            r"(?i)(?:(\d+)\s*Hub\s*x)",
-            r"(?i)(?:debi.*?(\d+(?:\.\d+)?))",
-            r"(?i)(?:flow.*?(\d+(?:\.\d+)?))"
-        ]
-        for pattern in flow_patterns:
-            flow_match = re.search(pattern, text)
-            if flow_match:
-                values["debi"] = flow_match.group(1)
-                break
-        
-        drum_patterns = [
-            r"(?i)(?:TAMBUR|DRUM|cylinder|silindir)",
-            r"(?i)(?:lifting\s*cylinder|kaldırma\s*silindir)",
-            r"(?i)(?:\d+x\d+.*?cylinder)"
-        ]
-        for pattern in drum_patterns:
-            drum_match = re.search(pattern, text)
-            if drum_match:
-                values["tambur"] = drum_match.group()
-                break
+        # Her field için pattern listesini çek ve uygula
+        for field_name in values.keys():
+            patterns = extract_values.get(field_name, [])
+            for pattern in patterns:
+                match = re.search(pattern, text)
+                if match:
+                    if match.groups():
+                        values[field_name] = next((m for m in match.groups() if m), match.group())
+                    else:
+                        values[field_name] = match.group()
+                    break
         
         return values
 
@@ -653,15 +554,21 @@ class AdvancedCircuitAnalyzer:
 # ============================================
 # HELPER FUNCTIONS
 # ============================================
-def validate_document_server(text):
-    """Server document validation"""
-    critical_terms = [
-        ["hidrolik", "hydraulic", "devre", "circuit", "şema", "diagram", "schema"],
-        ["pompa", "pump", "valf", "valve", "silindir", "cylinder", "motor", "actuator", "piston"],
-        ["basınç", "pressure", "bar", "psi", "debi", "flow", "l/min", "gpm", "mpa"],
-        ["yağ", "oil", "hidrolik yağ", "hydraulic oil", "tank", "rezervuar", "filtre", "filter"],
-        ["iso 1219", "1219", "sembol", "symbol", "bağlantı", "connection", "hat", "line"]
-    ]
+def validate_document_server(text, validation_keywords):
+    """Server document validation - DB'den"""
+    
+    # DB'den critical_terms al
+    critical_terms_data = validation_keywords.get('critical_terms', {})
+    
+    # Liste formatına dönüştür
+    critical_terms = []
+    for key, value in critical_terms_data.items():
+        if key.startswith('category_') and isinstance(value, list):
+            critical_terms.append(value)
+    
+    if not critical_terms:
+        logger.warning("⚠️ Critical terms bulunamadı, validasyon atlanıyor")
+        return True
     
     category_found = [
         any(re.search(rf"\b{term}\b", text, re.IGNORECASE) for term in category)
@@ -669,16 +576,20 @@ def validate_document_server(text):
     ]
     
     valid_categories = sum(category_found)
-    logger.info(f"Doküman validasyonu: {valid_categories}/5 kritik kategori bulundu")
+    logger.info(f"Doküman validasyonu: {valid_categories}/{len(critical_terms)} kritik kategori bulundu")
     
-    return valid_categories >= 5
+    return valid_categories >= len(critical_terms)
 
 
-def check_strong_keywords_first_pages(filepath):
-    """Check strong keywords in first pages"""
-    strong_keywords = [
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219"
-    ]
+def check_strong_keywords_first_pages(filepath, validation_keywords):
+    """Check strong keywords in first pages - DB'den"""
+    
+    # DB'den strong keywords al
+    strong_keywords = validation_keywords.get('strong_keywords', [])
+    
+    if not strong_keywords:
+        logger.warning("⚠️ Strong keywords bulunamadı, validasyon atlanıyor")
+        return True
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=1)
@@ -701,26 +612,15 @@ def check_strong_keywords_first_pages(filepath):
         return False
 
 
-def check_excluded_keywords_first_pages(filepath):
-    """Check excluded keywords in first pages"""
-    excluded_keywords = [
-        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık","ışık şiddeti",
-        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
-        "espe",
-        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
-        "loto",
-        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve",
-        "montaj", "assembly",
-        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
-        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
-        "titreşim", "vibration", "mekanik",
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate"
-    ]
+def check_excluded_keywords_first_pages(filepath, validation_keywords):
+    """Check excluded keywords in first pages - DB'den"""
+    
+    # DB'den excluded keywords al
+    excluded_keywords = validation_keywords.get('excluded_keywords', [])
+    
+    if not excluded_keywords:
+        logger.warning("⚠️ Excluded keywords bulunamadı, validasyon atlanıyor")
+        return False
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=1)
@@ -775,6 +675,11 @@ def get_main_issues_hydraulic(analysis_result):
 # ============================================
 app = Flask(__name__)
 
+# Database configuration (YENİ)
+app.config['SQLALCHEMY_DATABASE_URI'] = Config.SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = Config.SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['SQLALCHEMY_ECHO'] = Config.SQLALCHEMY_ECHO
+
 UPLOAD_FOLDER = 'temp_uploads_hydraulic'
 ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png', 'docx', 'doc', 'txt'}
 
@@ -806,17 +711,18 @@ def analyze_hydraulic_control():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
         
-        analyzer = AdvancedCircuitAnalyzer()
+        # Create analyzer instance with app context
+        analyzer = AdvancedCircuitAnalyzer(app=app)
         file_ext = os.path.splitext(filepath)[1].lower()
 
         # 3 AŞAMALI KONTROL (sadece PDF için)
         if file_ext == '.pdf':
             logger.info("Aşama 1: Hidrolik özgü kelime kontrolü...")
-            if check_strong_keywords_first_pages(filepath):
+            if check_strong_keywords_first_pages(filepath, analyzer.validation_keywords):
                 logger.info("✅ Aşama 1 geçti")
             else:
                 logger.info("Aşama 2: Excluded kelime kontrolü...")
-                if check_excluded_keywords_first_pages(filepath):
+                if check_excluded_keywords_first_pages(filepath, analyzer.validation_keywords):
                     logger.info("❌ Excluded kelimeler bulundu")
                     try:
                         os.remove(filepath)
@@ -834,7 +740,7 @@ def analyze_hydraulic_control():
                             pdf_reader = PyPDF2.PdfReader(f)
                             text = "".join(page.extract_text() + "\n" for page in pdf_reader.pages)
                         
-                        if not text or len(text.strip()) < 50 or not validate_document_server(text):
+                        if not text or len(text.strip()) < 50 or not validate_document_server(text, analyzer.validation_keywords):
                             try:
                                 os.remove(filepath)
                             except:
@@ -870,7 +776,7 @@ def analyze_hydraulic_control():
                     'message': 'Dosyadan yeterli metin çıkarılamadı'
                 }), 400
             
-            if not validate_document_server(text):
+            if not validate_document_server(text, analyzer.validation_keywords):
                 try:
                     os.remove(filepath)
                 except:
@@ -948,6 +854,9 @@ def health_check():
         'service': 'Hydraulic Circuit Diagram Analyzer API',
         'version': '1.0.0',
         'tesseract_available': tesseract_available,
+        'upload_folder': UPLOAD_FOLDER,
+        'max_file_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024),
+        'supported_formats': list(ALLOWED_EXTENSIONS),
         'report_type': 'HIDROLIK_DEVRE_SEMASI'
     })
 
@@ -958,20 +867,48 @@ def index():
     return jsonify({
         'service': 'Hydraulic Circuit Diagram Analyzer API',
         'version': '1.0.0',
+        'description': 'Hidrolik Devre Şemalarını analiz eden REST API servisi',
         'endpoints': {
             'POST /api/hydraulic-control': 'Hidrolik devre şeması analizi',
             'GET /api/health': 'Health check',
             'GET /': 'API info'
+        },
+        'usage': {
+            'upload_format': 'multipart/form-data',
+            'file_field': 'file',
+            'supported_types': list(ALLOWED_EXTENSIONS),
+            'max_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
         }
     })
 
 
+# ============================================
+# DATABASE INITIALIZATION
+# ============================================
+with app.app_context():
+    db.init_app(app)
+
+
+# ============================================
+# APPLICATION ENTRY POINT (Azure-Friendly)
+# ============================================
 if __name__ == '__main__':
     logger.info("=" * 60)
     logger.info("Hidrolik Devre Şeması Analiz Servisi")
     logger.info("=" * 60)
+    logger.info(f"📁 Upload klasörü: {UPLOAD_FOLDER}")
+    logger.info(f"📊 Desteklenen formatlar: {', '.join(ALLOWED_EXTENSIONS)}")
+    logger.info(f"📏 Maksimum dosya boyutu: {app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB")
+    logger.info(f"🔧 Tesseract OCR: {'Kurulu' if tesseract_available else 'Kurulu değil'}")
+    logger.info("")
+    logger.info("🔗 API Endpoints:")
+    logger.info("  POST /api/hydraulic-control - Hidrolik devre şeması analizi")
+    logger.info("  GET  /api/health           - Health check")
+    logger.info("  GET  /                     - API info")
+    logger.info("=" * 60)
     
     port = int(os.environ.get('PORT', 8011))
     logger.info(f"🚀 Servis başlatılıyor - Port: {port}")
+    logger.info("=" * 60)
     
     app.run(host='0.0.0.0', port=port, debug=False)

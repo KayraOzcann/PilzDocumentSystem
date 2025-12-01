@@ -15,19 +15,24 @@ import logging
 import math
 from collections import Counter
 import fitz  # PyMuPDF for better PDF handling
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 import pdf2image
+
+# ============================================
+# DATABASE IMPORTS (YENİ)
+# ============================================
+from database import db, init_db
+from db_loader import load_service_config
+
+# ============================================
+# CONFIG IMPORT (YENİ)
+# ============================================
+from config import Config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-# Azure için Tesseract path'leri (Azure'da otomatik bulunur)
-"""try:
-    pytesseract.pytesseract.tesseract_cmd = os.environ.get('TESSERACT_CMD', 'tesseract')
-except:
-    pass"""
 
 @dataclass
 class ComponentDetection:
@@ -52,159 +57,45 @@ class CircuitAnalysisResult:
 class PneumaticCircuitAnalyzer:
     """Gelişmiş pnömatik devre şeması analiz sistemi"""
     
-    def __init__(self):
-        # Kriter ağırlıkları (Toplam 100 puan)
-        self.pneumatic_criteria_weights = {
-            "Temel Sistem Bileşenleri": 25,
-            "Pnömatik Semboller ve Vana Sistemleri": 30,
-            "Akış Yönü ve Bağlantı Hatları": 20,
-            "Sistem Bilgileri ve Teknik Parametreler": 15,
-            "Dokümantasyon ve Standart Uygunluk": 10
-        }
+    def __init__(self, app=None):
+        logger.info("Pnömatik Devre Şeması analiz sistemi başlatılıyor...")
         
-        # Detaylı kriter tanımları (Yüklenen belgelere göre güncellendi)
-        self.pneumatic_criteria_details = {
-            "Temel Sistem Bileşenleri": {
-                "hava_kaynagi_ve_hazirlama": {
-                    "pattern": r"(?i)(?:pressure\s*source|hava\s*kaynağı|basınçlı\s*hava|air\s*supply|P\s*=\s*\d+.*?bar|kompresör|compressor|VHS|MS6|SPAN|pneumatic|pnömatik|bar|P\d*|basınç|hava|asansör|elevator|lift|coiltech|press\s*feeding\s*system)",
-                    "weight": 5,
-                    "description": "Hava kaynağı ve hazırlama ünitesi"
-                },
-                "filtre_regulator_lubrikator": {
-                    "pattern": r"(?i)(?:FRL|filtre|filter|regulator|regülatör|lubricator|yağlayıcı|MS6-LFR|MS6-EM1|MS6-EE|kondisyoner|conditioner|air\s*treatment|hava\s*hazırlama|hazırlama|FESTO|festo|data\s*sheet|pneumatic\s*plan)",
-                    "weight": 5,
-                    "description": "Hava hazırlama grubu (FRL)"
-                },
-                "basinc_gosterge_sensoru": {
-                    "pattern": r"(?i)(?:manometre|pressure.*?gauge|gösterge|indicator|PI|PT|PS|basınç.*?sensör|SPAN-B2R|ölçüm|measurement|gauge|ölçer|pressure|basınç|coiltech|doğu\s*pres)",
-                    "weight": 4,
-                    "description": "Basınç gösterge ve sensörleri"
-                },
-                "susturucu_egzoz": {
-                    "pattern": r"(?i)(?:susturucu|muffler|exhaust|egzoz|silencer|⊥|tahliye|MS6-DL|vent|boşaltım|exhaust|R|S|tahliye|pinch\s*roll|doğrultma)",
-                    "weight": 4,
-                    "description": "Susturucu ve egzoz elemanları"
-                },
-                "genel_pnomatik_sistem": {
-                    "pattern": r"(?i)(?:pneumatic|pnömatik|circuit|devre|diagram|diyagram|şema|schema|sistem|system|air|hava|○|□|◇|△|asansör|elevator|lift|P5|VS|version|coiltech|press\s*feeding|açıcı|kavrama|üst\s*baski|alt\s*baski|fren)",
-                    "weight": 7,
-                    "description": "Genel pnömatik sistem varlığı"
-                }
-            },
-            "Pnömatik Semboller ve Vana Sistemleri": {
-                "silindir_actuator": {
-                    "pattern": r"(?i)(?:silindir|cylinder|piston|actuator|çift.*?etkili|tek.*?etkili|double.*?acting|single.*?acting|C\d+|MGF|═══|▬▬▬|━━━|CYL|SIL|◊|⬟|⬢|üst\s*baski|alt\s*baski|açıcı|kavrama)",
-                    "weight": 8,
-                    "description": "Silindir ve aktüatör sembolleri"
-                },
-                "yon_kontrol_vanalar": {
-                    "pattern": r"(?i)(?:VUVG|Y\d+|V\d+|valf|valve|5/2|4/2|3/2|2/2|yön.*?kontrol|directional.*?control|solenoid|FESTO|□|■|⬜|⬛|vana|kontrol|coiltech|press\s*feeding|fren)",
-                    "weight": 10,
-                    "description": "Yön kontrol vanaları (FESTO VUVG serisi)"
-                },
-                "hiz_kontrol_vanalar": {
-                    "pattern": r"(?i)(?:hız.*?kontrol|speed.*?control|flow.*?control|akış.*?kontrol|throttle|kısıcı|VQZ|FHG|⧨|◈|◇|flow|akış|pinch\s*roll|doğrultma)",
-                    "weight": 6,
-                    "description": "Hız kontrol vanaları"
-                },
-                "basinc_kontrol_vanalar": {
-                    "pattern": r"(?i)(?:basınç.*?kontrol|pressure.*?control|relief|emniyet|PRV|basınç.*?azaltıcı|VHA|relief|basınç|pressure|coiltech|data\s*sheet)",
-                    "weight": 6,
-                    "description": "Basınç kontrol vanaları"
-                }
-            },
-            "Akış Yönü ve Bağlantı Hatları": {
-                "hava_besleme_hatlari": {
-                    "pattern": r"(?i)(?:besleme|supply.*?line|hava.*?hattı|ana.*?hat|pressure.*?line|P|feed|input|giriş)",
-                    "weight": 5,
-                    "description": "Hava besleme hatları"
-                },
-                "calisma_hatlari": {
-                    "pattern": r"(?i)(?:A|B|çalışma.*?hattı|working.*?line|port|SV\d+A|SV\d+B|output|çıkış)",
-                    "weight": 5,
-                    "description": "Çalışma hatları (A, B portları)"
-                },
-                "egzoz_tahliye_hatlari": {
-                    "pattern": r"(?i)(?:R|S|EA|EB|egzoz|exhaust|tahliye|drain|vent|return|boşaltım)",
-                    "weight": 3,
-                    "description": "Egzoz ve tahliye hatları"
-                },
-                "yon_oklari_akim_gosterimi": {
-                    "pattern": r"(?i)(?:→|←|↑|↓|⇒|⇐|⇑|⇓|yön|direction|ok|arrow|akış|flow|hat|line)",
-                    "weight": 4,
-                    "description": "Yön okları ve akış gösterimi"
-                },
-                "baglanti_hatlari": {
-                    "pattern": r"(?i)(?:bağlantı|connection|hat|line|pipe|boru|tube|hose)",
-                    "weight": 3,
-                    "description": "Genel bağlantı hatları"
-                }
-            },
-            "Sistem Bilgileri ve Teknik Parametreler": {
-                "calisma_basinci": {
-                    "pattern": r"(?i)(?:P\s*=\s*\d+(?:\.\d+)?.*?bar|\d+(?:\.\d+)?.*?bar|çalışma.*?basınç|working.*?pressure|4-6.*?bar|basınç|pressure|\d+\s*bar|6\s*bar|4\s*bar|pneumatic|pnömatik)",
-                    "weight": 4,
-                    "description": "Çalışma basıncı değerleri"
-                },
-                "hava_tuketimi": {
-                    "pattern": r"(?i)(?:Q\s*=\s*\d+.*?l/min|\d+.*?l/min|hava.*?tüketim|air.*?consumption|flow.*?rate|tüketim|consumption|l/min|flow)",
-                    "weight": 3,
-                    "description": "Hava tüketimi değerleri"
-                },
-                "strok_boyutlari": {
-                    "pattern": r"(?i)(?:strok|stroke|s\s*=\s*\d+.*?mm|\d+.*?mm|boyut|dimension|mesafe|size|mm|cm|asansör.*?mesafe|elevator.*?stroke)",
-                    "weight": 3,
-                    "description": "Strok ve boyut bilgileri"
-                },
-                "vana_tipleri_ozellikler": {
-                    "pattern": r"(?i)(?:VUVG-B14-P53C|normalde.*?kapalı|normalde.*?açık|NC|NO|spring.*?return|yay.*?geri|5/2|4/2|3/2|2/2|FESTO|festo)",
-                    "weight": 3,
-                    "description": "Vana tipleri ve özellikleri"
-                },
-                "teknik_parametreler": {
-                    "pattern": r"(?i)(?:teknik|technical|parametre|parameter|özellik|specification|spec|asansör|elevator|P5|VS|version|sistem|system)",
-                    "weight": 2,
-                    "description": "Genel teknik parametre varlığı"
-                }
-            },
-            "Dokümantasyon ve Standart Uygunluk": {
-                "sembol_standartlari": {
-                    "pattern": r"(?i)(?:ISO.*?1219|DIN.*?ISO|pnömatik.*?sembol|pneumatic.*?symbol|standart|standard|ISO|DIN|FESTO|festo)",
-                    "weight": 2,
-                    "description": "Sembol standartları"
-                },
-                "cizim_bilgileri": {
-                    "pattern": r"(?i)(?:çizim.*?tarih|drawing.*?date|tasarım.*?tarih|design.*?date|\d{2}.\d{2}.\d{4}|\d{2}/\d{2}/\d{4}|created|designed|tarih|date|P5|VS|version|V\d+)",
-                    "weight": 2,
-                    "description": "Çizim bilgileri ve tarihler"
-                },
-                "proje_bilgileri": {
-                    "pattern": r"(?i)(?:proje.*?adı|project.*?name|sistem.*?adı|luggage.*?punch|asansör|elevator|toyota|description|açıklama|P5|VS|version)",
-                    "weight": 2,
-                    "description": "Proje bilgileri"
-                },
-                "firma_logo_imza": {
-                    "pattern": r"(?i)(?:ACT|festo|FESTO|müstafa.*?altuntaş|onay.*?tarih|approval|kontrol.*?tarih|check|created.*?by|checked.*?by|approved|firma|company)",
-                    "weight": 2,
-                    "description": "Firma logosu ve imza bilgileri"
-                },
-                "dokumantasyon_genel": {
-                    "pattern": r"(?i)(?:revision|rev|circuit.*?number|customer|müşteri|sheet|size|boyut|asansör|elevator|P5|VS|diagram|diyagram|şema|schema)",
-                    "weight": 2,
-                    "description": "Genel dokümantasyon varlığı"
-                }
-            }
-        }
-        
-        # Görsel tanıma için şablon desenler
-        self.visual_templates = {
-            "pneumatic_cylinders": ["cylinder", "piston", "MGF", "silindir"],
-            "pneumatic_valves": ["VUVG", "valve", "valf", "Y01", "Y02"],
-            "pneumatic_frl": ["FRL", "filtre", "regulator", "MS6"],
-            "pneumatic_connections": ["connection", "T", "junction", "bağlantı"],
-            "flow_arrows": ["arrow", "ok", "→", "←"],
-            "pressure_gauges": ["gauge", "manometer", "PI", "pressure"]
-        }
+        # Flask app context varsa DB'den yükle, yoksa boş başlat
+        if app:
+            with app.app_context():
+                try:
+                    config = load_service_config('pneumatic_circuit')
+                    
+                    # DB'den yüklenen veriler
+                    self.pneumatic_criteria_weights = config.get('criteria_weights', {})
+                    self.pneumatic_criteria_details = config.get('criteria_details', {})
+                    self.pattern_definitions = config.get('pattern_definitions', {})
+                    self.validation_keywords = config.get('validation_keywords', {})
+                    self.category_actions = config.get('category_actions', {})
+                    
+                    # visual_templates pattern_definitions içinde
+                    self.visual_templates = self.pattern_definitions.get('visual_templates', {})
+                    
+                    logger.info(f"✅ Veritabanından yüklendi: {len(self.pneumatic_criteria_weights)} kategori")
+                    
+                except Exception as e:
+                    logger.error(f"⚠️ Veritabanından yükleme başarısız: {e}")
+                    logger.warning("⚠️ Fallback: Boş config kullanılıyor")
+                    self.pneumatic_criteria_weights = {}
+                    self.pneumatic_criteria_details = {}
+                    self.pattern_definitions = {}
+                    self.validation_keywords = {}
+                    self.category_actions = {}
+                    self.visual_templates = {}
+        else:
+            # Flask app yoksa boş başlat
+            logger.warning("⚠️ Flask app context yok, boş config kullanılıyor")
+            self.pneumatic_criteria_weights = {}
+            self.pneumatic_criteria_details = {}
+            self.pattern_definitions = {}
+            self.validation_keywords = {}
+            self.category_actions = {}
+            self.visual_templates = {}
 
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         """PDF'den metin çıkarma (gelişmiş)"""
@@ -379,48 +270,37 @@ class PneumaticCircuitAnalyzer:
                     )
                     detections.append(detection)
             
-            # Görsel template eşleştirme - çok daha geniş
+            # Görsel template eşleştirme - DB'den
             try:
-                # Çok daha geniş template matching
-                templates = {
-                    "cylinder": ["═══", "▬▬▬", "━━━", "||", "| |", "I I"],
-                    "valve": ["□", "■", "⬜", "⬛", "◼", "◻"],
-                    "arrow": ["→", "←", "↑", "↓", "▶", "◀", "▲", "▼"],
-                    "connection": ["━", "─", "│", "|", "┃"],
-                    "component": ["●", "○", "◎", "◉", "◊", "◇"]
-                }
-                
+                templates = self.pattern_definitions.get('templates', {})
                 for template_type, symbols in templates.items():
                     for symbol in symbols:
-                        # OCR tabanlı template matching
                         ocr_text = self.extract_text_from_image(image_path)
                         if symbol in ocr_text:
-                            # Sembol konumunu tahmin et
                             detection = ComponentDetection(
                                 component_type=template_type,
                                 label=f"{template_type}_template_{len(detections)+1}",
-                                position=(img.shape[1]//2, img.shape[0]//2),  # Orta konum
+                                position=(img.shape[1]//2, img.shape[0]//2),
                                 confidence=0.4,
-                                bounding_box=(0, 0, img.shape[1], img.shape[0])  # Tüm görüntü
+                                bounding_box=(0, 0, img.shape[1], img.shape[0])
                             )
                             detections.append(detection)
                             break
             except:
                 pass
             
-            # Çift tespiti önleme - daha geniş tolerans
+            # Çift tespiti önleme
             unique_detections = []
             seen_positions = set()
             for detection in detections:
-                pos_key = (detection.position[0] // 30, detection.position[1] // 30)  # Daha geniş tolerans
-                if pos_key not in seen_positions and detection.confidence > 0.2:  # Daha düşük güven eşiği
+                pos_key = (detection.position[0] // 30, detection.position[1] // 30)
+                if pos_key not in seen_positions and detection.confidence > 0.2:
                     unique_detections.append(detection)
                     seen_positions.add(pos_key)
             
             # Eğer hiç tespit yoksa, genel bileşen olarak işaretle
             if not unique_detections and contours:
-                # En azından bazı konturlar varsa genel bileşen olarak ekle
-                for i, contour in enumerate(contours[:10]):  # İlk 10 kontur
+                for i, contour in enumerate(contours[:10]):
                     area = cv2.contourArea(contour)
                     if area > 50:
                         x, y, w, h = cv2.boundingRect(contour)
@@ -433,7 +313,7 @@ class PneumaticCircuitAnalyzer:
                         )
                         unique_detections.append(detection)
             
-            return unique_detections[:30]  # Maximum 30 detection - daha fazla
+            return unique_detections[:30]
             
         except Exception as e:
             logger.error(f"Çok gelişmiş görsel bileşen tespiti hatası: {e}")
@@ -449,35 +329,34 @@ class PneumaticCircuitAnalyzer:
         for criterion_name, criterion_data in criteria.items():
             pattern = criterion_data["pattern"]
             weight = criterion_data["weight"]
-            description = criterion_data["description"]
+            description = criterion_data.get("description", criterion_name) 
             
             # Metin tabanlı eşleşme
             text_matches = re.findall(pattern, combined_text, re.IGNORECASE | re.MULTILINE)
             
-            # Görsel eşleşme kontrolü - daha geniş
+            # Görsel eşleşme kontrolü
             visual_matches = []
             if criterion_name in ["silindir_actuator", "yon_kontrol_vanalar", "hava_kaynagi", "hava_hazirlama_grubu"]:
-                # Daha geniş görsel eşleşme
                 relevant_detections = [d for d in visual_detections 
                                      if d.component_type in ["cylinder", "valve", "filter", "connection"] and d.confidence > 0.3]
-                visual_matches = relevant_detections[:5]  # Daha fazla eşleşme al
+                visual_matches = relevant_detections[:5]
             
             # Puan hesaplama - çok daha cömert algoritma
             base_score = 0
             
-            # Metin eşleşmesi için puan - çok daha cömert
+            # Metin eşleşmesi için puan
             if text_matches:
                 text_score = min(weight * 0.9, len(text_matches) * (weight * 0.4))
                 base_score += text_score
             
-            # Görsel eşleşmesi için puan - çok daha cömert
+            # Görsel eşleşmesi için puan
             if visual_matches:
                 visual_score = min(weight * 0.6, len(visual_matches) * (weight * 0.25))
                 base_score += visual_score
             
-            # Görsel bileşen varsa minimum puan garantisi - çok daha yüksek
+            # Görsel bileşen varsa minimum puan garantisi
             if visual_detections and len(visual_detections) > 2:
-                base_score = max(base_score, weight * 0.4)  # %40 minimum
+                base_score = max(base_score, weight * 0.4)
             
             # Herhangi bir görsel bileşen varsa bonus puan
             if visual_detections:
@@ -530,7 +409,6 @@ class PneumaticCircuitAnalyzer:
             
             if category_possible > 0:
                 raw_percentage = category_earned / category_possible
-                # Daha yumuşak eğri uygula
                 adjusted_percentage = math.pow(raw_percentage, 0.8)
                 normalized_score = adjusted_percentage * category_max
             else:
@@ -546,7 +424,6 @@ class PneumaticCircuitAnalyzer:
             
             total_score += normalized_score
         
-        # %5 bonus uygula
         final_score = min(100, total_score * 1.05)
         
         return {
@@ -557,7 +434,7 @@ class PneumaticCircuitAnalyzer:
         }
 
     def extract_specific_values(self, text: str, ocr_text: str) -> Dict[str, Any]:
-        """Özel değer çıkarma"""
+        """Özel değer çıkarma - DB'den pattern'ler ile"""
         combined_text = f"{text} {ocr_text}"
         values = {
             "proje_adi": "Belirtilmemiş",
@@ -572,87 +449,57 @@ class PneumaticCircuitAnalyzer:
             "firma": "Belirtilmemiş"
         }
         
+        # DB'den extract_values pattern'lerini al
+        extract_values = self.pattern_definitions.get('extract_values', {})
+        
         # Proje adı
-        project_patterns = [
-            r"TOYOTA\s+PROJE\s+ADI[:\s]*([^\n\r]+)",
-            r"LUGGAGE\s+PUNCH",
-            r"Asansör",
-            r"Elevator"
-        ]
+        project_patterns = extract_values.get('proje_adi', [])
         for pattern in project_patterns:
             match = re.search(pattern, combined_text, re.IGNORECASE)
             if match:
                 values["proje_adi"] = match.group(1) if match.groups() else match.group(0)
                 break
         
-        # Tarih bilgileri
-        date_pattern = r"(\d{1,2}[./]\d{1,2}[./]\d{4})"
-        dates = re.findall(date_pattern, combined_text)
-        if dates:
-            if "22.5.2020" in combined_text:
-                values["cizim_tarihi"] = "22.5.2020"
-            if "4.5.2020" in combined_text:
-                values["tasarim_tarihi"] = "4.5.2020"
-        
         # Basınç bilgisi
-        pressure_match = re.search(r"(\d+(?:\.\d+)?[-\s]*\d*)\s*bar", combined_text, re.IGNORECASE)
-        if pressure_match:
-            values["calisma_basinci"] = f"{pressure_match.group(1)} bar"
+        pressure_patterns = extract_values.get('calisma_basinci', [])
+        for pattern in pressure_patterns:
+            pressure_match = re.search(pattern, combined_text, re.IGNORECASE)
+            if pressure_match:
+                values["calisma_basinci"] = f"{pressure_match.group(1)} bar"
+                break
         
-        # Sistem tipi
-        if "luggage" in combined_text.lower() or "punch" in combined_text.lower():
-            values["sistem_tipi"] = "Luggage Punch System"
-        elif "asansör" in combined_text.lower() or "elevator" in combined_text.lower():
-            values["sistem_tipi"] = "Asansör Sistemi"
-        
-        # Vana sayısı - daha geniş pattern
-        vana_patterns = [
-            r"(?:VUVG|Y\d+|V\d+|SV\d+)",  # Spesifik vana kodları
-            r"(?:5/2|4/2|3/2|2/2)",        # Vana tipi notasyonları
-            r"(?:valf|valve|vana)",         # Genel vana terimleri
-            r"(?:directional|yön.*?kontrol)", # Kontrol vanaları
-            r"(?:VF|VM|VT|VP)",             # Kısa vana kodları
-            r"(?:sol.*?valf|solenoid.*?valve)", # Solenoid vana
-            r"(?:flow.*?control|akış.*?kontrol)" # Akış kontrol
-        ]
-        
+        # Vana sayısı
+        vana_patterns = extract_values.get('vana_sayisi', [])
         vana_matches = []
         for pattern in vana_patterns:
             matches = re.findall(pattern, combined_text, re.IGNORECASE)
             vana_matches.extend(matches)
         
-        # Görsel algılamadan da vana sayısı tahmin et
         rectangle_count = combined_text.lower().count('□') + combined_text.lower().count('■')
         if rectangle_count > 0:
             vana_matches.extend(['visual_valve'] * min(rectangle_count, 3))
         
         values["vana_sayisi"] = len(set(vana_matches)) if vana_matches else 0
         
-        # Silindir sayısı - daha geniş pattern
-        silindir_patterns = [
-            r"(?:C\d+|CYL\d*|SIL\d*)",     # Silindir kodları
-            r"(?:silindir|cylinder|piston)", # Genel silindir terimleri
-            r"(?:MGF|actuator)",            # Aktüatör kodları
-            r"(?:double.*?acting|single.*?acting)", # Etkili türleri
-            r"(?:çift.*?etkili|tek.*?etkili)",       # Türkçe etkili türleri
-            r"(?:SIL|CYL|ACT)",             # Kısa kodlar
-            r"(?:pnömatik.*?silindir|pneumatic.*?cylinder)" # Tam tanım
-        ]
-        
+        # Silindir sayısı
+        silindir_patterns = extract_values.get('silindir_sayisi', [])
         silindir_matches = []
         for pattern in silindir_patterns:
             matches = re.findall(pattern, combined_text, re.IGNORECASE)
             silindir_matches.extend(matches)
         
-        # Görsel algılamadan da silindir sayısı tahmin et
         piston_symbols = combined_text.count('═') + combined_text.count('━')
-        if piston_symbols > 2:  # Minimum piston göstergesi
+        if piston_symbols > 2:
             silindir_matches.extend(['visual_cylinder'] * min(piston_symbols // 3, 2))
         
         values["silindir_sayisi"] = len(set(silindir_matches)) if silindir_matches else 0
         
         # FRL kontrolü
-        values["frl_mevcut"] = bool(re.search(r"(?:FRL|MS6-LFR|FILTRE|REGULATOR)", combined_text, re.IGNORECASE))
+        frl_patterns = extract_values.get('frl_mevcut', [])
+        for pattern in frl_patterns:
+            if re.search(pattern, combined_text, re.IGNORECASE):
+                values["frl_mevcut"] = True
+                break
         
         # Firma bilgisi
         if "ACT" in combined_text:
@@ -663,143 +510,34 @@ class PneumaticCircuitAnalyzer:
         return values
 
     def extract_project_information(self, text: str, ocr_text: str) -> Dict[str, Any]:
-        """Proje bilgilerini çıkarır (Türkçe ve İngilizce destekli)"""
+        """Proje bilgilerini çıkarır - DB'den"""
         combined_text = f"{text} {ocr_text}"
         project_info = {}
         
-        # Created by / Oluşturan
-        created_patterns = [
-            r"Created\s+by[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Oluşturan[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Tasarlayan[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Designer[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))"
-        ]
+        extract_values = self.pattern_definitions.get('extract_values', {})
         
+        # Created by
+        created_patterns = extract_values.get('created_by', [])
         for pattern in created_patterns:
             match = re.search(pattern, combined_text, re.IGNORECASE)
             if match:
                 project_info["created_by"] = match.group(1).strip()
                 break
         
-        # Checked by / Kontrol eden
-        checked_patterns = [
-            r"Checked\s+by[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Kontrol\s+eden[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Kontrolcü[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))"
-        ]
-        
+        # Checked by
+        checked_patterns = extract_values.get('checked_by', [])
         for pattern in checked_patterns:
             match = re.search(pattern, combined_text, re.IGNORECASE)
             if match:
                 project_info["checked_by"] = match.group(1).strip()
                 break
         
-        # Approved by / Onaylayan
-        approved_patterns = [
-            r"Approved\s+by[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Onaylayan[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))",
-            r"Approval[:\s]*([A-ZÇĞÜŞİÖ\s]+(?:[A-ZÇĞÜŞİÖ\s]*[A-ZÇĞÜŞİÖ]))"
-        ]
-        
+        # Approved by
+        approved_patterns = extract_values.get('approved_by', [])
         for pattern in approved_patterns:
             match = re.search(pattern, combined_text, re.IGNORECASE)
             if match:
                 project_info["approved_by"] = match.group(1).strip()
-                break
-        
-        # Tarihler (DD.MM.YYYY ve DD/MM/YYYY formatları)
-        date_patterns = [
-            r"(\d{1,2}[./]\d{1,2}[./]\d{4})",
-            r"(\d{4}-\d{1,2}-\d{1,2})"
-        ]
-        
-        dates_found = []
-        for pattern in date_patterns:
-            dates = re.findall(pattern, combined_text)
-            dates_found.extend(dates)
-        
-        if dates_found:
-            # En son tarihi al (genellikle en güncel)
-            project_info["creation_date"] = dates_found[-1] if dates_found else None
-            if len(dates_found) > 1:
-                project_info["check_date"] = dates_found[0]
-        
-        # Circuit Number / Devre Numarası
-        circuit_patterns = [
-            r"Circuit\s+Number[:\s]*([A-Z0-9\-\.]+)",
-            r"Devre\s+Numarası[:\s]*([A-Z0-9\-\.]+)",
-            r"Circuit\s+No[:\s]*([A-Z0-9\-\.]+)"
-        ]
-        
-        for pattern in circuit_patterns:
-            match = re.search(pattern, combined_text, re.IGNORECASE)
-            if match:
-                project_info["circuit_number"] = match.group(1).strip()
-                break
-        
-        # Description / Açıklama
-        description_patterns = [
-            r"Description[:\s]*([A-ZÇĞÜŞİÖ0-9\s]+(?:PNOMATİK|PNEUMATIC|DİYAGRAM|DIAGRAM)[A-ZÇĞÜŞİÖ0-9\s]*)",
-            r"Açıklama[:\s]*([A-ZÇĞÜŞİÖ0-9\s]+(?:PNOMATİK|PNEUMATIC|DİYAGRAM|DIAGRAM)[A-ZÇĞÜŞİÖ0-9\s]*)",
-            r"(PRES\s+PNOMATİK\s+DİYAGRAM\s*\d*)",
-            r"(PNEUMATIC\s+CIRCUIT\s+DIAGRAM\s*\d*)"
-        ]
-        
-        for pattern in description_patterns:
-            match = re.search(pattern, combined_text, re.IGNORECASE)
-            if match:
-                project_info["description"] = match.group(1).strip()
-                break
-        
-        # Customer / Müşteri
-        customer_patterns = [
-            r"Customer[:\s]*([A-ZÇĞÜŞİÖ\s]+)",
-            r"Müşteri[:\s]*([A-ZÇĞÜŞİÖ\s]+)",
-            r"Client[:\s]*([A-ZÇĞÜŞİÖ\s]+)"
-        ]
-        
-        for pattern in customer_patterns:
-            match = re.search(pattern, combined_text, re.IGNORECASE)
-            if match:
-                project_info["customer"] = match.group(1).strip()
-                break
-        
-        # Revision / Revizyon
-        revision_patterns = [
-            r"Revision[:\s]*(\d+/\d+|\d+)",
-            r"Rev[\.:\s]*(\d+/\d+|\d+)",
-            r"Revizyon[:\s]*(\d+/\d+|\d+)",
-            r"Sheet[:\s]*(\d+/\d+)"
-        ]
-        
-        for pattern in revision_patterns:
-            match = re.search(pattern, combined_text, re.IGNORECASE)
-            if match:
-                project_info["revision"] = match.group(1).strip()
-                break
-        
-        # ISO Standard
-        iso_patterns = [
-            r"(ISO\s*\d+)",
-            r"This\s+circuit\s+diagram\s+was\s+designed\s+on\s+the\s+basis\s+of\s+(ISO\s*\d+)"
-        ]
-        
-        for pattern in iso_patterns:
-            match = re.search(pattern, combined_text, re.IGNORECASE)
-            if match:
-                project_info["iso_standard"] = match.group(1).strip()
-                break
-        
-        # Size bilgisi
-        size_patterns = [
-            r"Size[:\s]*([A-Z0-9]+)",
-            r"Boyut[:\s]*([A-Z0-9]+)"
-        ]
-        
-        for pattern in size_patterns:
-            match = re.search(pattern, combined_text, re.IGNORECASE)
-            if match:
-                project_info["size"] = match.group(1).strip()
                 break
         
         return project_info
@@ -828,37 +566,13 @@ class PneumaticCircuitAnalyzer:
             
             if category_score < 50:
                 recommendations.append(f"❌ {category}: Ciddi eksiklikler var (%{category_score:.1f})")
-                
                 missing_criteria = [result.criteria_name for result in results.values() if not result.found]
                 if missing_criteria:
                     recommendations.append(f"   Eksik: {', '.join(missing_criteria[:3])}")
-                    
             elif category_score < 70:
                 recommendations.append(f"⚠️ {category}: Geliştirme gerekli (%{category_score:.1f})")
             else:
                 recommendations.append(f"✅ {category}: Yeterli (%{category_score:.1f})")
-        
-        # Teknik öneriler
-        recommendations.append("\n🔧 TEKNİK ÖNERİLER:")
-        
-        if extracted_values["vana_sayisi"] == 0:
-            recommendations.append("- Vana etiketleri eksik veya okunaksız")
-        
-        if not extracted_values["frl_mevcut"]:
-            recommendations.append("- Hava hazırlama ünitesi (FRL) gösterilmeli")
-        
-        if extracted_values["calisma_basinci"] == "Belirtilmemiş":
-            recommendations.append("- Çalışma basıncı değerleri belirtilmeli")
-        
-        if extracted_values["cizim_tarihi"] == "Belirtilmemiş":
-            recommendations.append("- Çizim tarihi eklenmeli")
-        
-        # Standart uygunluk
-        recommendations.append("\n📋 STANDART UYGUNLUK:")
-        if overall_score >= 70:
-            recommendations.append("✅ ISO 1219 standartlarına genel uygunluk sağlanmış")
-        else:
-            recommendations.append("❌ ISO 1219 standartlarına uygunluk için iyileştirme gerekli")
         
         return recommendations
 
@@ -877,7 +591,7 @@ class PneumaticCircuitAnalyzer:
                 # PDF'den görüntü çıkarıp OCR uygula
                 try:
                     doc = fitz.open(file_path)
-                    for page_num in range(min(3, len(doc))):  # İlk 3 sayfa
+                    for page_num in range(min(3, len(doc))):
                         page = doc[page_num]
                         pix = page.get_pixmap()
                         img_data = pix.pil_tobytes(format="PNG")
@@ -906,19 +620,11 @@ class PneumaticCircuitAnalyzer:
             for category in self.pneumatic_criteria_weights.keys():
                 analysis_results[category] = self.analyze_criteria(text, ocr_text, visual_detections, category)
             
-            # Puanları hesapla
             scores = self.calculate_scores(analysis_results)
-            
-            # Özel değerleri çıkar
             extracted_values = self.extract_specific_values(text, ocr_text)
-            
-            # Proje bilgilerini çıkar
             project_info = self.extract_project_information(text, ocr_text)
-            
-            # Önerileri oluştur
             recommendations = self.generate_recommendations(analysis_results, scores, extracted_values)
             
-            # Rapor oluştur
             report = {
                 "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "file_info": {
@@ -971,7 +677,7 @@ class PneumaticCircuitAnalyzer:
             return "KÖTÜ"
 
 # ============================================================================
-# FLASK SERVER FUNCTIONS - Server.py'den alınan kodlar
+# HELPER FUNCTIONS
 # ============================================================================
 
 def check_tesseract_installation():
@@ -986,30 +692,23 @@ def check_tesseract_installation():
 
 tesseract_available, tesseract_info = check_tesseract_installation()
 
-def validate_document_server(text):
-    """Server kodunda doküman validasyonu - Pnömatik Devre Şeması için"""
+def validate_document_server(text, validation_keywords):
+    """Server kodunda doküman validasyonu - DB'den"""
     
-    # Pnömatik devre şemalarında MUTLAKA olması gereken kritik kelimeler
-    critical_terms = [
-        # Pnömatik temel terimleri
-        ["pnömatik", "pnomatik", "pneumatic", "hava", "air", "basınçlı hava", "compressed air"],
-        
-        # Pnömatik bileşenleri ve semboller
-        ["silindir", "cylinder", "valf", "valve", "vana", "frl", "lubricator", "regulator", "filter"],
-        
-        # Pnömatik basınç ve akış terimleri
-        ["basınç", "pressure", "psi", "bar", "debi", "flow", "cfm", "l/min"],
-        
-        # Pnömatik kontrol elemanları
-        ["kontrol", "control", "yön kontrol", "directional control", "hız kontrol", "speed control"],
-        
-        # ISO standartları ve teknik terimler
-        ["iso 5599", "5599", "iso 1219", "sembol", "symbol", "bağlantı", "connection", "port"]
-    ]
+    # DB'den critical_terms al
+    critical_terms_data = validation_keywords.get('critical_terms', {})
     
-    # Her kategori için kontrol
+    # Liste formatına dönüştür
+    critical_terms = []
+    for key, value in critical_terms_data.items():
+        if key.startswith('category_') and isinstance(value, list):
+            critical_terms.append(value)
+    
+    if not critical_terms:
+        logger.warning("⚠️ Critical terms bulunamadı, validasyon atlanıyor")
+        return True
+    
     category_found = []
-    
     for i, category in enumerate(critical_terms):
         found_in_category = False
         for term in category:
@@ -1019,29 +718,20 @@ def validate_document_server(text):
                 break
         category_found.append(found_in_category)
     
-    # Tüm kategorilerden en az bir terim bulunmalı
     valid_categories = sum(category_found)
+    logger.info(f"Doküman validasyonu: {valid_categories}/{len(critical_terms)} kritik kategori bulundu")
     
-    logger.info(f"Doküman validasyonu: {valid_categories}/5 kritik kategori bulundu")
-    
-    # 5 kategorinin en az 4'ünde terim bulunmalı
-    return valid_categories >= 4
+    return valid_categories >= len(critical_terms) - 1
 
-def check_strong_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada özgü kelimeleri OCR ile ara - Pnömatik Devre Şeması için"""
-    strong_keywords = [
-        "pnömatik",
-        "pnomatik", 
-        "pneumatic",
-        "lubricator",
-        "inflate",
-        "psi",
-        "bar",
-        "regis",
-        "r102",
-        "regulator",
-        "dump valve"
-    ]
+def check_strong_keywords_first_pages(filepath, validation_keywords):
+    """İlk 1-2 sayfada özgü kelimeleri OCR ile ara - DB'den"""
+    
+    # DB'den strong keywords al
+    strong_keywords = validation_keywords.get('strong_keywords', [])
+    
+    if not strong_keywords:
+        logger.warning("⚠️ Strong keywords bulunamadı, validasyon atlanıyor")
+        return True
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=400, first_page=1, last_page=1)
@@ -1067,57 +757,15 @@ def check_strong_keywords_first_pages(filepath):
         logger.warning(f"İlk sayfa kontrol hatası: {e}")
         return False
 
-def check_excluded_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara"""
-    excluded_keywords = [
-        # Aydınlatma raporu
-        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
-        
-        # Hidrolik devre şeması (eski strong_keywords hidrolikten)
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
-        
-        # HRC raporu
-        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        
-        # Elektrik devre şeması
-        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
-        
-        # Espe raporu  
-        "espe",
-        
-        # Gürültü ölçüm raporu
-        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        
-        # Manuel/kullanma kılavuzu
-        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
-        
-        # LOTO raporu
-        "loto",
-        
-        # LVD raporu
-        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        
-        # AT tip muayene
-        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
-        
-        # İSG periyodik kontrol
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        
-        # Montaj talimatları
-        "montaj", "assembly",
-        
-        # EN 60204-1 topraklama raporu
-        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
-        
-        # Bakım talimatları
-        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
-        
-        # Mekanik titreşim raporu
-        "titreşim", "vibration","TİTREŞİM",
-        
-        # AT tip inceleme sertifikası
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate"
-    ]
+def check_excluded_keywords_first_pages(filepath, validation_keywords):
+    """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara - DB'den"""
+    
+    # DB'den excluded keywords al
+    excluded_keywords = validation_keywords.get('excluded_keywords', [])
+    
+    if not excluded_keywords:
+        logger.warning("⚠️ Excluded keywords bulunamadı, validasyon atlanıyor")
+        return False
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=200, first_page=1, last_page=1)
@@ -1131,7 +779,6 @@ def check_excluded_keywords_first_pages(filepath):
             text = pytesseract.image_to_string(processed, config='--oem 3 --psm 3 -l tur+eng', timeout=15)
             all_text += text.lower() + " "
         
-        # OCR text'ini logla
         logger.info(f"OCR okunan text: {all_text[:500]}...")
         
         found_excluded = []
@@ -1164,7 +811,6 @@ def get_main_issues_pneumatic(analysis_result):
             if isinstance(score_data, dict) and score_data.get('percentage', 0) < 50:
                 issues.append(f"{category} kategorisinde ciddi eksiklikler")
     
-    # Eğer hiç kritik sorun yoksa genel sorunları ekle
     if not issues:
         if analysis_result['summary']['total_score'] < 50:
             issues = [
@@ -1178,24 +824,26 @@ def get_main_issues_pneumatic(analysis_result):
     return issues[:4]
 
 # ============================================================================
-# FLASK APP - Azure App Service için
+# FLASK APP
 # ============================================================================
 
 app = Flask(__name__)
 
-# Azure için port yapılandırması
+# Database configuration (YENİ)
+app.config['SQLALCHEMY_DATABASE_URI'] = Config.SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = Config.SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['SQLALCHEMY_ECHO'] = Config.SQLALCHEMY_ECHO
+
 PORT = int(os.environ.get('PORT', 8010))
 
-# Configure upload settings
 UPLOAD_FOLDER = 'temp_uploads_pnomatic'
 ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
 
-# Create upload folder if it doesn't exist
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -1230,21 +878,19 @@ def analyze_pnomatic_control():
             file.save(filepath)
             logger.info(f"Pnömatik Devre Şeması kontrol ediliyor: {filename}")
 
-            # Create analyzer instance
-            analyzer = PneumaticCircuitAnalyzer()
+            # Create analyzer instance with app context
+            analyzer = PneumaticCircuitAnalyzer(app=app)
             
-            # ÜÇ AŞAMALI PNÖMATİK KONTROLÜ
             logger.info(f"Üç aşamalı pnömatik kontrolü başlatılıyor: {filename}")
             file_ext = os.path.splitext(filepath)[1].lower()
 
             if file_ext == '.pdf':
-                # PDF için üç aşamalı kontrol (OCR dahil)
                 logger.info("Aşama 1: İlk sayfa pnömatik özgü kelime kontrolü...")
-                if check_strong_keywords_first_pages(filepath):
+                if check_strong_keywords_first_pages(filepath, analyzer.validation_keywords):
                     logger.info("✅ Aşama 1 geçti - Pnömatik özgü kelimeler bulundu")
                 else:
                     logger.info("Aşama 2: İlk sayfa excluded kelime kontrolü...")
-                    if check_excluded_keywords_first_pages(filepath):
+                    if check_excluded_keywords_first_pages(filepath, analyzer.validation_keywords):
                         logger.info("❌ Aşama 2'de excluded kelimeler bulundu - Pnömatik değil")
                         try:
                             os.remove(filepath)
@@ -1260,7 +906,6 @@ def analyze_pnomatic_control():
                             }
                         }), 400
                     else:
-                        # AŞAMA 3: PyPDF2 ile tam doküman kontrolü
                         logger.info("Aşama 3: Tam doküman critical terms kontrolü...")
                         try:
                             with open(filepath, 'rb') as pdf_file:
@@ -1279,7 +924,7 @@ def analyze_pnomatic_control():
                                     'message': 'Dosyadan yeterli metin çıkarılamadı'
                                 }), 400
                             
-                            if not validate_document_server(text):
+                            if not validate_document_server(text, analyzer.validation_keywords):
                                 try:
                                     os.remove(filepath)
                                 except:
@@ -1306,10 +951,8 @@ def analyze_pnomatic_control():
                             }), 500
 
             elif file_ext in ['.jpg', '.jpeg', '.png']:
-                # Image files - check if OCR is available
                 requires_ocr = True
                 if requires_ocr and not tesseract_available:
-                    # Clean up file first
                     try:
                         os.remove(filepath)
                     except:
@@ -1321,28 +964,19 @@ def analyze_pnomatic_control():
                         'details': {
                             'tesseract_error': tesseract_info,
                             'file_type': file_ext,
-                            'requires_ocr': True,
-                            'installation_help': {
-                                'windows': 'https://github.com/UB-Mannheim/tesseract/wiki adresinden Tesseract indirip kurun',
-                                'macos': 'brew install tesseract komutunu çalıştırın',
-                                'ubuntu': 'sudo apt-get install tesseract-ocr tesseract-ocr-tur komutunu çalıştırın',
-                                'centos': 'sudo yum install tesseract tesseract-langpack-tur komutunu çalıştırın'
-                            }
+                            'requires_ocr': True
                         }
                     }), 500
 
-            # Buraya kadar geldiyse pnömatik devre şeması, şimdi analizi yap
             logger.info(f"Pnömatik devre şeması doğrulandı, analiz başlatılıyor: {filename}")
             analysis_result = analyzer.analyze_file(filepath)
             
-            # Clean up the uploaded file
             try:
                 os.remove(filepath)
                 logger.info(f"Uploaded file {filename} cleaned up")
             except Exception as e:
                 logger.warning(f"Could not remove uploaded file {filename}: {e}")
 
-            # Check if analysis was successful
             if 'error' in analysis_result:
                 return jsonify({
                     'error': 'Analysis failed',
@@ -1353,7 +987,6 @@ def analyze_pnomatic_control():
                     }
                 }), 400
 
-            # Extract key results for API response - PNÖMATİK FORMATINDA
             overall_percentage = analysis_result['summary']['percentage']
             status = "PASS" if overall_percentage >= 70 else "FAIL"
             
@@ -1397,7 +1030,6 @@ def analyze_pnomatic_control():
                 }
             }
             
-            # Add category scores - PNÖMATİK FORMATINDA
             if 'scoring' in analysis_result and 'category_scores' in analysis_result['scoring']:
                 for category, score_data in analysis_result['scoring']['category_scores'].items():
                     if isinstance(score_data, dict):
@@ -1418,7 +1050,6 @@ def analyze_pnomatic_control():
             })
 
         except Exception as analysis_error:
-            # Clean up file on error
             try:
                 if 'filepath' in locals():
                     os.remove(filepath)
@@ -1444,7 +1075,7 @@ def analyze_pnomatic_control():
 
 @app.route('/api/pnomatic-health', methods=['GET'])
 def health_check():
-    """Health check endpoint - Pnömatik için"""
+    """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
         'service': 'Pneumatic Circuit Diagram Analyzer API',
@@ -1458,41 +1089,25 @@ def health_check():
         'report_type': 'PNOMATIK_DEVRE_SEMASI'
     })
 
-@app.route('/api/pnomatic-validate', methods=['GET'])
-def validate_file():
-    """Dosya doğrulama endpoint'i"""
-    filename = request.args.get('filename', '')
-    
-    if not filename:
-        return jsonify({
-            'valid': False,
-            'message': 'Dosya adı belirtilmedi'
-        }), 400
-    
-    # Check file extension
-    is_valid = allowed_file(filename)
-    file_extension = os.path.splitext(filename)[1].lower()
-    requires_ocr = file_extension in ['.jpg', '.jpeg', '.png']
-    
-    response = {
-        'valid': is_valid,
-        'filename': filename,
-        'file_extension': file_extension,
-        'requires_ocr': requires_ocr,
-        'tesseract_available': tesseract_available
-    }
-    
-    if not is_valid:
-        response['message'] = f'Desteklenmeyen dosya türü: {file_extension}'
-        response['supported_formats'] = list(ALLOWED_EXTENSIONS)
-    elif requires_ocr and not tesseract_available:
-        response['valid'] = False
-        response['message'] = 'OCR gerekli ama Tesseract kurulu değil'
-        response['tesseract_error'] = tesseract_info
-    else:
-        response['message'] = 'Dosya geçerli ve analiz edilebilir'
-    
-    return jsonify(response)
+@app.route('/', methods=['GET'])
+def index():
+    """API bilgileri"""
+    return jsonify({
+        'service': 'Pneumatic Circuit Diagram Analyzer API',
+        'version': '1.0.0',
+        'description': 'Pnömatik Devre Şemalarını analiz eden REST API servisi',
+        'endpoints': {
+            'POST /api/pnomatic-control': 'Pnömatik devre şeması analizi',
+            'GET /api/pnomatic-health': 'Health check',
+            'GET /': 'API info'
+        },
+        'usage': {
+            'upload_format': 'multipart/form-data',
+            'file_field': 'file',
+            'supported_types': list(ALLOWED_EXTENSIONS),
+            'max_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
+        }
+    })
 
 @app.errorhandler(413)
 def too_large(e):
@@ -1515,16 +1130,34 @@ def internal_error(e):
         'message': 'Sunucu hatası oluştu'
     }), 500
 
+# ============================================
+# DATABASE INITIALIZATION
+# ============================================
+with app.app_context():
+    db.init_app(app)
+
+# ============================================
+# APPLICATION ENTRY POINT
+# ============================================
 if __name__ == '__main__':
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     
-    logger.info("Pnömatik Devre Şeması Analiz API başlatılıyor...")
-    logger.info(f"Upload klasörü: {UPLOAD_FOLDER}")
-    logger.info(f"Tesseract OCR durumu: {'Kurulu' if tesseract_available else 'Kurulu değil'}")
-    logger.info(f"Port: {PORT}")
-    logger.info("API endpoint'leri:")
+    logger.info("=" * 60)
+    logger.info("Pnömatik Devre Şeması Analiz API")
+    logger.info("=" * 60)
+    logger.info(f"📁 Upload klasörü: {UPLOAD_FOLDER}")
+    logger.info(f"📊 Desteklenen formatlar: {', '.join(ALLOWED_EXTENSIONS)}")
+    logger.info(f"📏 Maksimum dosya boyutu: {app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB")
+    logger.info(f"🔧 Tesseract OCR: {'Kurulu' if tesseract_available else 'Kurulu değil'}")
+    logger.info("")
+    logger.info("🔗 API Endpoints:")
     logger.info("  POST /api/pnomatic-control - Pnömatik devre şeması analizi")
-    logger.info("  GET  /api/pnomatic-health  - Sağlık kontrolü")
-    logger.info("  GET  /api/pnomatic-validate - Dosya doğrulama")
+    logger.info("  GET  /api/pnomatic-health  - Health check")
+    logger.info("  GET  /                     - API info")
+    logger.info("=" * 60)
     
-    app.run(host='0.0.0.0', port=PORT, debug=False)
+    port = int(os.environ.get('PORT', 8010))
+    logger.info(f"🚀 Servis başlatılıyor - Port: {port}")
+    logger.info("=" * 60)
+    
+    app.run(host='0.0.0.0', port=port, debug=False)

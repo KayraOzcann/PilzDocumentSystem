@@ -4,6 +4,8 @@
 Manual Report Checker (Kullanım Kılavuzu Analiz Sistemi)
 Created for analyzing operating manuals from various companies
 Supports both Turkish and English with OCR capabilities
+Azure App Service için optimize edilmiş standalone servis
+Database-driven configuration ile dinamik pattern yönetimi
 """
 
 import re
@@ -18,8 +20,19 @@ from pdf2image import convert_from_path
 import cv2
 import numpy as np
 from PIL import Image
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, current_app
 from werkzeug.utils import secure_filename
+
+# ============================================
+# DATABASE IMPORTS (YENİ)
+# ============================================
+from database import db, init_db
+from db_loader import load_service_config
+
+# ============================================
+# CONFIG IMPORT (YENİ)
+# ============================================
+from config import Config
 
 try:
     from langdetect import detect
@@ -29,12 +42,6 @@ except ImportError:
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-"""# Azure için Tesseract path'leri (Azure'da otomatik bulunur)
-try:
-    pytesseract.pytesseract.tesseract_cmd = os.environ.get('TESSERACT_CMD', 'tesseract')
-except:
-    pass"""
 
 @dataclass
 class ManualAnalysisResult:
@@ -49,66 +56,40 @@ class ManualAnalysisResult:
 class ManualReportAnalyzer:
     """Kullanma Kılavuzu rapor analiz sınıfı"""
     
-    def __init__(self):
+    def __init__(self, app=None):
         logger.info("Kullanma Kılavuzu analiz sistemi başlatılıyor...")
         
-        self.criteria_weights = {
-            "Genel Bilgiler": 10,
-            "Giriş ve Amaç": 5,
-            "Güvenlik Bilgileri": 15,
-            "Ürün Tanıtımı": 10,
-            "Kurulum ve Montaj Bilgileri": 15,
-            "Kullanım Talimatları": 20,
-            "Bakım ve Temizlik": 10,
-            "Arıza Giderme": 15
-        }
-        
-        self.criteria_details = {
-            "Genel Bilgiler": {
-                "kilavuz_adi_kod": {"pattern": r"(?:Kılavuz|Manual|Guide|Kullan[ıi]m\s*K[ıi]lavuzu|User\s*Manual|Operating\s*Manual)", "weight": 5},
-                "urun_modeli": {"pattern": r"(?:Ürün|Product|Model|Seri\s*No|Serial\s*Number|Part\s*Number)", "weight": 3},
-                "revizyon_bilgisi": {"pattern": r"(?:Revizyon|Revision|Rev\.?|Version|v)\s*[:=]?\s*(\d+|[A-Z])", "weight": 2}
-            },
-            "Giriş ve Amaç": {
-                "kilavuz_amaci": {"pattern": r"(?:Amaç|Purpose|Objective|Bu\s*k[ıi]lavuz|This\s*manual|Introduction|Giriş)", "weight": 3},
-                "kapsam": {"pattern": r"(?:Kapsam|Scope|Coverage|Bu\s*dokuman|This\s*document)", "weight": 2}
-            },
-            "Güvenlik Bilgileri": {
-                "genel_guvenlik": {"pattern": r"(?:Güvenlik|Safety|Güvenlik\s*Uyar[ıi]s[ıi]|Safety\s*Warning|UYARI|WARNING|DİKKAT|CAUTION)", "weight": 4},
-                "tehlikeler": {"pattern": r"(?:Tehlike|Hazard|Risk|Tehlikeli|Dangerous|Yaralanma|Injury)", "weight": 4},
-                "guvenlik_prosedur": {"pattern": r"(?:Prosedür|Procedure|Güvenlik\s*Prosedür|Safety\s*Procedure|Uyulmas[ıi]\s*gereken)", "weight": 3},
-                "kkd_gerekliligi": {"pattern": r"(?:KKD|PPE|Personal\s*Protective|Koruyucu\s*Donanım|Protective\s*Equipment|Eldiven|Glove|Gözlük|Goggle|Koruyucu\s*Alet)", "weight": 4}
-            },
-            "Ürün Tanıtımı": {
-                "urun_tanimi": {"pattern": r"(?:Ürün\s*Tan[ıi]m[ıi]|Product\s*Description|Genel\s*Tan[ıi]m|General\s*Description)", "weight": 3},
-                "teknik_ozellikler": {"pattern": r"(?:Teknik\s*Özellik|Technical\s*Specification|Specification|Özellik|Feature)", "weight": 3},
-                "bilesenler": {"pattern": r"(?:Bileşen|Component|Parça|Part|Liste|List|İçerik|Content)", "weight": 2},
-                "gorseller": {"pattern": r"(?:Görsel|Image|Resim|Picture|Şekil|Figure|Fotoğraf|Photo)", "weight": 2}
-            },
-            "Kurulum ve Montaj Bilgileri": {
-                "kurulum_oncesi": {"pattern": r"(?:Kurulum\s*Öncesi|Before\s*Installation|Hazırl[ıi]k|Preparation|Ön\s*hazırl[ıi]k)", "weight": 4},
-                "montaj_talimatlari": {"pattern": r"(?:Montaj|Installation|Assembly|Ad[ıi]m|Step|Talimat|Instruction)", "weight": 4},
-                "gerekli_aletler": {"pattern": r"(?:Alet|Tool|Malzeme|Material|Gerekli|Required|Equipment)", "weight": 3},
-                "kurulum_kontrolu": {"pattern": r"(?:Kontrol|Check|Test|Doğrula|Verify|Kurulum\s*Sonras[ıi]|After\s*Installation)", "weight": 4}
-            },
-            "Kullanım Talimatları": {
-                "calistirma": {"pattern": r"(?:Çal[ıi]şt[ıi]rma|Start|Operation|Açma|Turn\s*On|Power\s*On)", "weight": 5},
-                "kullanim_kilavuzu": {"pattern": r"(?:Kullan[ıi]m|Usage|Use|Operating|Ad[ıi]m\s*ad[ıi]m|Step\s*by\s*step)", "weight": 5},
-                "calisma_modlari": {"pattern": r"(?:Mod|Mode|Ayar|Setting|Çal[ıi]şma\s*Mod|Operating\s*Mode)", "weight": 5},
-                "kullanim_ipuclari": {"pattern": r"(?:İpucu|Tip|Öneri|Recommendation|Doğru\s*kullan[ıi]m|Proper\s*use)", "weight": 5}
-            },
-            "Bakım ve Temizlik": {
-                "duzenli_bakim": {"pattern": r"(?:Bak[ıi]m|Maintenance|Düzenli|Regular|Periyodik|Periodic)", "weight": 3},
-                "temizlik_yontemleri": {"pattern": r"(?:Temizlik|Cleaning|Temizle|Clean|Hijyen|Hygiene)", "weight": 3},
-                "parca_degisimi": {"pattern": r"(?:Parça\s*Değiş|Part\s*Replace|Yedek\s*Parça|Spare\s*Part|Değiştir|Replace)", "weight": 4}
-            },
-            "Arıza Giderme": {
-                "sorun_cozumleri": {"pattern": r"(?:Sorun|Problem|Ar[ıi]za|Fault|Troubleshoot|Çözüm|Solution)", "weight": 5},
-                "hata_kodlari": {"pattern": r"(?:Hata\s*Kod|Error\s*Code|Kod|Code|Alarm|Uyar[ıi]\s*Lambas[ıi]|Warning\s*Light)", "weight": 5},
-                "teknik_destek": {"pattern": r"(?:Teknik\s*Destek|Technical\s*Support|Destek|Support|İletişim|Contact|Tel|Phone|E-?mail)", "weight": 3},
-                "teknik_cizimler": {"pattern": r"(?:Çizim|Drawing|Şema|Scheme|Diyagram|Diagram|Plan)", "weight": 2}
-            }
-        }
+        # Flask app context varsa DB'den yükle, yoksa boş başlat
+        if app:
+            with app.app_context():
+                try:
+                    config = load_service_config('assembly_instructions')
+                    
+                    # DB'den yüklenen veriler
+                    self.criteria_weights = config.get('criteria_weights', {})
+                    self.criteria_details = config.get('criteria_details', {})
+                    self.pattern_definitions = config.get('pattern_definitions', {})
+                    self.validation_keywords = config.get('validation_keywords', {})
+                    self.category_actions = config.get('category_actions', {})
+                    
+                    logger.info(f"✅ Veritabanından yüklendi: {len(self.criteria_weights)} kategori")
+                    
+                except Exception as e:
+                    logger.error(f"⚠️ Veritabanından yükleme başarısız: {e}")
+                    logger.warning("⚠️ Fallback: Boş config kullanılıyor")
+                    self.criteria_weights = {}
+                    self.criteria_details = {}
+                    self.pattern_definitions = {}
+                    self.validation_keywords = {}
+                    self.category_actions = {}
+        else:
+            # Flask app yoksa boş başlat
+            logger.warning("⚠️ Flask app context yok, boş config kullanılıyor")
+            self.criteria_weights = {}
+            self.criteria_details = {}
+            self.pattern_definitions = {}
+            self.validation_keywords = {}
+            self.category_actions = {}
     
     def detect_language(self, text: str) -> str:
         """Metin dilini tespit et"""
@@ -258,7 +239,7 @@ class ManualReportAnalyzer:
         }
     
     def extract_specific_values(self, text: str) -> Dict[str, Any]:
-        """Özel değerleri çıkar"""
+        """Özel değerleri çıkar - DB'den pattern'ler ile"""
         values = {
             "manual_name": "Bulunamadı",
             "product_model": "Bulunamadı",
@@ -268,12 +249,11 @@ class ManualReportAnalyzer:
             "safety_warnings_count": 0
         }
         
-        # Manual name extraction
-        manual_patterns = [
-            r"(?:Kullan[ıi]m\s*K[ıi]lavuzu|User\s*Manual|Operating\s*Manual|Manual)",
-            r"(?:Guide|K[ıi]lavuz|Handbook)"
-        ]
+        # DB'den extract_values pattern'lerini al
+        extract_values = self.pattern_definitions.get('extract_values', {})
         
+        # Manual name extraction
+        manual_patterns = extract_values.get('manual_namei', [])
         for pattern in manual_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
@@ -281,22 +261,18 @@ class ManualReportAnalyzer:
                 break
         
         # Product model
-        model_patterns = [
-            r"(?:Model|Product|Ürün)\s*(?:No|Number)?\s*[:\-]?\s*([A-Z0-9\-\.]{3,20})",
-            r"(?:Type|Tip|Model)\s*[:\-]?\s*([A-Z0-9\-\.]{3,20})"
-        ]
-        
+        model_patterns = extract_values.get('product_model', [])
         for pattern in model_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                values["product_model"] = match.group(1).strip()
+                if match.groups():
+                    values["product_model"] = match.group(1).strip()
+                else:
+                    values["product_model"] = match.group(0).strip()
                 break
         
         # Safety warnings count
-        safety_patterns = [
-            r"(?:UYARI|WARNING|DİKKAT|CAUTION|Güvenlik)",
-        ]
-        
+        safety_patterns = extract_values.get('safety_warnings_count', [])
         safety_count = 0
         for pattern in safety_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
@@ -398,7 +374,7 @@ class ManualReportAnalyzer:
             }
 
 # ============================================================================
-# FLASK SERVER FUNCTIONS - Server.py'den alınan kodlar
+# HELPER FUNCTIONS
 # ============================================================================
 
 def check_tesseract_installation():
@@ -413,23 +389,21 @@ def check_tesseract_installation():
 
 tesseract_available, tesseract_info = check_tesseract_installation()
 
-def validate_document_server(text):
-    """Server kodunda doküman validasyonu - Montaj Talimatları için"""
+def validate_document_server(text, validation_keywords):
+    """Server kodunda doküman validasyonu - Montaj Talimatları için - DB'den"""
     
-    # Montaj talimatlarında MUTLAKA olması gereken kritik kelimeler
-    critical_terms = [
-        # Montaj temel terimleri (en az 1 tane olmalı)
-        ["montaj", "assembly", "kurulum", "installation", "talimat", "instruction", "kılavuz", "manual"],
-        
-        # Adımlar/Prosedür terimleri (en az 1 tane olmalı)  
-        ["adım", "step", "prosedür", "procedure", "sıralama", "sequence", "önce", "before", "sonra", "after"],
-        
-        # Araçlar/Malzemeler terimleri (mutlaka olmalı)
-        ["araç", "tool", "malzeme", "material", "gerekli", "required", "parça", "part", "bileşen", "component"],
-        
-        # Güvenlik/Uyarı terimleri (en az 1 tane olmalı)
-        ["güvenlik", "safety", "uyarı", "warning", "dikkat", "caution", "tehlike", "danger", "önlem", "precaution"]
-    ]
+    # DB'den critical_terms al
+    critical_terms_data = validation_keywords.get('critical_terms', {})
+    
+    # Liste formatına dönüştür
+    critical_terms = []
+    for key, value in critical_terms_data.items():
+        if key.startswith('category_') and isinstance(value, list):
+            critical_terms.append(value)
+    
+    if not critical_terms:
+        logger.warning("⚠️ Critical terms bulunamadı, validasyon atlanıyor")
+        return True
     
     # Her kategori için kontrol
     category_found = []
@@ -446,26 +420,20 @@ def validate_document_server(text):
     # Tüm kategorilerden en az bir terim bulunmalı
     valid_categories = sum(category_found)
     
-    logger.info(f"Doküman validasyonu: {valid_categories}/4 kritik kategori bulundu")
+    logger.info(f"Doküman validasyonu: {valid_categories}/{len(critical_terms)} kritik kategori bulundu")
     
-    # 4 kategorinin tamamında terim bulunmalı (daha sıkı kontrol)
-    return valid_categories >= 4
+    # Tüm kategorilerde terim bulunmalı (n-1 kuralı yerine hepsi)
+    return valid_categories >= len(critical_terms)
 
-def check_strong_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada özgü kelimeleri OCR ile ara - Montaj Talimatları için"""
-    strong_keywords = [
-        "montaj",
-        "assembly",
-        "kurulum",
-        "installation",
-        "talimat",
-        "instruction",
-        "kılavuz",
-        "manual",
-        "kılavuzu",
-        "kılavuzun",
-        "kullanma",
-    ]
+def check_strong_keywords_first_pages(filepath, validation_keywords):
+    """İlk 1-2 sayfada özgü kelimeleri OCR ile ara - Montaj Talimatları için - DB'den"""
+    
+    # DB'den strong keywords al
+    strong_keywords = validation_keywords.get('strong_keywords', [])
+    
+    if not strong_keywords:
+        logger.warning("⚠️ Strong keywords bulunamadı, validasyon atlanıyor")
+        return True
     
     try:
         pages = convert_from_path(filepath, dpi=200, first_page=1, last_page=1)
@@ -491,54 +459,15 @@ def check_strong_keywords_first_pages(filepath):
         logger.warning(f"İlk sayfa kontrol hatası: {e}")
         return False
 
-def check_excluded_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara"""
-    excluded_keywords = [
-        # HRC raporu
-        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        
-        # Elektrik devre şeması
-        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
-        
-        # Espe raporu  
-        "espe",
-        
-        # Hidrolik devre şeması
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
-        
-        # Gürültü ölçüm raporu
-        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        
-        # LOTO raporu
-        "loto",
-        
-        # LVD raporu
-        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        
-        # AT tip muayene (AT uygunluk beyanı)
-        "uygunluk", "beyan", "muayene", "conformity", "declaration",
-        
-        # İSG periyodik kontrol
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        
-        # Pnömatik devre şeması
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
-        
-        # EN 60204-1 topraklama raporu
-        "topraklama direnci", "grounding", "earthing", "60204", "topraklama","TOPRAKLAMA DİRENCİ",
-        
-        # Bakım talimatları
-        "bakım", "maintenance", "servis", "service", "bakim", "MAINTENCE",
-        
-        # Mekanik titreşim raporu
-        "titreşim", "vibration", "mekanik",
-        
-        # AT tip inceleme sertifikası
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
-
-        # Aydınlatma
-        "aydınlatma", "lighting",  "illumination",  "lux",  "lümen",  "lumen",  "ts en 12464",  "en 12464", "ışık",  "ışık şiddeti"
-    ]
+def check_excluded_keywords_first_pages(filepath, validation_keywords):
+    """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara - DB'den"""
+    
+    # DB'den excluded keywords al
+    excluded_keywords = validation_keywords.get('excluded_keywords', [])
+    
+    if not excluded_keywords:
+        logger.warning("⚠️ Excluded keywords bulunamadı, validasyon atlanıyor")
+        return False
     
     try:
         pages = convert_from_path(filepath, dpi=200, first_page=1, last_page=2)
@@ -602,8 +531,10 @@ def get_main_issues(analysis_result):
 
 app = Flask(__name__)
 
-# Azure için port yapılandırması
-PORT = int(os.environ.get('PORT', 8012))
+# Database configuration (YENİ)
+app.config['SQLALCHEMY_DATABASE_URI'] = Config.SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = Config.SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['SQLALCHEMY_ECHO'] = Config.SQLALCHEMY_ECHO
 
 # Configure upload settings
 UPLOAD_FOLDER = 'temp_uploads_montaj'
@@ -649,8 +580,8 @@ def analyze_manual():
             file.save(filepath)
             logger.info(f"Montaj Talimatları kontrol ediliyor: {filename}")
 
-            # Create analyzer instance
-            analyzer = ManualReportAnalyzer()
+            # Create analyzer instance with app context
+            analyzer = ManualReportAnalyzer(app=app)
             
             # ÜÇ AŞAMALI MONTAJ KONTROLÜ
             logger.info(f"Üç aşamalı montaj kontrolü başlatılıyor: {filename}")
@@ -660,11 +591,11 @@ def analyze_manual():
             if file_ext == '.pdf':
                 # PDF için üç aşamalı kontrol (OCR dahil)
                 logger.info("Aşama 1: İlk sayfa montaj özgü kelime kontrolü...")
-                if check_strong_keywords_first_pages(filepath):
+                if check_strong_keywords_first_pages(filepath, analyzer.validation_keywords):
                     logger.info("✅ Aşama 1 geçti - Montaj özgü kelimeler bulundu")
                 else:
                     logger.info("Aşama 2: İlk sayfa excluded kelime kontrolü...")
-                    if check_excluded_keywords_first_pages(filepath):
+                    if check_excluded_keywords_first_pages(filepath, analyzer.validation_keywords):
                         logger.info("❌ Aşama 2'de excluded kelimeler bulundu - Montaj değil")
                         try:
                             os.remove(filepath)
@@ -699,7 +630,7 @@ def analyze_manual():
                                     'message': 'Dosyadan yeterli metin çıkarılamadı'
                                 }), 400
                             
-                            if not validate_document_server(text):
+                            if not validate_document_server(text, analyzer.validation_keywords):
                                 try:
                                     os.remove(filepath)
                                 except:
@@ -821,7 +752,6 @@ def analyze_manual():
                 'message': 'Montaj Talimatları başarıyla analiz edildi',
                 'analysis_service': 'montaj_talimatları',
                 'service_description': 'Montaj Talimatları Analizi',
-                'service_port': PORT,
                 'data': response_data
             })
 
@@ -870,7 +800,7 @@ def health_check():
 def test_analysis():
     """Test endpoint for debugging - Montaj için"""
     try:
-        analyzer = ManualReportAnalyzer()
+        analyzer = ManualReportAnalyzer(app=app)
         test_info = {
             'analyzer_initialized': True,
             'available_methods': [method for method in dir(analyzer) if not method.startswith('_')],
@@ -895,7 +825,7 @@ def test_analysis():
 def get_categories():
     """Montaj analiz kategorilerini döndür"""
     try:
-        analyzer = ManualReportAnalyzer()
+        analyzer = ManualReportAnalyzer(app=app)
         return jsonify({
             'success': True,
             'data': {
@@ -913,6 +843,28 @@ def get_categories():
             'error': 'Failed to get categories',
             'message': str(e)
         }), 500
+
+@app.route('/', methods=['GET'])
+def index():
+    """API bilgileri"""
+    return jsonify({
+        'service': 'Montaj Talimatları Analyzer API',
+        'version': '1.0.0',
+        'description': 'Montaj Talimatlarını analiz eden REST API servisi',
+        'endpoints': {
+            'POST /api/assembly-instructions': 'Montaj talimatları analizi',
+            'GET /api/health': 'Servis sağlık kontrolü',
+            'GET /api/test-analysis': 'Test analizi',
+            'GET /api/categories': 'Analiz kategorileri',
+            'GET /': 'Bu bilgi sayfası'
+        },
+        'usage': {
+            'upload_format': 'multipart/form-data',
+            'file_field': 'file',
+            'supported_types': list(ALLOWED_EXTENSIONS),
+            'max_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
+        }
+    })
 
 @app.errorhandler(413)
 def too_large(e):
@@ -935,17 +887,37 @@ def internal_error(e):
         'message': 'Sunucu hatası oluştu'
     }), 500
 
+# ============================================
+# DATABASE INITIALIZATION
+# ============================================
+with app.app_context():
+    db.init_app(app)
+
+# ============================================
+# APPLICATION ENTRY POINT (Azure-Friendly)
+# ============================================
 if __name__ == '__main__':
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     
-    logger.info("Montaj Talimatları Analyzer API başlatılıyor...")
-    logger.info(f"Upload klasörü: {UPLOAD_FOLDER}")
-    logger.info(f"Tesseract OCR durumu: {'Kurulu' if tesseract_available else 'Kurulu değil'}")
-    logger.info(f"Port: {PORT}")
-    logger.info("API endpoint'leri:")
+    logger.info("=" * 60)
+    logger.info("Montaj Talimatları Analyzer API")
+    logger.info("=" * 60)
+    logger.info(f"📁 Upload klasörü: {UPLOAD_FOLDER}")
+    logger.info(f"📊 Desteklenen formatlar: {', '.join(ALLOWED_EXTENSIONS)}")
+    logger.info(f"📏 Maksimum dosya boyutu: {app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB")
+    logger.info(f"🔧 Tesseract OCR: {'Kurulu' if tesseract_available else 'Kurulu değil'}")
+    logger.info("")
+    logger.info("🔗 API Endpoints:")
     logger.info("  POST /api/assembly-instructions - Montaj talimatları analizi")
-    logger.info("  GET  /api/health             - Sağlık kontrolü")
-    logger.info("  GET  /api/test-analysis      - Test analizi")
-    logger.info("  GET  /api/categories         - Analiz kategorileri")
+    logger.info("  GET  /api/health                - Sağlık kontrolü")
+    logger.info("  GET  /api/test-analysis         - Test analizi")
+    logger.info("  GET  /api/categories            - Analiz kategorileri")
+    logger.info("  GET  /                          - API bilgileri")
+    logger.info("=" * 60)
     
-    app.run(host='0.0.0.0', port=PORT, debug=False)
+    port = int(os.environ.get('PORT', 8012))
+    
+    logger.info(f"🚀 Servis başlatılıyor - Port: {port}")
+    logger.info("=" * 60)
+    
+    app.run(host='0.0.0.0', port=port, debug=False)

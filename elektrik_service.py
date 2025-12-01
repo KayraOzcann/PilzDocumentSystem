@@ -1,6 +1,9 @@
 """
 Elektrik Devre Şeması Analiz Servisi
 ====================================
+Azure App Service için optimize edilmiş standalone servis
+Database-driven configuration ile dinamik pattern yönetimi
+
 Endpoint: POST /api/elektrik-report
 Health: GET /api/health
 """
@@ -23,8 +26,19 @@ import numpy as np
 import pdf2image
 import pytesseract
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, current_app
 from werkzeug.utils import secure_filename
+
+# ============================================
+# DATABASE IMPORTS (YENİ)
+# ============================================
+from database import db, init_db
+from db_loader import load_service_config
+
+# ============================================
+# CONFIG IMPORT (YENİ)
+# ============================================
+from config import Config
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -49,68 +63,45 @@ class CircuitAnalysisResult:
 
 class AdvancedElectricCircuitAnalyzer:
     
-    def __init__(self):
-        self.electric_criteria_weights = {
-            "Semboller ve İşaretler": 30,
-            "Bağlantı Hatları": 25,
-            "Etiketleme ve Numara Sistemleri": 20,
-            "Kontrol Panosu / Makine Otomasyon Öğeleri": 15,
-            "Şematik Yerleşim": 10
-        }
+    def __init__(self, app=None):
+        logger.info("Elektrik Devre Şeması Analiz Sistemi başlatılıyor...")
         
-        self.electric_criteria_details = {
-            "Semboller ve İşaretler": {
-                "direnc_sembol": {"pattern": r"(?i)(?:direnç|resistor|ohm|Ω|R\d+|[0-9]+[RKM][0-9]*|zigzag|potansiyometre|pot|trimmer|━+|─+)", "weight": 6},
-                "kondansator_sembol": {"pattern": r"(?i)(?:kondansatör|capacitor|C\d+|[0-9]+[µnpF]+|paralel\s*çizgi|elektrolitik|seramik|\|\||═+|◇.*?\|\||◇.*?═+|⬧.*?\|\||⬧.*?═+|⬥.*?\|\||⬥.*?═+|<>.*?\|\||<>.*?═+|[\u25C7\u25C8\u25C6].*?(?:\|\||═+))", "weight": 6},
-                "bobin_sembol": {"pattern": r"(?i)(?:bobin|inductor|L\d+|[0-9]+[mH]+|spiral|solenoid|trafo|transformatör|transformer|⤾|⟲|⥀)", "weight": 5},
-                "diyot_sembol": {"pattern": r"(?i)(?:diyot|diode|D\d+|LED|zener|köprü|bridge|rectifier|doğrultucu|▶|►|⊳)", "weight": 5},
-                "transistor_sembol": {"pattern": r"(?i)(?:transistör|transistor|Q\d+|NPN|PNP|FET|MOSFET|BJT|darlington|⊲|△)", "weight": 4},
-                "toprak_sembol": {"pattern": r"(?i)(?:toprak|ground|earth|GND|⏚|⊥|chassis|şasi|PE|↧|⌁)", "weight": 2},
-                "sigorta_sembol": {"pattern": r"(?i)(?:sigorta|fuse|F\d+|MCB|RCD|devre\s*kesici|circuit\s*breaker|termik|⚡|═+)", "weight": 2}
-            },
-            "Bağlantı Hatları": {
-                "iletken_baglanti": {"pattern": r"(?i)(?:kablo|wire|cable|hat|line|bağlantı|connection|conductor|iletken|NYA|NYM|H0[57]|━+|─+)", "weight": 8},
-                "kesisen_hatlar": {"pattern": r"(?i)(?:kesişen|crossing|köprü|bridge|junction|node|düğüm|bağlantı\s*noktası|●|⊏|⊐)", "weight": 6},
-                "baglanti_noktalari": {"pattern": r"(?i)(?:bağlantı\s*noktası|connection\s*point|terminal|node|klemens|terminal\s*block|X\d+|●|○|◯|⊙)", "weight": 6},
-                "elektriksel_yon": {"pattern": r"(?i)(?:yön|direction|ok|arrow|akış|flow|akım|current|→|←|↑|↓|⟶|⇾)", "weight": 5}
-            },
-            "Etiketleme ve Numara Sistemleri": {
-                "bilesenlerin_etiketlenmesi": {"pattern": r"(?i)(?:[RCL]\d+|[QDT]\d+|[MKF]\d+|[UIC]\d+|[+-]V(?:cc|dd|ss)|[+-]?\d+V|S[0-9]|K[0-9])", "weight": 6},
-                "elektriksel_degerler": {"pattern": r"(?i)(?:\d+(?:\.\d+)?.*?(?:[VvAaMmWwΩ]|volt|amp|watt|ohm|VA|kVA|mA|µA)|[~=]|\~|\∿)", "weight": 5},
-                "klemens_numaralari": {"pattern": r"(?i)(?:klemens|terminal|X\d+|TB\d+|[0-9]+\.[0-9]+|L[123N]|PE|[UVWN]\d*)", "weight": 5},
-                "kablo_etiketleri": {"pattern": r"(?i)(?:kablo|wire|H\d+|W\d+|[0-9]+[AWG]|NYA|NYM|H0[57]|[0-9xX]+mm²)", "weight": 4}
-            },
-            "Kontrol Panosu / Makine Otomasyon Öğeleri": {
-                "plc_giris_cikis": {"pattern": r"(?i)(?:PLC|I[0-9]+|Q[0-9]+|DI|DO|AI|AO|input|output|giriş|çıkış|[0-9]+[VI][0-9]+)", "weight": 4},
-                "kontaktor_rele": {"pattern": r"(?i)(?:kontaktör|contactor|röle|relay|K\d+|KM\d+|NO|NC|coil|bobin|⤾|⟲)", "weight": 4},
-                "motor_starter": {"pattern": r"(?i)(?:motor|starter|M\d+|drive|sürücü|inverter|softstarter|DOL|VFD|⊏⊐|▭M)", "weight": 3},
-                "buton_sensor": {"pattern": r"(?i)(?:buton|button|sensör|sensor|S\d+|B\d+|switch|anahtar|proximity|PNP|NPN|○|◯|⊙)", "weight": 2},
-                "ac_dc_guc": {"pattern": r"(?i)(?:AC|DC|güç|power|[0-9]+[VvAa]|~|⎓|[1-3]~|\+|-|N|PE|L[123]|\∿|=)", "weight": 2}
-            },
-            "Şematik Yerleşim": {
-                "bilgi_akisi": {"pattern": r"(?i)(?:giriş|input|çıkış|output|soldan|sağa|yukarı|aşağı|→|←|↑|↓|⟶|⇾)", "weight": 3},
-                "mantikli_dizilim": {"pattern": r"(?i)(?:işleme|process|dönüşüm|transformation|kontrol|control|güç|power|▭|⊏⊐)", "weight": 3},
-                "sayfa_basligi": {"pattern": r"(?i)(?:proje|project|tarih|date|çizim|drawing|revizyon|revision|ref|no)", "weight": 2},
-                "cerceve_frame": {"pattern": r"(?i)(?:çerçeve|frame|başlık|title|numara|number|sayfa|page|sheet|▭|□)", "weight": 2}
-            }
-        }
-        
-        self.component_templates = {
-            "electric": {
-                "resistor": ["R1", "R2", "R3", "RESISTOR", "DİRENÇ", "POT", "TRIMMER"],
-                "capacitor": ["C1", "C2", "C3", "CAPACITOR", "KONDANSATÖR", "ELKO"],
-                "inductor": ["L1", "L2", "L3", "INDUCTOR", "BOBİN", "TRAFO"],
-                "diode": ["D1", "D2", "D3", "DIODE", "DİYOT", "LED", "ZENER"],
-                "transistor": ["Q1", "Q2", "Q3", "TRANSISTOR", "TRANSİSTÖR", "FET", "MOSFET"],
-                "relay": ["K1", "K2", "K3", "RELAY", "RÖLE", "KONTAKTÖR"],
-                "motor": ["M1", "M2", "M3", "MOTOR", "STARTER", "SÜRÜCÜ"],
-                "fuse": ["F1", "F2", "F3", "FUSE", "SİGORTA", "MCB", "RCD"],
-                "switch": ["S1", "S2", "S3", "SWITCH", "ANAHTAR", "BUTON"],
-                "power": ["V1", "V2", "V3", "POWER", "GÜÇ", "AC", "DC"],
-                "ground": ["GND", "GROUND", "TOPRAK", "PE", "EARTH"],
-                "terminal": ["X1", "X2", "X3", "TERMINAL", "KLEMENS", "TB"]
-            }
-        }
+        # Flask app context varsa DB'den yükle, yoksa boş başlat
+        if app:
+            with app.app_context():
+                try:
+                    config = load_service_config('electric_circuit')
+                    
+                    # DB'den yüklenen veriler
+                    self.electric_criteria_weights = config.get('criteria_weights', {})
+                    self.electric_criteria_details = config.get('criteria_details', {})
+                    self.pattern_definitions = config.get('pattern_definitions', {})
+                    self.validation_keywords = config.get('validation_keywords', {})
+                    self.category_actions = config.get('category_actions', {})
+                    
+                    # component_templates pattern_definitions içinde
+                    self.component_templates = self.pattern_definitions.get('electric', {})
+                    
+                    logger.info(f"✅ Veritabanından yüklendi: {len(self.electric_criteria_weights)} kategori")
+                    
+                except Exception as e:
+                    logger.error(f"⚠️ Veritabanından yükleme başarısız: {e}")
+                    logger.warning("⚠️ Fallback: Boş config kullanılıyor")
+                    self.electric_criteria_weights = {}
+                    self.electric_criteria_details = {}
+                    self.pattern_definitions = {}
+                    self.validation_keywords = {}
+                    self.category_actions = {}
+                    self.component_templates = {}
+        else:
+            # Flask app yoksa boş başlat
+            logger.warning("⚠️ Flask app context yok, boş config kullanılıyor")
+            self.electric_criteria_weights = {}
+            self.electric_criteria_details = {}
+            self.pattern_definitions = {}
+            self.validation_keywords = {}
+            self.category_actions = {}
+            self.component_templates = {}
 
     def _preprocess_image_for_ocr(self, img: Image.Image) -> Image.Image:
         """Preprocess image for better OCR results"""
@@ -132,6 +123,7 @@ class AdvancedElectricCircuitAnalyzer:
         except Exception as e:
             logger.warning(f"Advanced image preprocessing failed: {e}")
             return img
+            
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         """Extract text and symbols from PDF using PyMuPDF and OCR"""
         try:
@@ -214,30 +206,24 @@ class AdvancedElectricCircuitAnalyzer:
             return ""
 
     def _process_electrical_symbols(self, text: str) -> str:
-        """Process and normalize electrical symbols"""
-        symbol_map = {
-            'Ω': 'ohm', '∆': 'delta', '±': 'plusminus', '→': 'arrow', '←': 'arrow',
-            '↑': 'arrow', '↓': 'arrow', '⏚': 'ground', '⊥': 'ground', '~': 'ac',
-            '≈': 'ac', '⎓': 'dc', '⌁': 'dc', '∿': 'sine', '⚡': 'power'
-        }
+        """Process and normalize electrical symbols - DB'den"""
+        # DB'den symbol_map al
+        symbol_map = self.pattern_definitions.get('symbol_map', {})
+        
         for symbol, replacement in symbol_map.items():
             text = text.replace(symbol, f' {replacement} ')
         return text
 
     def _normalize_electrical_text(self, text: str) -> str:
-        """Normalize electrical terms and measurements"""
-        unit_map = {
-            r'([0-9]+)\s*[vV]\b': r'\1 volt',
-            r'([0-9]+)\s*[aA]\b': r'\1 amp',
-            r'([0-9]+)\s*[wW]\b': r'\1 watt',
-            r'([0-9]+)\s*[hH][zZ]\b': r'\1 hertz',
-            r'([0-9]+)\s*Ω': r'\1 ohm',
-            r'([0-9]+)\s*[kK][vV][aA]': r'\1 kva',
-            r'([0-9]+)\s*[mM][aA]': r'\1 milliamp',
-            r'([0-9]+)\s*[µuU][fF]': r'\1 microfarad',
-            r'([0-9]+)\s*[pP][fF]': r'\1 picofarad',
-            r'([0-9]+)\s*[mM][hH]': r'\1 millihenry'
-        }
+        """Normalize electrical terms and measurements - DB'den"""
+        # DB'den unit_map al
+        unit_map_data = self.pattern_definitions.get('unit_map', {})
+        
+        # unit_map formatı: {pattern: [replacement]}
+        unit_map = {}
+        for pattern, replacement_list in unit_map_data.items():
+            if replacement_list:
+                unit_map[pattern] = replacement_list[0]
         
         for pattern, replacement in unit_map.items():
             text = re.sub(pattern, replacement, text)
@@ -343,25 +329,21 @@ class AdvancedElectricCircuitAnalyzer:
         """Detect electrical components in images - OPTIMIZED VERSION"""
         try:
             detected_components = []
-            templates = self.component_templates.get(circuit_type, {})
+            templates = self.component_templates if hasattr(self, 'component_templates') else {}
             
             logger.info(f"Görsel bileşen analizi başlıyor... Toplam {len(images)} sayfa taranacak.")
 
             # --- OPTİMİZASYON 1: Şablonları ÖNCEDEN hazırla (Pre-calculate) ---
-            # Her döngüde tekrar tekrar resim oluşturmamak için hafızaya alıyoruz.
             cached_templates = {}
             for comp_type, labels in templates.items():
                 cached_templates[comp_type] = []
                 for label in labels:
-                    # Şablonu bir kere oluştur
                     template = np.zeros((50, 100), dtype=np.uint8)
                     cv2.putText(template, label, (10, 30),
                               cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
                     cached_templates[comp_type].append((label, template))
-            # ------------------------------------------------------------------
 
             for i, img_data in enumerate(images):
-                # Kullanıcıyı bilgilendir (Hangi sayfada olduğunu gör)
                 if i % 5 == 0 or i == len(images) - 1:
                     logger.info(f"Görsel analiz: Sayfa {i+1}/{len(images)} işleniyor...")
 
@@ -373,7 +355,6 @@ class AdvancedElectricCircuitAnalyzer:
 
                     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
                     
-                    # Gürültü azaltma ve eşikleme
                     binary = cv2.adaptiveThreshold(
                         gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                         cv2.THRESH_BINARY, 11, 2
@@ -383,21 +364,16 @@ class AdvancedElectricCircuitAnalyzer:
                         binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
                     )
                     
-                    # Sayfadaki her bir kontur (şekil) için
                     for contour in contours:
                         x, y, w, h = cv2.boundingRect(contour)
                         
-                        # --- OPTİMİZASYON 2: Çok küçük veya çok büyük alanları atla ---
-                        # Sadece makul boyuttaki şekilleri kontrol et
                         if w < 30 or h < 30 or w > 500 or h > 500:
                             continue
                             
                         roi = gray[y:y+h, x:x+w]
                         
-                        # Hazırladığımız şablonları kullanarak eşleştirme yap
                         for comp_type, label_data in cached_templates.items():
                             for label, template in label_data:
-                                # Boyut kontrolü (ROI şablondan küçükse hata verir, atla)
                                 if roi.shape[0] < template.shape[0] or roi.shape[1] < template.shape[1]:
                                     continue
 
@@ -432,16 +408,12 @@ class AdvancedElectricCircuitAnalyzer:
     def determine_circuit_type(self, text: str, images: List[Any]) -> Tuple[str, float]:
         return "electric", 1.0
 
-    # ESKİ HALİ YERİNE BUNU KULLAN
     def analyze_criteria(self, text: str, ocr_text: str, detected_components: List[ComponentDetection], 
                         category: str) -> Dict[str, CircuitAnalysisResult]:
         results = {}
         criteria = self.electric_criteria_details.get(category, {})
         
-        # OCR zaten yapıldı, sadece birleştiriyoruz
         combined_text = text + " " + ocr_text
-        
-        # Componentler zaten bulundu, tekrar aramıyoruz
         
         for criterion_name, criterion_data in criteria.items():
             pattern = criterion_data["pattern"]
@@ -449,7 +421,6 @@ class AdvancedElectricCircuitAnalyzer:
             
             text_matches = re.findall(pattern, combined_text, re.IGNORECASE | re.MULTILINE)
             
-            # detected_components parametre olarak geldi
             relevant_components = [comp for comp in detected_components 
                                  if self._is_relevant_component(comp, criterion_name)]
             
@@ -539,6 +510,7 @@ class AdvancedElectricCircuitAnalyzer:
         }
 
     def extract_specific_values(self, text: str, circuit_type: str) -> Dict[str, Any]:
+        """Extract specific values - DB'den pattern'ler ile"""
         values = {
             "proje_no": "Not found",
             "sistem_tipi": "Not found",
@@ -551,25 +523,18 @@ class AdvancedElectricCircuitAnalyzer:
             "klemens_blogu": "Not found"
         }
         
-        patterns = {
-            "proje_no": r"(?:30292390|PROJE\s*NO|PROJECT\s*NO)",
-            "sistem_tipi": r"(?i)(?:elektrik\s*şeması|electric\s*circuit|electrical\s*diagram)",
-            "tarih": r"(\d{2}\.\d{2}\.\d{4})",
-            "elektrik_paneli": r"(?i)(?:ELEKTRİK\s*PANELİ|ELECTRICAL\s*PANEL|CONTROL\s*PANEL)",
-            "voltaj": r"(?i)(?:(\d+)\s*V|(\d+)\s*volt)",
-            "akim": r"(?i)(?:(\d+)\s*A|(\d+)\s*amp)",
-            "guc": r"(?i)(?:(\d+)\s*W|(\d+)\s*watt|(\d+)\s*kW)",
-            "frekans": r"(?i)(?:(\d+)\s*Hz|(\d+)\s*hertz)",
-            "klemens_blogu": r"(?i)(?:KLEMENS|TERMINAL|TB\d+|X\d+)"
-        }
+        # DB'den pattern'leri al
+        extract_values = self.pattern_definitions.get('extract_values', {})
         
-        for key, pattern in patterns.items():
-            match = re.search(pattern, text)
-            if match:
-                if match.groups():
-                    values[key] = next((m for m in match.groups() if m), match.group())
-                else:
-                    values[key] = match.group()
+        for key in values.keys():
+            pattern = extract_values.get(key, '')
+            if pattern:
+                match = re.search(pattern, text)
+                if match:
+                    if match.groups():
+                        values[key] = next((m for m in match.groups() if m), match.group())
+                    else:
+                        values[key] = match.group()
         
         return values
 
@@ -618,8 +583,6 @@ class AdvancedElectricCircuitAnalyzer:
         images = self.extract_images_from_pdf(pdf_path)
         circuit_type, _ = self.determine_circuit_type(text, images)
 
-        # --- PERFORMANS DÜZELTMESİ BAŞLANGIÇ ---
-        # OCR ve Görüntü İşlemeyi sadece 1 kez yapıyoruz!
         logger.info("OCR ve Görsel Analiz tek seferlik çalıştırılıyor...")
         
         ocr_text = ""
@@ -629,12 +592,9 @@ class AdvancedElectricCircuitAnalyzer:
             
         detected_components = self.detect_components_in_images(images, circuit_type)
         logger.info(f"Görsel analiz tamamlandı. Tespit edilen bileşen sayısı: {len(detected_components)}")
-        # --- PERFORMANS DÜZELTMESİ BİTİŞ ---
 
         analysis_results = {}
-        # Artık döngü içinde ağır işlem yok, sadece karşılaştırma var
         for category in self.electric_criteria_weights.keys():
-            # Yeni parametreleri gönderiyoruz
             analysis_results[category] = self.analyze_criteria(text, ocr_text, detected_components, category)
 
         scores = self.calculate_scores(analysis_results, circuit_type)
@@ -656,14 +616,21 @@ class AdvancedElectricCircuitAnalyzer:
 # ============================================
 # HELPER FUNCTIONS
 # ============================================
-def validate_document_server(text):
-    """Elektrik doküman validasyonu"""
-    critical_terms = [
-        ["elektrik", "electrical", "circuit", "devre", "şema", "diagram", "voltage", "current"],
-        ["kontaktör", "contactor", "röle", "relay", "sigorta", "fuse", "mcb", "rcd", "switch"],
-        ["volt", "v", "amper", "a", "watt", "w", "ohm", "ω", "hz", "hertz"],
-        ["stop", "start", "emergency", "acil", "güvenlik", "safety", "control", "kontrol"]
-    ]
+def validate_document_server(text, validation_keywords):
+    """Elektrik doküman validasyonu - DB'den"""
+    
+    # DB'den critical_terms al
+    critical_terms_data = validation_keywords.get('critical_terms', {})
+    
+    # Liste formatına dönüştür
+    critical_terms = []
+    for key, value in critical_terms_data.items():
+        if key.startswith('category_') and isinstance(value, list):
+            critical_terms.append(value)
+    
+    if not critical_terms:
+        logger.warning("⚠️ Critical terms bulunamadı, validasyon atlanıyor")
+        return True
     
     category_found = []
     for i, category in enumerate(critical_terms):
@@ -673,16 +640,19 @@ def validate_document_server(text):
         category_found.append(found)
     
     valid = sum(category_found)
-    logger.info(f"Doküman validasyonu: {valid}/4 kritik kategori")
-    return valid >= 4
+    logger.info(f"Doküman validasyonu: {valid}/{len(critical_terms)} kritik kategori")
+    return valid >= len(critical_terms) - 1
 
 
-def check_strong_keywords_first_pages(filepath):
-    """İlk sayfada elektrik özgü kelime kontrolü - OCR"""
-    strong_keywords = [
-        "elektrik", "circuit", "electrical", "voltage", "amper", "ohm",
-        "enclosure", "wrp-", "light curtain", "contactors", "controller"
-    ]
+def check_strong_keywords_first_pages(filepath, validation_keywords):
+    """İlk sayfada elektrik özgü kelime kontrolü - OCR - DB'den"""
+    
+    # DB'den strong keywords al
+    strong_keywords = validation_keywords.get('strong_keywords', [])
+    
+    if not strong_keywords:
+        logger.warning("⚠️ Strong keywords bulunamadı, validasyon atlanıyor")
+        return True
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=2)
@@ -702,26 +672,15 @@ def check_strong_keywords_first_pages(filepath):
         return False
 
 
-def check_excluded_keywords_first_pages(filepath):
-    """İlk sayfada excluded keyword kontrolü - OCR"""
-    excluded = [
-        "topraklama direnci", "grounding", "earthing", "60204", "topraklama", "TOPRAKLAMA DİRENCİ",
-        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
-        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        "espe",
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
-        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
-        "loto",
-        "lvd", "TOPRAKLAMA SÜREKLİLİK", "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
-        "montaj", "assembly",
-        "bakım", "maintenance", "servis", "service", "bakim", "MAINTENCE",
-        "titreşim", "vibration", "mekanik",
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate"
-    ]
+def check_excluded_keywords_first_pages(filepath, validation_keywords):
+    """İlk sayfada excluded keyword kontrolü - OCR - DB'den"""
+    
+    # DB'den excluded keywords al
+    excluded_keywords = validation_keywords.get('excluded_keywords', [])
+    
+    if not excluded_keywords:
+        logger.warning("⚠️ Excluded keywords bulunamadı, validasyon atlanıyor")
+        return False
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=2)
@@ -733,7 +692,7 @@ def check_excluded_keywords_first_pages(filepath):
             text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng')
             all_text += text.lower() + " "
         
-        found = [kw for kw in excluded if re.search(rf"\b{kw.lower()}\b", all_text)]
+        found = [kw for kw in excluded_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
         logger.info(f"Excluded: {len(found)} kelime bulundu")
         return len(found) >= 1
     except Exception as e:
@@ -753,6 +712,12 @@ def get_conclusion_message_elektrik(status, percentage):
 # ============================================
 app = Flask(__name__)
 
+# Database configuration (YENİ)
+app.config['SQLALCHEMY_DATABASE_URI'] = Config.SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = Config.SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['SQLALCHEMY_ECHO'] = Config.SQLALCHEMY_ECHO
+
+# Upload configuration
 UPLOAD_FOLDER = 'temp_uploads_elektrik'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'doc', 'txt'}
 
@@ -783,18 +748,19 @@ def analyze_elektrik_report():
             file.save(filepath)
             logger.info(f"Elektrik analizi başlatılıyor: {filename}")
 
-            analyzer = AdvancedElectricCircuitAnalyzer()
+            # Create analyzer instance with app context
+            analyzer = AdvancedElectricCircuitAnalyzer(app=app)
             
             # 3 AŞAMALI KONTROL
             file_ext = os.path.splitext(filepath)[1].lower()
             
             if file_ext == '.pdf':
                 logger.info("Aşama 1: Elektrik özgü kelime kontrolü...")
-                if check_strong_keywords_first_pages(filepath):
+                if check_strong_keywords_first_pages(filepath, analyzer.validation_keywords):
                     logger.info("✅ Aşama 1 geçti")
                 else:
                     logger.info("Aşama 2: Excluded kelime kontrolü...")
-                    if check_excluded_keywords_first_pages(filepath):
+                    if check_excluded_keywords_first_pages(filepath, analyzer.validation_keywords):
                         logger.info("❌ Excluded kelimeler bulundu")
                         try:
                             os.remove(filepath)
@@ -813,7 +779,7 @@ def analyze_elektrik_report():
                                 pdf_reader = PyPDF2.PdfReader(f)
                                 text = "".join(page.extract_text() + "\n" for page in pdf_reader.pages)
                             
-                            if not text or len(text.strip()) < 50 or not validate_document_server(text):
+                            if not text or len(text.strip()) < 50 or not validate_document_server(text, analyzer.validation_keywords):
                                 try:
                                     os.remove(filepath)
                                 except:
@@ -900,6 +866,9 @@ def health_check():
         'status': 'healthy',
         'service': 'Electric Circuit Analyzer API',
         'version': '1.0.0',
+        'upload_folder': UPLOAD_FOLDER,
+        'max_file_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024),
+        'supported_formats': list(ALLOWED_EXTENSIONS),
         'report_type': 'ELEKTRIK_DEVRE_SEMASI'
     })
 
@@ -915,13 +884,38 @@ def index():
             'POST /api/elektrik-report': 'Elektrik devre şeması analizi',
             'GET /api/health': 'Servis sağlık kontrolü',
             'GET /': 'Bu bilgi sayfası'
+        },
+        'usage': {
+            'upload_format': 'multipart/form-data',
+            'file_field': 'file',
+            'supported_types': list(ALLOWED_EXTENSIONS),
+            'max_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
         }
     })
 
 
+# ============================================
+# DATABASE INITIALIZATION
+# ============================================
+with app.app_context():
+    db.init_app(app)
+
+
+# ============================================
+# APPLICATION ENTRY POINT (Azure-Friendly)
+# ============================================
 if __name__ == '__main__':
     logger.info("=" * 60)
     logger.info("Elektrik Devre Şeması Analiz Servisi")
+    logger.info("=" * 60)
+    logger.info(f"📁 Upload klasörü: {UPLOAD_FOLDER}")
+    logger.info(f"📊 Desteklenen formatlar: {', '.join(ALLOWED_EXTENSIONS)}")
+    logger.info(f"📏 Maksimum dosya boyutu: {app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB")
+    logger.info("")
+    logger.info("🔗 API Endpoints:")
+    logger.info("  POST /api/elektrik-report - Elektrik devre şeması analizi")
+    logger.info("  GET /api/health - Servis sağlık kontrolü")
+    logger.info("  GET / - API bilgileri")
     logger.info("=" * 60)
     
     port = int(os.environ.get('PORT', 8001))

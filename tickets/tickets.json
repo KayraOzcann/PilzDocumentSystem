@@ -3048,5 +3048,1430 @@
     },
     "comments": [],
     "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket33",
+    "ticket_id": "at_20251201_211350",
+    "document_name": "2004.106-EC_Declaration_of_Conformity-V524B_Knee_pad_punch_machine-EN-Ver0.pdf",
+    "document_type": "AT_UYGUNLUK_BEYANI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/2004.106-EC_Declaration_of_Conformity-V524B_Knee_pad_punch_machine-EN-Ver0.pdf",
+    "opening_date": "2025-12-01T21:13:50.492045",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 97.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 97.0
+      },
+      "category_scores": {
+        "Kritik Bilgiler": {
+          "max_score": 60,
+          "percentage": 100.0,
+          "score": 60.0,
+          "status": "PASS"
+        },
+        "Standartlar ve Belgeler": {
+          "max_score": 15,
+          "percentage": 80.0,
+          "score": 12.0,
+          "status": "PASS"
+        },
+        "Zorunlu Teknik Bilgiler": {
+          "max_score": 25,
+          "percentage": 100.0,
+          "score": 25.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "Beyan Tarihi": "Bulunamadı",
+        "Direktif Referansı": "Bulunamadı",
+        "Makine Açıklaması": "V524B Knee pad punching machine",
+        "Makine Modeli": "V524B",
+        "Pozisyon": "Pilz Ireland \nCork Business",
+        "Seri Numarası": "A2306F-012",
+        "Uygulanan Standartlar": "EN 60204-1:, ISO 13849-1, ISO 13849-1:",
+        "Yetkili Kişi": "and title Pilz Ireland \nCork Business",
+        "Üretici Adresi": "Bulunamadı",
+        "Üretici Adı": "Pilz Ireland",
+        "Üretim Yılı": "2024"
+      },
+      "recommendations": [
+        "✅ AT Uygunluk Beyanı yeterli"
+      ],
+      "summary": {
+        "conclusion": "AT uygunluk beyanı 2006/42/EC direktifine uygun (%97)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket34",
+    "ticket_id": "at_20251201_211751",
+    "document_name": "2208007____FORD_Eskisehir_12.7lt_Ecotorq_Kafa_Baga_Cakma_CE-Declaration.pdf",
+    "document_type": "AT_UYGUNLUK_BEYANI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/2208007____FORD_Eskisehir_12.7lt_Ecotorq_Kafa_Baga_Cakma_CE-Declaration.pdf",
+    "opening_date": "2025-12-01T21:17:51.186754",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 83.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 83.0
+      },
+      "category_scores": {
+        "Kritik Bilgiler": {
+          "max_score": 60,
+          "percentage": 100.0,
+          "score": 60.0,
+          "status": "PASS"
+        },
+        "Standartlar ve Belgeler": {
+          "max_score": 15,
+          "percentage": 53.33,
+          "score": 8.0,
+          "status": "FAIL"
+        },
+        "Zorunlu Teknik Bilgiler": {
+          "max_score": 25,
+          "percentage": 60.0,
+          "score": 15.0,
+          "status": "FAIL"
+        }
+      },
+      "extracted_values": {
+        "Beyan Tarihi": "25.12.2023",
+        "Direktif Referansı": "Bulunamadı",
+        "Makine Açıklaması": "FO 12.7it Ecotorg Kafa Baya Çakma\n\nSeri Numarası",
+        "Makine Modeli": "ine ba",
+        "Pozisyon": "Bulunamadı",
+        "Seri Numarası": "2208007/2023",
+        "Uygulanan Standartlar": "EN 60446, ISO 12100-2, EN 60204-4, ISO 12100-1, EN 294, EN 1050",
+        "Yetkili Kişi": "İmza",
+        "Üretici Adresi": "Bulunamadı",
+        "Üretici Adı": "Sibernetik Makina & Otomasyon Ar-Ge Merkezi",
+        "Üretim Yılı": "2023"
+      },
+      "recommendations": [
+        "✅ AT Uygunluk Beyanı yeterli"
+      ],
+      "summary": {
+        "conclusion": "AT uygunluk beyanı 2006/42/EC direktifine uygun (%83)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket35",
+    "ticket_id": "at_20251201_212418",
+    "document_name": "2004.106-EC_Declaration_of_Conformity-V524B_Knee_pad_punch_machine-EN-Ver0.pdf",
+    "document_type": "AT_UYGUNLUK_BEYANI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/2004.106-EC_Declaration_of_Conformity-V524B_Knee_pad_punch_machine-EN-Ver0.pdf",
+    "opening_date": "2025-12-01T21:24:18.970424",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 97.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 97.0
+      },
+      "category_scores": {
+        "Kritik Bilgiler": {
+          "max_score": 60,
+          "percentage": 100.0,
+          "score": 60.0,
+          "status": "PASS"
+        },
+        "Standartlar ve Belgeler": {
+          "max_score": 15,
+          "percentage": 80.0,
+          "score": 12.0,
+          "status": "PASS"
+        },
+        "Zorunlu Teknik Bilgiler": {
+          "max_score": 25,
+          "percentage": 100.0,
+          "score": 25.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "Beyan Tarihi": "Bulunamadı",
+        "Direktif Referansı": "Bulunamadı",
+        "Makine Açıklaması": "V524B Knee pad punching machine",
+        "Makine Modeli": "Bulunamadı",
+        "Pozisyon": "Pilz Ireland \nCork Business",
+        "Seri Numarası": "Bulunamadı",
+        "Uygulanan Standartlar": "EN 60204-1:, ISO 13849-1, ISO 13849-1:",
+        "Yetkili Kişi": "and title Pilz Ireland \nCork Business",
+        "Üretici Adresi": "Bulunamadı",
+        "Üretici Adı": "Pilz Ireland",
+        "Üretim Yılı": "2024"
+      },
+      "recommendations": [
+        "✅ AT Uygunluk Beyanı yeterli"
+      ],
+      "summary": {
+        "conclusion": "AT uygunluk beyanı 2006/42/EC direktifine uygun (%97)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket36",
+    "ticket_id": "at_20251201_212833",
+    "document_name": "2208007____FORD_Eskisehir_12.7lt_Ecotorq_Kafa_Baga_Cakma_CE-Declaration.pdf",
+    "document_type": "AT_UYGUNLUK_BEYANI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/2208007____FORD_Eskisehir_12.7lt_Ecotorq_Kafa_Baga_Cakma_CE-Declaration.pdf",
+    "opening_date": "2025-12-01T21:28:33.707488",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 83.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 83.0
+      },
+      "category_scores": {
+        "Kritik Bilgiler": {
+          "max_score": 60,
+          "percentage": 100.0,
+          "score": 60.0,
+          "status": "PASS"
+        },
+        "Standartlar ve Belgeler": {
+          "max_score": 15,
+          "percentage": 53.33,
+          "score": 8.0,
+          "status": "FAIL"
+        },
+        "Zorunlu Teknik Bilgiler": {
+          "max_score": 25,
+          "percentage": 60.0,
+          "score": 15.0,
+          "status": "FAIL"
+        }
+      },
+      "extracted_values": {
+        "Beyan Tarihi": "25.12.2023",
+        "Direktif Referansı": "Bulunamadı",
+        "Makine Açıklaması": "FO 12.7it Ecotorg Kafa Baya Çakma\n\nSeri Numarası",
+        "Makine Modeli": "Bulunamadı",
+        "Pozisyon": "Bulunamadı",
+        "Seri Numarası": "Bulunamadı",
+        "Uygulanan Standartlar": "ISO 12100-1, EN 60446, EN 1050, EN 294, ISO 12100-2, EN 60204-4",
+        "Yetkili Kişi": "İmza",
+        "Üretici Adresi": "Bulunamadı",
+        "Üretici Adı": "Sibernetik Makina & Otomasyon Ar-Ge Merkezi",
+        "Üretim Yılı": "2023"
+      },
+      "recommendations": [
+        "✅ AT Uygunluk Beyanı yeterli"
+      ],
+      "summary": {
+        "conclusion": "AT uygunluk beyanı 2006/42/EC direktifine uygun (%83)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket37",
+    "ticket_id": "at_20251201_214208",
+    "document_name": "2004.106-EC_Declaration_of_Conformity-V524B_Knee_pad_punch_machine-EN-Ver0.pdf",
+    "document_type": "AT_UYGUNLUK_BEYANI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/2004.106-EC_Declaration_of_Conformity-V524B_Knee_pad_punch_machine-EN-Ver0.pdf",
+    "opening_date": "2025-12-01T21:42:08.730838",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 97.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 97.0
+      },
+      "category_scores": {
+        "Kritik Bilgiler": {
+          "max_score": 60,
+          "percentage": 100.0,
+          "score": 60.0,
+          "status": "PASS"
+        },
+        "Standartlar ve Belgeler": {
+          "max_score": 15,
+          "percentage": 80.0,
+          "score": 12.0,
+          "status": "PASS"
+        },
+        "Zorunlu Teknik Bilgiler": {
+          "max_score": 25,
+          "percentage": 100.0,
+          "score": 25.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "Beyan Tarihi": "Bulunamadı",
+        "Direktif Referansı": "Bulunamadı",
+        "Makine Açıklaması": "V524B Knee pad punching machine",
+        "Makine Modeli": "V524B",
+        "Pozisyon": "Pilz Ireland \nCork Business",
+        "Seri Numarası": "A2306F-012",
+        "Uygulanan Standartlar": "ISO 13849-1:, ISO 13849-1, EN 60204-1:",
+        "Yetkili Kişi": "and title Pilz Ireland \nCork Business",
+        "Üretici Adresi": "Bulunamadı",
+        "Üretici Adı": "Pilz Ireland",
+        "Üretim Yılı": "2024"
+      },
+      "recommendations": [
+        "✅ AT Uygunluk Beyanı yeterli"
+      ],
+      "summary": {
+        "conclusion": "AT uygunluk beyanı 2006/42/EC direktifine uygun (%97)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket38",
+    "ticket_id": "at_20251201_214231",
+    "document_name": "2208007____FORD_Eskisehir_12.7lt_Ecotorq_Kafa_Baga_Cakma_CE-Declaration.pdf",
+    "document_type": "AT_UYGUNLUK_BEYANI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/2208007____FORD_Eskisehir_12.7lt_Ecotorq_Kafa_Baga_Cakma_CE-Declaration.pdf",
+    "opening_date": "2025-12-01T21:42:31.786192",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 83.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 83.0
+      },
+      "category_scores": {
+        "Kritik Bilgiler": {
+          "max_score": 60,
+          "percentage": 100.0,
+          "score": 60.0,
+          "status": "PASS"
+        },
+        "Standartlar ve Belgeler": {
+          "max_score": 15,
+          "percentage": 53.33,
+          "score": 8.0,
+          "status": "FAIL"
+        },
+        "Zorunlu Teknik Bilgiler": {
+          "max_score": 25,
+          "percentage": 60.0,
+          "score": 15.0,
+          "status": "FAIL"
+        }
+      },
+      "extracted_values": {
+        "Beyan Tarihi": "25.12.2023",
+        "Direktif Referansı": "Bulunamadı",
+        "Makine Açıklaması": "FO 12.7it Ecotorg Kafa Baya Çakma\n\nSeri Numarası",
+        "Makine Modeli": "ine ba",
+        "Pozisyon": "Bulunamadı",
+        "Seri Numarası": "2208007/2023",
+        "Uygulanan Standartlar": "EN 60204-4, EN 1050, EN 60446, ISO 12100-2, ISO 12100-1, EN 294",
+        "Yetkili Kişi": "İmza",
+        "Üretici Adresi": "Bulunamadı",
+        "Üretici Adı": "Sibernetik Makina & Otomasyon Ar-Ge Merkezi",
+        "Üretim Yılı": "2023"
+      },
+      "recommendations": [
+        "✅ AT Uygunluk Beyanı yeterli"
+      ],
+      "summary": {
+        "conclusion": "AT uygunluk beyanı 2006/42/EC direktifine uygun (%83)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket39",
+    "ticket_id": "isg_kontrol_20251201_215948",
+    "document_name": "IR_18-025_vestel_beyaz_esya_buzdolab_1.pdf",
+    "document_type": "ISG_PERIYODIK_KONTROL_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/IR_18-025_vestel_beyaz_esya_buzdolab_1.pdf",
+    "opening_date": "2025-12-01T21:59:48.167546",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 93.0,
+        "report_type": "ISG_PERIYODIK_KONTROL",
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 93.0
+      },
+      "category_scores": {
+        "Aydınlatma Ölçümleri": {
+          "max_score": 0,
+          "percentage": 100.0,
+          "score": 0,
+          "status": "PASS"
+        },
+        "Değerlendirme ve Sonuç": {
+          "max_score": 0,
+          "percentage": 100.0,
+          "score": 0,
+          "status": "PASS"
+        },
+        "Genel Bilgiler ve Firma": {
+          "max_score": 0,
+          "percentage": 100.0,
+          "score": 0,
+          "status": "PASS"
+        },
+        "Gürültü Ölçümleri": {
+          "max_score": 0,
+          "percentage": 100.0,
+          "score": 0,
+          "status": "PASS"
+        },
+        "Hava Kalitesi Ölçümleri": {
+          "max_score": 0,
+          "percentage": 65.0,
+          "score": 0,
+          "status": "CONDITIONAL"
+        },
+        "Termal Konfor Ölçümleri": {
+          "max_score": 0,
+          "percentage": 100.0,
+          "score": 0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "adres": "Bulunamadı",
+        "aydinlatma_seviye": "1339 lux",
+        "firma_adi": "ARTEK ARTEK MÜHENDİSLİK ÇEVRE ÖLÇÜM VE DANIŞMANLIK HİZM. TİC. A.Ş.",
+        "genel_degerlendirme": "VE ÖLÇÜM SONUÇLARI",
+        "gurultu_seviye": "80 dB(A)",
+        "laboratuvar": "ve Tarifi Name and identity of test item Açıklamalar Remarks Ölçümün Yapıldığı Tarih Date of Measurement Numunenin Kabul Tarihi The date of receipt of test item Analizin Yapıldığı Tarih Date of Analysis Raporun",
+        "olcum_tarihi": "02.09.2019",
+        "rapor_numarasi": "AB-0017-1"
+      },
+      "recommendations": [
+        "❌ RAPOR GEÇERSİZ: Rapor tarihi 1 yıldan eski (2282 gün önce)",
+        "🔴 İSG raporları en fazla 1 yıl geçerlidir",
+        "📅 Yeni bir İSG ölçüm raporu temin edilmelidir",
+        "",
+        "📊 PUANLAMA (Referans için):",
+        "✅ İSG Periyodik Kontrol GEÇERLİ (Toplam: %93)",
+        "🟢 Genel Bilgiler ve Firma bölümü yeterli (%100)",
+        "🟢 Gürültü Ölçümleri bölümü yeterli (%100)",
+        "🟢 Aydınlatma Ölçümleri bölümü yeterli (%100)",
+        "🟢 Termal Konfor Ölçümleri bölümü yeterli (%100)",
+        "🟡 Hava Kalitesi Ölçümleri bölümü geliştirilmeli (%65)",
+        "🟢 Değerlendirme ve Sonuç bölümü yeterli (%100)"
+      ],
+      "summary": {
+        "conclusion": "İSG periyodik kontrol raporu İş Sağlığı ve Güvenliği Yönetmeliği gereksinimlerine uygundur (%93)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket40",
+    "ticket_id": "manuel_20251201_224335",
+    "document_name": "manual.tr.pdf",
+    "document_type": "KULLANIM_KILAVUZU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/manual.tr.pdf",
+    "opening_date": "2025-12-01T22:43:35.952187",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 93.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 93.0
+      },
+      "category_scores": {
+        "Arıza Giderme": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Bakım ve Temizlik": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Genel Bilgiler": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Giriş ve Amaç": {
+          "max_score": 5,
+          "percentage": 100.0,
+          "score": 5.0,
+          "status": "PASS"
+        },
+        "Güvenlik Bilgileri": {
+          "max_score": 15,
+          "percentage": 86.67,
+          "score": 13.0,
+          "status": "PASS"
+        },
+        "Kullanım Talimatları": {
+          "max_score": 20,
+          "percentage": 100.0,
+          "score": 20.0,
+          "status": "PASS"
+        },
+        "Kurulum ve Montaj Bilgileri": {
+          "max_score": 15,
+          "percentage": 86.67,
+          "score": 13.0,
+          "status": "PASS"
+        },
+        "Ürün Tanıtımı": {
+          "max_score": 10,
+          "percentage": 70.0,
+          "score": 7.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "hazirlayan": "Bulunamadı",
+        "hazırlama_tarihi": "23.03.2022",
+        "kilavuz_adi": "www.ecoclean -group.net Ecoclean   EcoCcore Temizl",
+        "urun_modeli": "deki bir temizlik tesisi için öngörülmemektedir an"
+      },
+      "recommendations": [
+        "✅ Kullanma Kılavuzu GEÇERLİ (Toplam: %93.0)",
+        "🟢 Genel Bilgiler bölümü yeterli (%100.0)",
+        "🟢 Giriş ve Amaç bölümü yeterli (%100.0)",
+        "🟢 Güvenlik Bilgileri bölümü yeterli (%86.7)",
+        "🟢 Ürün Tanıtımı bölümü yeterli (%70.0)",
+        "🟢 Kurulum ve Montaj Bilgileri bölümü yeterli (%86.7)",
+        "🟢 Kullanım Talimatları bölümü yeterli (%100.0)",
+        "🟢 Bakım ve Temizlik bölümü yeterli (%100.0)",
+        "🟢 Arıza Giderme bölümü yeterli (%100.0)"
+      ],
+      "summary": {
+        "conclusion": "Kullanım kılavuzu yeterli kriterleri sağlamaktadır (%93)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket41",
+    "ticket_id": "montaj_20251201_224444",
+    "document_name": "INSTALLATION_AND_SAFETY_MANUAL-TH-06-15-1041.pdf",
+    "document_type": "MONTAJ_TALIMATLARI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/INSTALLATION_AND_SAFETY_MANUAL-TH-06-15-1041.pdf",
+    "opening_date": "2025-12-01T22:44:44.777466",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 96.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 96.0
+      },
+      "category_scores": {
+        "Arıza Giderme": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Bakım ve Temizlik": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Genel Bilgiler": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Giriş ve Amaç": {
+          "max_score": 5,
+          "percentage": 100.0,
+          "score": 5.0,
+          "status": "PASS"
+        },
+        "Güvenlik Bilgileri": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Kullanım Talimatları": {
+          "max_score": 20,
+          "percentage": 100.0,
+          "score": 20.0,
+          "status": "PASS"
+        },
+        "Kurulum ve Montaj Bilgileri": {
+          "max_score": 15,
+          "percentage": 73.33,
+          "score": 11.0,
+          "status": "PASS"
+        },
+        "Ürün Tanıtımı": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "contact_info": "Bulunamadı",
+        "manual_name": "MANUAL",
+        "manufacturer": "Bulunamadı",
+        "product_model": "chart...............",
+        "revision_info": "Bulunamadı",
+        "safety_warnings_count": 16
+      },
+      "recommendations": [
+        "🔍 Eksik kritik kriterler:",
+        "  • Kurulum ve Montaj Bilgileri: kurulum_oncesi",
+        "✅ Kullanım kılavuzu yüksek kalitede ve standartlara uygun"
+      ],
+      "summary": {
+        "conclusion": "Montaj talimatları yüksek kalitede ve standartlara uygun (%96)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket42",
+    "ticket_id": "montaj_20251201_224526",
+    "document_name": "AKYAPAK-AHS-KullanmaKlavuzu-2023.04.28.pdf",
+    "document_type": "MONTAJ_TALIMATLARI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/AKYAPAK-AHS-KullanmaKlavuzu-2023.04.28.pdf",
+    "opening_date": "2025-12-01T22:45:26.086974",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 97.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 97.0
+      },
+      "category_scores": {
+        "Arıza Giderme": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Bakım ve Temizlik": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Genel Bilgiler": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Giriş ve Amaç": {
+          "max_score": 5,
+          "percentage": 100.0,
+          "score": 5.0,
+          "status": "PASS"
+        },
+        "Güvenlik Bilgileri": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Kullanım Talimatları": {
+          "max_score": 20,
+          "percentage": 100.0,
+          "score": 20.0,
+          "status": "PASS"
+        },
+        "Kurulum ve Montaj Bilgileri": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Ürün Tanıtımı": {
+          "max_score": 10,
+          "percentage": 70.0,
+          "score": 7.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "contact_info": "Bulunamadı",
+        "manual_name": "kullanım kılavuzu",
+        "manufacturer": "Bulunamadı",
+        "product_model": "TANITIM",
+        "revision_info": "Bulunamadı",
+        "safety_warnings_count": 128
+      },
+      "recommendations": [
+        "✅ Kullanım kılavuzu yüksek kalitede ve standartlara uygun"
+      ],
+      "summary": {
+        "conclusion": "Montaj talimatları yüksek kalitede ve standartlara uygun (%97)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket43",
+    "ticket_id": "montaj_20251201_225357",
+    "document_name": "INSTALLATION_AND_SAFETY_MANUAL-TH-06-15-1041.pdf",
+    "document_type": "MONTAJ_TALIMATLARI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/INSTALLATION_AND_SAFETY_MANUAL-TH-06-15-1041.pdf",
+    "opening_date": "2025-12-01T22:53:57.475506",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 96.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 96.0
+      },
+      "category_scores": {
+        "Arıza Giderme": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Bakım ve Temizlik": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Genel Bilgiler": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Giriş ve Amaç": {
+          "max_score": 5,
+          "percentage": 100.0,
+          "score": 5.0,
+          "status": "PASS"
+        },
+        "Güvenlik Bilgileri": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Kullanım Talimatları": {
+          "max_score": 20,
+          "percentage": 100.0,
+          "score": 20.0,
+          "status": "PASS"
+        },
+        "Kurulum ve Montaj Bilgileri": {
+          "max_score": 15,
+          "percentage": 73.33,
+          "score": 11.0,
+          "status": "PASS"
+        },
+        "Ürün Tanıtımı": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "contact_info": "Bulunamadı",
+        "manual_name": "MANUAL",
+        "manufacturer": "Bulunamadı",
+        "product_model": "chart...............",
+        "revision_info": "Bulunamadı",
+        "safety_warnings_count": 16
+      },
+      "recommendations": [
+        "🔍 Eksik kritik kriterler:",
+        "  • Kurulum ve Montaj Bilgileri: kurulum_oncesi",
+        "✅ Kullanım kılavuzu yüksek kalitede ve standartlara uygun"
+      ],
+      "summary": {
+        "conclusion": "Montaj talimatları yüksek kalitede ve standartlara uygun (%96)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket44",
+    "ticket_id": "elektrik_20251201_231134",
+    "document_name": "30292390_1.pdf",
+    "document_type": "ELEKTRIK_DEVRE_SEMASI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/30292390_1.pdf",
+    "opening_date": "2025-12-01T23:11:34.208099",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 89.98,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 89.98
+      },
+      "category_scores": {
+        "Bağlantı Hatları": {
+          "earned": 15.200000000000001,
+          "max_weight": 25,
+          "normalized": 17.65,
+          "percentage": 60.8,
+          "possible": 25
+        },
+        "Etiketleme ve Numara Sistemleri": {
+          "earned": 16.0,
+          "max_weight": 20,
+          "normalized": 17.11,
+          "percentage": 80.0,
+          "possible": 20
+        },
+        "Kontrol Panosu / Makine Otomasyon Öğeleri": {
+          "earned": 12.0,
+          "max_weight": 15,
+          "normalized": 12.83,
+          "percentage": 80.0,
+          "possible": 15
+        },
+        "Semboller ve İşaretler": {
+          "earned": 24.0,
+          "max_weight": 30,
+          "normalized": 25.66,
+          "percentage": 80.0,
+          "possible": 30
+        },
+        "Şematik Yerleşim": {
+          "earned": 8.0,
+          "max_weight": 10,
+          "normalized": 8.55,
+          "percentage": 80.0,
+          "possible": 10
+        }
+      },
+      "extracted_values": {
+        "akim": "0",
+        "elektrik_paneli": "Not found",
+        "frekans": "Not found",
+        "guc": "1",
+        "klemens_blogu": "TERMINAL",
+        "proje_no": "30292390",
+        "sistem_tipi": "Not found",
+        "tarih": "Not found",
+        "voltaj": "120"
+      },
+      "recommendations": [
+        "⚡ Elektrik Geçerlilik: %95.8 (23/24 kriter)",
+        "✅ Semboller ve İşaretler bölümü yeterli (%80.0)",
+        "⚠️ Bağlantı Hatları bölümü geliştirilmeli (%60.8)",
+        "✅ Etiketleme ve Numara Sistemleri bölümü yeterli (%80.0)",
+        "✅ Kontrol Panosu / Makine Otomasyon Öğeleri bölümü yeterli (%80.0)",
+        "✅ Şematik Yerleşim bölümü yeterli (%80.0)"
+      ],
+      "summary": {
+        "conclusion": "Elektrik devre şeması standartlara uygundur (%90)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket45",
+    "ticket_id": "hydraulic_20251201_231657",
+    "document_name": "d_4879_985e9d.pdf",
+    "document_type": "HIDROLIK_DEVRE_SEMASI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/d_4879_985e9d.pdf",
+    "opening_date": "2025-12-01T23:16:57.438434",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 75.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 75.0
+      },
+      "category_scores": {
+        "Akış Yönü ve Bağlantı Hattı": {
+          "max_score": 20,
+          "percentage": 40.0,
+          "score": 8.0,
+          "status": "FAIL"
+        },
+        "Başlık ve Belgelendirme": {
+          "max_score": 10,
+          "percentage": 84.82,
+          "score": 8.48,
+          "status": "PASS"
+        },
+        "Enerji Kaynağı": {
+          "max_score": 25,
+          "percentage": 59.08,
+          "score": 14.77,
+          "status": "FAIL"
+        },
+        "Hidrolik Semboller ve Bileşenler": {
+          "max_score": 30,
+          "percentage": 49.84,
+          "score": 14.95,
+          "status": "FAIL"
+        },
+        "Sistem Bilgileri ve Etiketler": {
+          "max_score": 15,
+          "percentage": 42.47,
+          "score": 6.37,
+          "status": "FAIL"
+        }
+      },
+      "extracted_values": {
+        "debi": "12",
+        "devir": "1500",
+        "hidrolik_unite": "HYDRAULIC",
+        "motor_gucu": "3",
+        "proje_no": "Bulunamadı",
+        "sistem_tipi": "press feeding system",
+        "tambur": "TAMBUR",
+        "tank_hacmi": "12",
+        "tarih": "09.05.2019"
+      },
+      "recommendations": [
+        "⚠️ Hidrolik Geçerlilik: %61.9 (13/21 kriter)",
+        "⚠️ Enerji Kaynağı bölümü geliştirilmeli (%59.1)",
+        "⚠️ Hidrolik Semboller ve Bileşenler bölümü geliştirilmeli (%49.8)",
+        "⚠️ Akış Yönü ve Bağlantı Hattı bölümü geliştirilmeli (%40.0)",
+        "⚠️ Sistem Bilgileri ve Etiketler bölümü geliştirilmeli (%42.5)",
+        "✅ Başlık ve Belgelendirme bölümü yeterli (%84.8)"
+      ],
+      "summary": {
+        "conclusion": "Hidrolik devre şeması ISO 1219 standardına uygun ve teknik açıdan yeterlidir (%75)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket46",
+    "ticket_id": "hydraulic_20251201_231950",
+    "document_name": "Dogu_Pres_-_Hidrolik_Semalar.pdf",
+    "document_type": "HIDROLIK_DEVRE_SEMASI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/Dogu_Pres_-_Hidrolik_Semalar.pdf",
+    "opening_date": "2025-12-01T23:19:50.153092",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 75.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 75.0
+      },
+      "category_scores": {
+        "Akış Yönü ve Bağlantı Hattı": {
+          "max_score": 20,
+          "percentage": 40.0,
+          "score": 8.0,
+          "status": "FAIL"
+        },
+        "Başlık ve Belgelendirme": {
+          "max_score": 10,
+          "percentage": 84.82,
+          "score": 8.48,
+          "status": "PASS"
+        },
+        "Enerji Kaynağı": {
+          "max_score": 25,
+          "percentage": 59.08,
+          "score": 14.77,
+          "status": "FAIL"
+        },
+        "Hidrolik Semboller ve Bileşenler": {
+          "max_score": 30,
+          "percentage": 49.84,
+          "score": 14.95,
+          "status": "FAIL"
+        },
+        "Sistem Bilgileri ve Etiketler": {
+          "max_score": 15,
+          "percentage": 42.47,
+          "score": 6.37,
+          "status": "FAIL"
+        }
+      },
+      "extracted_values": {
+        "debi": "12",
+        "devir": "1500",
+        "hidrolik_unite": "HYDRAULIC",
+        "motor_gucu": "3",
+        "proje_no": "Bulunamadı",
+        "sistem_tipi": "press feeding system",
+        "tambur": "TAMBUR",
+        "tank_hacmi": "12",
+        "tarih": "09.05.2019"
+      },
+      "recommendations": [
+        "⚠️ Hidrolik Geçerlilik: %61.9 (13/21 kriter)",
+        "⚠️ Enerji Kaynağı bölümü geliştirilmeli (%59.1)",
+        "⚠️ Hidrolik Semboller ve Bileşenler bölümü geliştirilmeli (%49.8)",
+        "⚠️ Akış Yönü ve Bağlantı Hattı bölümü geliştirilmeli (%40.0)",
+        "⚠️ Sistem Bilgileri ve Etiketler bölümü geliştirilmeli (%42.5)",
+        "✅ Başlık ve Belgelendirme bölümü yeterli (%84.8)"
+      ],
+      "summary": {
+        "conclusion": "Hidrolik devre şeması ISO 1219 standardına uygun ve teknik açıdan yeterlidir (%75)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket47",
+    "ticket_id": "pneumatic_20251201_232243",
+    "document_name": "30293567.pdf",
+    "document_type": "PNOMATIK_DEVRE_SEMASI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/30293567.pdf",
+    "opening_date": "2025-12-01T23:22:43.918055",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 76.58,
+        "quality_level": "İYİ",
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 76.58
+      },
+      "category_scores": {
+        "Akış Yönü ve Bağlantı Hatları": {
+          "max_score": 20,
+          "percentage": 82.5,
+          "score": 17.15,
+          "status": "PASS"
+        },
+        "Dokümantasyon ve Standart Uygunluk": {
+          "max_score": 10,
+          "percentage": 50.0,
+          "score": 5.74,
+          "status": "CONDITIONAL"
+        },
+        "Pnömatik Semboller ve Vana Sistemleri": {
+          "max_score": 30,
+          "percentage": 72.0,
+          "score": 23.07,
+          "status": "PASS"
+        },
+        "Sistem Bilgileri ve Teknik Parametreler": {
+          "max_score": 15,
+          "percentage": 50.0,
+          "score": 8.62,
+          "status": "CONDITIONAL"
+        },
+        "Temel Sistem Bileşenleri": {
+          "max_score": 25,
+          "percentage": 68.0,
+          "score": 18.36,
+          "status": "CONDITIONAL"
+        }
+      },
+      "extracted_values": {
+        "calisma_basinci": "Belirtilmemiş",
+        "cizim_tarihi": "Belirtilmemiş",
+        "firma": "Belirtilmemiş",
+        "frl_mevcut": false,
+        "onay_tarihi": "Belirtilmemiş",
+        "proje_adi": "Belirtilmemiş",
+        "silindir_sayisi": 0,
+        "sistem_tipi": "Belirtilmemiş",
+        "tasarim_tarihi": "Belirtilmemiş",
+        "vana_sayisi": 1
+      },
+      "recommendations": [
+        "✅ ÇİZİM KALİTESİ: İyi",
+        "📊 Toplam Puan: 76.6/100",
+        "⚠️ Temel Sistem Bileşenleri: Geliştirme gerekli (%68.0)",
+        "✅ Pnömatik Semboller ve Vana Sistemleri: Yeterli (%72.0)",
+        "✅ Akış Yönü ve Bağlantı Hatları: Yeterli (%82.5)",
+        "⚠️ Sistem Bilgileri ve Teknik Parametreler: Geliştirme gerekli (%50.0)",
+        "⚠️ Dokümantasyon ve Standart Uygunluk: Geliştirme gerekli (%50.0)",
+        "\n🔧 TEKNİK ÖNERİLER:",
+        "- Hava hazırlama ünitesi (FRL) gösterilmeli",
+        "- Çalışma basıncı değerleri belirtilmeli",
+        "- Çizim tarihi eklenmeli",
+        "\n📋 STANDART UYGUNLUK:",
+        "✅ ISO 1219 standartlarına genel uygunluk sağlanmış"
+      ],
+      "summary": {
+        "conclusion": "Pnömatik devre şeması ISO 5599 ve ilgili standartlara uygun ve teknik açıdan yeterlidir (%77)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket48",
+    "ticket_id": "pneumatic_20251201_232405",
+    "document_name": "Dogu_Pres_-_Pnomatik_Semalar.pdf",
+    "document_type": "PNOMATIK_DEVRE_SEMASI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/Dogu_Pres_-_Pnomatik_Semalar.pdf",
+    "opening_date": "2025-12-01T23:24:05.708185",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 97.71,
+        "quality_level": "MÜKEMMEL",
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 97.71
+      },
+      "category_scores": {
+        "Akış Yönü ve Bağlantı Hatları": {
+          "max_score": 20,
+          "percentage": 82.5,
+          "score": 17.15,
+          "status": "PASS"
+        },
+        "Dokümantasyon ve Standart Uygunluk": {
+          "max_score": 10,
+          "percentage": 80.0,
+          "score": 8.37,
+          "status": "PASS"
+        },
+        "Pnömatik Semboller ve Vana Sistemleri": {
+          "max_score": 30,
+          "percentage": 100.0,
+          "score": 30.0,
+          "status": "PASS"
+        },
+        "Sistem Bilgileri ve Teknik Parametreler": {
+          "max_score": 15,
+          "percentage": 80.0,
+          "score": 12.55,
+          "status": "PASS"
+        },
+        "Temel Sistem Bileşenleri": {
+          "max_score": 25,
+          "percentage": 100.0,
+          "score": 25.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "calisma_basinci": "Belirtilmemiş",
+        "cizim_tarihi": "Belirtilmemiş",
+        "firma": "Belirtilmemiş",
+        "frl_mevcut": false,
+        "onay_tarihi": "Belirtilmemiş",
+        "proje_adi": "Belirtilmemiş",
+        "silindir_sayisi": 0,
+        "sistem_tipi": "Belirtilmemiş",
+        "tasarim_tarihi": "Belirtilmemiş",
+        "vana_sayisi": 0
+      },
+      "recommendations": [
+        "✅ ÇİZİM KALİTESİ: Mükemmel",
+        "📊 Toplam Puan: 97.7/100",
+        "✅ Temel Sistem Bileşenleri: Yeterli (%100.0)",
+        "✅ Pnömatik Semboller ve Vana Sistemleri: Yeterli (%100.0)",
+        "✅ Akış Yönü ve Bağlantı Hatları: Yeterli (%82.5)",
+        "✅ Sistem Bilgileri ve Teknik Parametreler: Yeterli (%80.0)",
+        "✅ Dokümantasyon ve Standart Uygunluk: Yeterli (%80.0)",
+        "\n🔧 TEKNİK ÖNERİLER:",
+        "- Vana etiketleri eksik veya okunaksız",
+        "- Hava hazırlama ünitesi (FRL) gösterilmeli",
+        "- Çalışma basıncı değerleri belirtilmeli",
+        "- Çizim tarihi eklenmeli",
+        "\n📋 STANDART UYGUNLUK:",
+        "✅ ISO 1219 standartlarına genel uygunluk sağlanmış"
+      ],
+      "summary": {
+        "conclusion": "Pnömatik devre şeması ISO 5599 ve ilgili standartlara uygun ve teknik açıdan yeterlidir (%98)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket49",
+    "ticket_id": "hydraulic_20251201_232723",
+    "document_name": "d_4879_985e9d.pdf",
+    "document_type": "HIDROLIK_DEVRE_SEMASI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/d_4879_985e9d.pdf",
+    "opening_date": "2025-12-01T23:27:23.174075",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 75.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 75.0
+      },
+      "category_scores": {
+        "Akış Yönü ve Bağlantı Hattı": {
+          "max_score": 20,
+          "percentage": 40.0,
+          "score": 8.0,
+          "status": "FAIL"
+        },
+        "Başlık ve Belgelendirme": {
+          "max_score": 10,
+          "percentage": 84.82,
+          "score": 8.48,
+          "status": "PASS"
+        },
+        "Enerji Kaynağı": {
+          "max_score": 25,
+          "percentage": 59.08,
+          "score": 14.77,
+          "status": "FAIL"
+        },
+        "Hidrolik Semboller ve Bileşenler": {
+          "max_score": 30,
+          "percentage": 49.84,
+          "score": 14.95,
+          "status": "FAIL"
+        },
+        "Sistem Bilgileri ve Etiketler": {
+          "max_score": 15,
+          "percentage": 42.47,
+          "score": 6.37,
+          "status": "FAIL"
+        }
+      },
+      "extracted_values": {
+        "debi": "12",
+        "devir": "1500",
+        "hidrolik_unite": "HYDRAULIC",
+        "motor_gucu": "3",
+        "proje_no": "Bulunamadı",
+        "sistem_tipi": "press feeding system",
+        "tambur": "TAMBUR",
+        "tank_hacmi": "12",
+        "tarih": "09.05.2019"
+      },
+      "recommendations": [
+        "⚠️ Hidrolik Geçerlilik: %61.9 (13/21 kriter)",
+        "⚠️ Enerji Kaynağı bölümü geliştirilmeli (%59.1)",
+        "⚠️ Hidrolik Semboller ve Bileşenler bölümü geliştirilmeli (%49.8)",
+        "⚠️ Akış Yönü ve Bağlantı Hattı bölümü geliştirilmeli (%40.0)",
+        "⚠️ Sistem Bilgileri ve Etiketler bölümü geliştirilmeli (%42.5)",
+        "✅ Başlık ve Belgelendirme bölümü yeterli (%84.8)"
+      ],
+      "summary": {
+        "conclusion": "Hidrolik devre şeması ISO 1219 standardına uygun ve teknik açıdan yeterlidir (%75)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket50",
+    "ticket_id": "pneumatic_20251201_234116",
+    "document_name": "30293567.pdf",
+    "document_type": "PNOMATIK_DEVRE_SEMASI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/30293567.pdf",
+    "opening_date": "2025-12-01T23:41:16.699417",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 76.58,
+        "quality_level": "İYİ",
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 76.58
+      },
+      "category_scores": {
+        "Akış Yönü ve Bağlantı Hatları": {
+          "max_score": 20,
+          "percentage": 82.5,
+          "score": 17.15,
+          "status": "PASS"
+        },
+        "Dokümantasyon ve Standart Uygunluk": {
+          "max_score": 10,
+          "percentage": 50.0,
+          "score": 5.74,
+          "status": "CONDITIONAL"
+        },
+        "Pnömatik Semboller ve Vana Sistemleri": {
+          "max_score": 30,
+          "percentage": 72.0,
+          "score": 23.07,
+          "status": "PASS"
+        },
+        "Sistem Bilgileri ve Teknik Parametreler": {
+          "max_score": 15,
+          "percentage": 50.0,
+          "score": 8.62,
+          "status": "CONDITIONAL"
+        },
+        "Temel Sistem Bileşenleri": {
+          "max_score": 25,
+          "percentage": 68.0,
+          "score": 18.36,
+          "status": "CONDITIONAL"
+        }
+      },
+      "extracted_values": {
+        "calisma_basinci": "Belirtilmemiş",
+        "cizim_tarihi": "Belirtilmemiş",
+        "firma": "Belirtilmemiş",
+        "frl_mevcut": false,
+        "onay_tarihi": "Belirtilmemiş",
+        "proje_adi": "Belirtilmemiş",
+        "silindir_sayisi": 0,
+        "sistem_tipi": "Belirtilmemiş",
+        "tasarim_tarihi": "Belirtilmemiş",
+        "vana_sayisi": 1
+      },
+      "recommendations": [
+        "✅ ÇİZİM KALİTESİ: İyi",
+        "📊 Toplam Puan: 76.6/100",
+        "⚠️ Temel Sistem Bileşenleri: Geliştirme gerekli (%68.0)",
+        "✅ Pnömatik Semboller ve Vana Sistemleri: Yeterli (%72.0)",
+        "✅ Akış Yönü ve Bağlantı Hatları: Yeterli (%82.5)",
+        "⚠️ Sistem Bilgileri ve Teknik Parametreler: Geliştirme gerekli (%50.0)",
+        "⚠️ Dokümantasyon ve Standart Uygunluk: Geliştirme gerekli (%50.0)"
+      ],
+      "summary": {
+        "conclusion": "Pnömatik devre şeması ISO 5599 ve ilgili standartlara uygun ve teknik açıdan yeterlidir (%77)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
   }
 ]

@@ -24,7 +24,7 @@ init_db(app)
 # ============================================
 # TODO: SERVİS KODUNU AYARLAYIN
 # ============================================
-DOCUMENT_TYPE_CODE = 'grounding_report'  # TODO: Değiştirin (örn: 'vibration_report', 'electric_circuit')
+DOCUMENT_TYPE_CODE = 'isg_periodic_control'  # TODO: Değiştirin (örn: 'vibration_report', 'electric_circuit')
 
 # ============================================
 # TODO: GÜNCELLENECEK PATTERN'LERİ TANIMLAYIN
@@ -37,10 +37,10 @@ DOCUMENT_TYPE_CODE = 'grounding_report'  # TODO: Değiştirin (örn: 'vibration_
 # }
 
 UPDATED_PATTERNS = {
-    "extract_values": {
-        "olcum_tarihi": [
-            r"(\d{1,2}[./]\d{1,2}[./]\d{2,4})"
-        ]
+    "approval_patterns": {
+            "uygun": [r"(?:uygun|UYGUN|✓|√|✔|☑|☒|v|V|c|C|onaylandı|kabul|geçer|ok|OK|var|mevcut|tamam|yapıldı|kontrol.*edildi)"],
+            "uygun_degil": [r"(?:uygun değil|UYGUN DEĞİL|degil|DEGIL|✗|✘|×|❌|x|X|red|yetersiz|eksik|yok|yapılmadı|kontrol.*edilmedi)"],
+            "not_var": [r"(?:not|açıklama|dipnot|özel durum|NOT|gözlem|dikkat|uyarı)"]
     }
 }
 
