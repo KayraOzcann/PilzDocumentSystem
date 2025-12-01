@@ -1,5 +1,5 @@
 """
-AT Tip İnceleme Sertifikası Analiz Servisi
+AT Tip İnceleme Sertifikası Analiz Servisi - Database Entegrasyonlu
 ==========================================
 Endpoint: POST /api/at-type-cert-report
 Health: GET /api/health
@@ -21,6 +21,14 @@ from dataclasses import dataclass
 from typing import Dict, Any, List
 from docx import Document
 
+# ============================================
+# DATABASE IMPORTS (YENİ)
+# ============================================
+from flask import current_app
+from database import db, init_db
+from db_loader import load_service_config
+from config import Config
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -41,157 +49,40 @@ class ATTipIncelemeResult:
     details: Dict[str, Any]
 
 class ATTipIncelemeAnalyzer:
-    def __init__(self):
+    def __init__(self, app=None):
         logger.info("AT Type-Examination Certificate analysis system starting...")
         
-        # ESKİ HALDEKİ DOĞRU WEIGHTS (2. dokümandan)
-        self.criteria_weights = {
-            "Onaylanmış Kuruluş Bilgileri": 20,
-            "Başvuru Sahibi/İmalatçı Bilgileri": 20,
-            "Makine Tanımı": 15,
-            "İncelenen Tip Tanımı": 10,
-            "Uygulanan Hükümler": 15,
-            "Değerlendirme Sonucu": 10,
-            "Belge Geçerlilik Bilgileri": 10
-        }
-
-        # ESKİ HALDEKİ DETAYLI TÜRKÇE & İNGİLİZCE KARMA DESENLER
-        self.criteria_details = {
-            "Onaylanmış Kuruluş Bilgileri": {
-                "kurulusun_adi": {
-                    "pattern": r"(?:notified\s+body|onaylanmış\s+kuruluş|onaylı\s+kuruluş|nb|bureau\s+veritas|tuv|sgs|dekra|intertek|bsi|lloyd's\s+register|dnv|kiwa|icim|csi|mts)[\s\w]*([A-Za-zÇŞİĞÜÖıçşığüö\s\.\-&]{5,80})|([A-Za-zÇŞİĞÜÖıçşığüö\s&\.]{5,50})\s*(?:ltd|gmbh|inc|corp|ag|certification|testing|inspection|prüfung|notified\s+body)",
-                    "weight": 7,
-                    "critical": True,
-                    "description": "Onaylanmış kuruluşun adı"
-                },
-                "kurulusun_adresi": {
-                    "pattern": r"(?:address|adres|adresi|konumu|yeri|sede|adresse)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/,&]{20,150})|(?:street|road|avenue|str\.|strasse|calle|via|cadde|sokak)[\s\w]*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/,&]{15,100})|(?:[0-9]{1,5}\s+[A-Za-zÇŞİĞÜÖıçşığüö\s]{5,50}(?:street|road|avenue|str\.|strasse|cadde|sokak))|(?:D-[0-9]{5}\s+[A-Za-zÇŞİĞÜÖıçşığüö]+)",
-                    "weight": 6,
-                    "critical": True,
-                    "description": "Onaylanmış kuruluşun adresi"
-                },
-                "kimlik_numarasi": {
-                    "pattern": r"(?:notified\s+body|nb|identification|kimlik|id|number|numarası|no|nummer|número)\s*[:\-]?\s*([0-9]{4})|(?:nb\s*[0-9]{4})|([0-9]{4})(?:\s*(?:notified|onaylanmış))",
-                    "weight": 7,
-                    "critical": True,
-                    "description": "Onaylanmış kuruluş kimlik numarası (4 haneli)"
-                }
-            },
-            "Başvuru Sahibi/İmalatçı Bilgileri": {
-                "imalatci_adi": {
-                    "pattern": r"(?:manufacturer|imalatçı|imalatci|fabrika|üretici|fabricant|hersteller|applicant|başvuru\s+sahibi|müracaatçı|company|şirket|firma|üretim\s+yeri)[\s:]*([A-Za-zÇŞİĞÜÖıçşığüö\s\.\-&]{5,100})|(?:we\s+hereby\s+certify\s+that\s+)([A-Za-zÇŞİĞÜÖıçşığüö\s&\.]+)|(?:this\s+certificate\s+is\s+issued\s+to\s+)([A-Za-zÇŞİĞÜÖıçşığüö\s&\.]+)",
-                    "weight": 10,
-                    "critical": True,
-                    "description": "İmalatçı veya yetkili temsilcinin adı"
-                },
-                "imalatci_adres": {
-                    "pattern": r"(?:manufacturer\s+address|imalatçı\s+adres|imalatci\s+adres|adresse\s+du\s+fabricant|herstelleradresse|üretici\s+adresi)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/,&]{20,150})|(?:located\s+at|registered\s+at|address|adres|konum|yer)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/,&]{15,120})",
-                    "weight": 10,
-                    "critical": True,
-                    "description": "İmalatçı veya yetkili temsilcinin tam adresi"
-                }
-            },
-            "Makine Tanımı": {
-                "ticari_ad_tip": {
-                    "pattern": r"(?:trade\s+name|ticari\s+ad|ticari\s+isim|commercial\s+name|product\s+name|denomination|type|tip|model|bezeichnung|ürün\s+adı|makine\s+adı)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/]{3,80})|(?:machine\s+type|makine\s+tipi|makine\s+modeli)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/]{3,80})",
-                    "weight": 8,
-                    "critical": True,
-                    "description": "Makinenin ticari adı, tipi, modeli"
-                },
-                "seri_numarasi": {
-                    "pattern": r"(?:serial\s+number|seri\s+numarası|seri\s+no|s/n|sn|série|seriennummer|sıra\s+no|üretim\s+no)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\-/\.]{2,25})|(?:serial)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\-/\.]{2,25})",
-                    "weight": 4,
-                    "critical": True,
-                    "description": "Seri numarası veya tanımlamayı sağlayan bilgiler"
-                },
-                "varyantlar": {
-                    "pattern": r"(?:variant|varyant|version|versions|sürüm|model\s+variants|configuration|konfigürasyon|seçenekler)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/,]{5,100})",
-                    "weight": 3,
-                    "critical": False,
-                    "description": "Varyantlar veya versiyonlar (varsa)"
-                }
-            },
-            "İncelenen Tip Tanımı": {
-                "detayli_tanim": {
-                    "pattern": r"(?:detailed\s+description|ayrıntılı\s+tanım|detaylı\s+açıklama|description\s+of\s+the\s+machine|machine\s+description|technical\s+description|makine\s+açıklaması|teknik\s+tanım)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/,&]{10,200})",
-                    "weight": 4,
-                    "critical": True,
-                    "description": "İncelenen tipin ayrıntılı tanımı"
-                },
-                "teknik_dosya_atif": {
-                    "pattern": r"(?:technical\s+file|teknik\s+dosya|teknik\s+evrak|technical\s+documentation|dossier\s+technique|technische\s+unterlage|documentation|reference|belge|dokümantasyon)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/]{5,50})|(?:according\s+to|göre|in\s+accordance\s+with)\s+(?:technical\s+file|documentation|teknik\s+dosya)",
-                    "weight": 3,
-                    "critical": True,
-                    "description": "İlgili teknik dosyaya atıf"
-                },
-                "resim_plan_sema": {
-                    "pattern": r"(?:drawing|plan|schema|şema|resim|picture|figure|şekil|diagram|blueprint|çizim|photos|fotoğraf|plan|poz|vaziyet\s+planı|montaj\s+resmi)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/]{3,50})|(?:as\s+shown\s+in|gösterildiği\s+gibi|according\s+to\s+drawing|çizime\s+göre)",
-                    "weight": 3,
-                    "critical": False,
-                    "description": "Resim, plan, şema, parça listeleri"
-                }
-            },
-            "Uygulanan Hükümler": {
-                "direktif_atif": {
-                    "pattern": r"(?:2006/42/EC|2006\/42\/EC|machinery\s+directive|makine\s+direktifi|directive\s+2006/42|machine\s+safety\s+directive|makine\s+emniyet\s+direktifi)",
-                    "weight": 8,
-                    "critical": True,
-                    "description": "2006/42/EC direktif maddelerine atıf"
-                },
-                "uyumlastirilmis_standartlar": {
-                    "pattern": r"(?:EN\s*ISO\s*[0-9]{3,5}[\-:]*[0-9]*[\-:]*[0-9]*|EN\s*[0-9]{3,5}[\-:]*[0-9]*[\-:]*[0-9]*|ISO\s*[0-9]{3,5}[\-:]*[0-9]*[\-:]*[0-9]*|IEC\s*[0-9]{3,5}[\-:]*[0-9]*[\-:]*[0-9]*)",
-                    "weight": 5,
-                    "critical": True,
-                    "description": "Uyumlaştırılmış standartlar (EN ISO, EN IEC vb.)"
-                },
-                "esdeger_cozumler": {
-                    "pattern": r"(?:equivalent\s+solution|eşdeğer\s+çözüm|alternative\s+solution|other\s+technical\s+solution|diğer\s+teknik\s+çözüm|non-harmonised|harmonize\s+olmayan|alternatif\s+çözüm)",
-                    "weight": 2,
-                    "critical": False,
-                    "description": "Eşdeğer çözümlerin açıklaması (varsa)"
-                }
-            },
-            "Değerlendirme Sonucu": {
-                "uygunluk_ifadesi": {
-                    "pattern": r"(?:complies\s+with|uygun|conform|conforms\s+to|in\s+compliance|meets\s+the\s+requirements|requirements\s+of|satisfies|karşılar|uygunluğu|conformity|compliance|uygundur|uygun\s+olduğu|uygunluk\s+ifadesi)",
-                    "weight": 6,
-                    "critical": True,
-                    "description": "Direktif hükümlerine uygunluk ifadesi"
-                },
-                "test_muayene_ozet": {
-                    "pattern": r"(?:test|muayene|examination\s+carried\s+out|inspection|assessment|değerlendirme|inceleme|kontrolü|yapılan\s+testler|performed\s+tests|evaluated|examined|test\s+sonuçları|muayene\s+raporu)",
-                    "weight": 4,
-                    "critical": True,
-                    "description": "Yapılan testler/muayeneler/hesaplamaların özeti"
-                }
-            },
-            "Belge Geçerlilik Bilgileri": {
-                "duzenleme_tarihi": {
-                    "pattern": r"(?:date|tarih|datum|fecha|düzenlenme\s+tarihi|issue\s+date)\s*[:\-]?\s*([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})|([0-9]{1,2}\s+[A-Za-zÇŞİĞÜÖıçşığüö]{3,9}\s+[0-9]{4})|([0-9]{4}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{1,2})",
-                    "weight": 3,
-                    "critical": True,
-                    "description": "Belgenin düzenlenme tarihi"
-                },
-                "belge_numarasi": {
-                    "pattern": r"(?:certificate\s+number|belge\s+numarası|sertifika\s+no|cert\.\s*no\.?|number|nummer|número|ref|reference)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\-/\.]{5,30})|(?:cert\.\s*no\.?)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\-/\.]{5,30})",
-                    "weight": 4,
-                    "critical": True,
-                    "description": "Belge numarası"
-                },
-                "gecerlilik_suresi": {
-                    "pattern": r"(?:valid\s+until|geçerli|validity|expires|expiry\s+date|son\s+geçerlilik|until|bis|geçerlilik\s+süresi)\s*[:\-]?\s*([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})|(?:this\s+certificate\s+is\s+valid)|(?:remains\s+valid)",
-                    "weight": 2,
-                    "critical": False,
-                    "description": "Geçerlilik süresi (varsa)"
-                },
-                "yetkili_imza": {
-                    "pattern": r"(?:signed\s+by|imzalayan|signature|imza|authorized\s+by|yetkili\s+temsilci|responsible\s+person|sorumlu\s+kişi|signatory|signed\s+for|on\s+behalf|imza\s+yetkilisi)",
-                    "weight": 1,
-                    "critical": True,
-                    "description": "Yetkili temsilcinin imzası"
-                }
-            }
-        }
+        # Flask app context varsa DB'den yükle, yoksa boş başlat
+        if app:
+            with app.app_context():
+                try:
+                    config = load_service_config('at_type_report')
+                    
+                    # DB'den yüklenen veriler
+                    self.criteria_weights = config.get('criteria_weights', {})
+                    self.criteria_details = config.get('criteria_details', {})
+                    self.pattern_definitions = config.get('pattern_definitions', {})
+                    self.validation_keywords = config.get('validation_keywords', {})
+                    self.category_actions = config.get('category_actions', {})
+                    
+                    logger.info(f"✅ Veritabanından yüklendi: {len(self.criteria_weights)} kategori")
+                    
+                except Exception as e:
+                    logger.error(f"⚠️ Veritabanından yükleme başarısız: {e}")
+                    logger.warning("⚠️ Fallback: Boş config kullanılıyor")
+                    self.criteria_weights = {}
+                    self.criteria_details = {}
+                    self.pattern_definitions = {}
+                    self.validation_keywords = {}
+                    self.category_actions = {}
+        else:
+            # Flask app yoksa boş başlat (eski davranış)
+            logger.warning("⚠️ Flask app context yok, boş config kullanılıyor")
+            self.criteria_weights = {}
+            self.criteria_details = {}
+            self.pattern_definitions = {}
+            self.validation_keywords = {}
+            self.category_actions = {}
 
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         """PDF'den metin çıkarımı - PyPDF2 + OCR fallback"""
@@ -254,15 +145,20 @@ class ATTipIncelemeAnalyzer:
             return 'en'
         
     def analyze_criteria(self, text: str, category: str) -> Dict[str, ATTipIncelemeResult]:
-        """Kriterleri analiz et"""
+        """Kriterleri analiz et - DB'den gelen pattern'lerle"""
         results = {}
         criteria = self.criteria_details.get(category, {})
         
         for criterion_name, criterion_data in criteria.items():
-            pattern = criterion_data["pattern"]
-            weight = criterion_data["weight"]
-            is_critical = criterion_data["critical"]
-            description = criterion_data["description"]
+            pattern = criterion_data.get("pattern", "")
+            weight = criterion_data.get("weight", 0)
+            # critical veya is_critical olabilir - her ikisini de kontrol et
+            is_critical = criterion_data.get("critical", criterion_data.get("is_critical", False))
+            description = criterion_data.get("description", criterion_name)  # Fallback: criterion_name
+            
+            if not pattern:  # Pattern yoksa atla
+                logger.warning(f"Pattern bulunamadı: {criterion_name}")
+                continue
             
             matches = re.findall(pattern, text, re.IGNORECASE | re.MULTILINE)
             
@@ -349,7 +245,7 @@ class ATTipIncelemeAnalyzer:
         }
 
     def extract_specific_values(self, text: str) -> Dict[str, Any]:
-        """Spesifik değerleri çıkar - ESKİ HALDEKİ DETAYLI VERSİYON"""
+        """Spesifik değerleri çıkar - DB'den pattern'lerle - ORİJİNAL MANTIK"""
         values = {
             "notified_body_name": "Bulunamadı",
             "notified_body_address": "Bulunamadı",
@@ -368,65 +264,43 @@ class ATTipIncelemeAnalyzer:
             "authorized_person": "Bulunamadı"
         }
 
-        # Notified Body Name - Çoklu pattern
-        nb_name_patterns = [
-            r"(bureau\s+veritas[^,\n]*)",
-            r"(tuv\s+[a-zçşığüö\s]+(?:gmbh|ag|ltd)?[^,\n]*)",
-            r"(sgs\s+[a-zçşığüö\s]+(?:gmbh|ltd|inc)?[^,\n]*)",
-            r"(dekra\s+[a-zçşığüö\s]+(?:gmbh|ag)?[^,\n]*)",
-            r"(intertek\s+[a-zçşığüö\s]+(?:ltd|gmbh|inc)?[^,\n]*)",
-            r"(bsi\s+[a-zçşığüö\s]+(?:ltd|gmbh)?[^,\n]*)",
-            r"(lloyd's\s+register[^,\n]*)",
-            r"(dnv\s+[a-zçşığüö\s]*(?:gl)?[^,\n]*)",
-            r"([A-Za-zÇŞİĞÜÖıçşığüö\s&\.]{5,50})\s*(?:ltd|gmbh|inc|corp|ag|certification|testing|inspection|prüfung|notified\s+body)"
-        ]
+        # DB'den extract_values pattern'lerini al
+        extract_patterns = self.pattern_definitions.get('extract_values', {})
+
+        # Notified Body Name - DB'den pattern'ler
+        nb_name_patterns = extract_patterns.get('notified_body_name', [])
         for pattern in nb_name_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 values["notified_body_name"] = match.group(1).strip()
                 break
 
-        # Notified Body ID
-        nb_id_patterns = [
-            r"(?:notified\s+body|nb|onaylanmış\s+kuruluş|kimlik|id)\s*[:\-]?\s*([0-9]{4})",
-            r"nb\s*([0-9]{4})",
-            r"([0-9]{4})\s*(?:notified|onaylanmış)"
-        ]
+        # Notified Body ID - DB'den pattern'ler
+        nb_id_patterns = extract_patterns.get('notified_body_id', [])
         for pattern in nb_id_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 values["notified_body_id"] = match.group(1).strip()
                 break
 
-        # Manufacturer Name
-        manuf_patterns = [
-            r"(?:manufacturer|imalatçı|imalatci|üretici|fabrika|fabricant|hersteller|applicant|başvuru\s+sahibi|müracaatçı|company|şirket|firma)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö\s\.\-&]{5,100})",
-            r"(?:we\s+hereby\s+certify\s+that\s+)([A-Za-zÇŞİĞÜÖıçşığüö\s&\.]+)",
-            r"(?:this\s+certificate\s+is\s+issued\s+to\s+)([A-Za-zÇŞİĞÜÖıçşığüö\s&\.]+)"
-        ]
+        # Manufacturer Name - DB'den pattern'ler
+        manuf_patterns = extract_patterns.get('manufacturer_name', [])
         for pattern in manuf_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 values["manufacturer_name"] = match.group(1).strip()
                 break
 
-        # Machine Type/Model
-        machine_patterns = [
-            r"(?:machine\s+type|makine\s+tipi|makine\s+modeli|tipo\s+de\s+máquina|maschinentyp|type\s+de\s+machine)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/]{3,80})",
-            r"(?:trade\s+name|ticari\s+ad|ticari\s+isim|commercial\s+name|product\s+name|ürün\s+adı)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/]{3,80})",
-            r"(?:model|modelo|modèle|modell|tip|çeşit)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\s\.\-/]{2,50})"
-        ]
+        # Machine Type/Model - DB'den pattern'ler
+        machine_patterns = extract_patterns.get('machine_type', [])
         for pattern in machine_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 values["machine_type"] = match.group(1).strip()
                 break
 
-        # Certificate Number
-        cert_patterns = [
-            r"(?:certificate\s+number|belge\s+numarası|sertifika\s+no|cert\.\s*no\.?|number|nummer|número|ref|reference)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\-/\.]{5,30})",
-            r"(?:number|nummer|número|ref|reference)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\-/\.]{8,30})"
-        ]
+        # Certificate Number - DB'den pattern'ler
+        cert_patterns = extract_patterns.get('certificate_number', [])
         for pattern in cert_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
@@ -435,43 +309,39 @@ class ATTipIncelemeAnalyzer:
                     values["certificate_number"] = cert_num
                     break
 
-        # Issue Date
-        date_patterns = [
-            r"(?:date|tarih|datum|fecha|düzenlenme\s+tarihi|issue\s+date)\s*[:\-]?\s*([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})",
-            r"([0-9]{1,2}\s+[A-Za-zÇŞİĞÜÖıçşığüö]{3,9}\s+[0-9]{4})",
-            r"([0-9]{4}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{1,2})"
-        ]
+        # Issue Date - DB'den pattern'ler
+        date_patterns = extract_patterns.get('issue_date', [])
         for pattern in date_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 values["issue_date"] = match.group(1).strip()
                 break
 
-        # Serial Number
-        serial_patterns = [
-            r"(?:serial\s+number|seri\s+numarası|seri\s+no|s/n|sn|série|seriennummer|sıra\s+no|üretim\s+no)\s*[:\-]?\s*([A-Za-zÇŞİĞÜÖıçşığüö0-9\-/\.]{2,25})"
-        ]
+        # Serial Number - DB'den pattern'ler
+        serial_patterns = extract_patterns.get('serial_number', [])
         for pattern in serial_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 values["serial_number"] = match.group(1).strip()
                 break
 
-        # Applied Standards
-        standards = re.findall(
-            r"(?:EN\s*ISO\s*[0-9]{3,5}[\-:]*[0-9]*[\-:]*[0-9]*|EN\s*[0-9]{3,5}[\-:]*[0-9]*[\-:]*[0-9]*|ISO\s*[0-9]{3,5}[\-:]*[0-9]*[\-:]*[0-9]*|IEC\s*[0-9]{3,5}[\-:]*[0-9]*[\-:]*[0-9]*)",
-            text, re.IGNORECASE)
-        values["applied_standards"] = list(set(standards))
+        # Applied Standards - DB'den pattern (liste döndürür)
+        standards_patterns = extract_patterns.get('applied_standards', [])
+        if standards_patterns:
+            standards = re.findall(standards_patterns[0], text, re.IGNORECASE)
+            values["applied_standards"] = list(set(standards))
 
-        # Directive Reference
-        if re.search(r"2006/42/EC|2006\/42\/EC|machinery\s+directive|makine\s+direktifi", text, re.IGNORECASE):
-            values["directive_reference"] = "2006/42/EC"
+        # Directive Reference - DB'den pattern (kontrol)
+        directive_patterns = extract_patterns.get('directive_reference', [])
+        if directive_patterns:
+            if re.search(directive_patterns[0], text, re.IGNORECASE):
+                values["directive_reference"] = "2006/42/EC"
 
         return values
 
     def generate_recommendations(self, analysis_results: Dict[str, Dict[str, ATTipIncelemeResult]], 
                                 scores: Dict[str, Any]) -> List[str]:
-        """Öneriler oluştur - ESKİ HALDEKİ DETAYLI VERSİYON"""
+        """Öneriler oluştur"""
         recommendations = []
         
         if scores["critical_missing"]:
@@ -598,21 +468,27 @@ class ATTipIncelemeAnalyzer:
                 "error": f"Analiz sırasında hata oluştu: {str(e)}",
                 "analysis_date": datetime.now().isoformat()
             }
-def validate_document_server(text):
-    """Server kodunda doküman validasyonu - AT Type Certificate için"""
-    critical_terms = [
-        # AT Tip temel terimleri (en az 1 tane olmalı)
-        ["inceleme", "examination", "sertifika", "certificate", "belge", "document", "at tip", "ec type"],
-        
-        # Makine direktifi terimleri (en az 1 tane olmalı)  
-        ["direktif", "directive", "makine", "machinery", "2006/42/ec", "42/ec", "ek ix", "annex ix"],
-        
-        # Onaylanmış kuruluş terimleri (mutlaka olmalı)
-        ["onaylanmış", "notified", "kuruluş", "body", "notified body", "onaylanmış kuruluş"],
-        
-        # Belge geçerlilik terimleri (en az 1 tane olmalı)
-        ["geçerli", "valid", "yetki", "authority", "onay", "approval", "tarih", "date"]
-    ]
+
+# ============================================
+# HELPER FUNCTIONS (Server Validasyon)
+# ============================================
+def validate_document_server(text, validation_keywords):
+    """Server kodunda doküman validasyonu - DB'den gelen keywords ile"""
+    
+    # DB'den gelen critical_terms
+    critical_terms_data = validation_keywords.get('critical_terms', [])
+    
+    # Liste formatına dönüştür
+    critical_terms = []
+    for item in critical_terms_data:
+        if isinstance(item, dict) and 'keywords' in item:
+            critical_terms.append(item['keywords'])
+        elif isinstance(item, list):
+            critical_terms.append(item)
+    
+    if not critical_terms:
+        logger.warning("⚠️ Critical terms bulunamadı, validasyon atlanıyor")
+        return True
     
     category_found = []
     for i, category in enumerate(critical_terms):
@@ -625,21 +501,17 @@ def validate_document_server(text):
         category_found.append(found_in_category)
     
     valid_categories = sum(category_found)
-    logger.info(f"Doküman validasyonu: {valid_categories}/4 kritik kategori bulundu")
-    return valid_categories >= 3
+    logger.info(f"Doküman validasyonu: {valid_categories}/{len(critical_terms)} kritik kategori bulundu")
+    return valid_categories >= len(critical_terms) - 1
 
-def check_strong_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada özgü kelimeleri OCR ile ara - AT Type Certificate için"""
-    strong_keywords = [
-        "AT TİP",
-        "at tip",
-        "ec type",
-        "SERTİFİKA",
-        "sertifika",
-        "certificate",
-        "examination",
-        "inceleme"
-    ]
+
+def check_strong_keywords_first_pages(filepath, validation_keywords):
+    """İlk 1-2 sayfada özgü kelimeleri OCR ile ara - DB'den keywords"""
+    strong_keywords = validation_keywords.get('strong_keywords', [])
+    
+    if not strong_keywords:
+        logger.warning("⚠️ Strong keywords bulunamadı, validasyon atlanıyor")
+        return True
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=1)
@@ -664,57 +536,14 @@ def check_strong_keywords_first_pages(filepath):
         logger.warning(f"İlk sayfa kontrol hatası: {e}")
         return False
 
-def check_excluded_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara"""
-    excluded_keywords = [
-        # HRC raporu
-        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        
-        # Elektrik devre şeması
-        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm", "enclosure", "wrp-", "light curtain", "contactors", "controller",
-        
-        # Espe raporu  
-        "espe",
-        
-        # Hidrolik devre şeması
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
-        
-        # Gürültü ölçüm raporu
-        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        
-        # Manuel/kullanma kılavuzu
-        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
-        
-        # LOTO raporu
-        "loto",
-        
-        # LVD raporu
-        "lvd", "TOPRAKLAMA SÜREKLİLİK", "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        
-        # AT uygunluk beyanı (declaration, NOT certificate)
-        "uygunluk", "beyan", "conformity", "declaration", "declare",
-        
-        # İSG periyodik kontrol
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        
-        # Pnömatik devre şeması
-        "pnömatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "oil", "regis", "r102", "regulator", "dump valve",
-        
-        # Montaj talimatları
-        "montaj", "assembly",
-        
-        # EN 60204-1 topraklama raporu
-        "topraklama direnci", "grounding", "earthing", "60204", "topraklama", "TOPRAKLAMA DİRENCİ",
-        
-        # Bakım talimatları
-        "bakım", "maintenance", "servis", "service", "bakim", "MAINTENCE",
-        
-        # Mekanik titreşim raporu
-        "titreşim", "vibration", "mekanik",
-        
-        # Aydınlatma
-        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti"
-    ]
+
+def check_excluded_keywords_first_pages(filepath, validation_keywords):
+    """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara - DB'den"""
+    excluded_keywords = validation_keywords.get('excluded_keywords', [])
+    
+    if not excluded_keywords:
+        logger.warning("⚠️ Excluded keywords bulunamadı, validasyon atlanıyor")
+        return False
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=200, first_page=1, last_page=2)
@@ -739,10 +568,12 @@ def check_excluded_keywords_first_pages(filepath):
         logger.warning(f"İlk sayfa excluded kontrol hatası: {e}")
         return False
 
+
 def get_conclusion_message(status, percentage):
     if status == "PASS":
         return f"AT Tip İnceleme Sertifikası 2006/42/EC Ek IX'a uygun (%{percentage:.0f})"
     return f"AT Tip İnceleme Sertifikası direktife uygun değil (%{percentage:.0f})"
+
 
 def get_main_issues(report):
     issues = []
@@ -751,7 +582,16 @@ def get_main_issues(report):
             issues.append(f"Kritik eksik: {item}")
     return issues[:4]
 
+
+# ============================================
+# FLASK SERVİS KATMANI - CONFIGURATION
+# ============================================
 app = Flask(__name__)
+
+# Database configuration (YENİ)
+app.config['SQLALCHEMY_DATABASE_URI'] = Config.SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = Config.SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['SQLALCHEMY_ECHO'] = Config.SQLALCHEMY_ECHO
 
 UPLOAD_FOLDER = 'temp_uploads_at_type_cert'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'doc', 'txt'}
@@ -762,9 +602,14 @@ if not os.path.exists(UPLOAD_FOLDER):
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
+# ============================================
+# FLASK SERVİS KATMANI - API ENDPOINTS
+# ============================================
 @app.route('/api/at-type-cert-report', methods=['POST'])
 def analyze_at_type_cert_report():
     """AT Type Certificate analiz API endpoint'i - 3 Aşamalı Validasyon"""
@@ -781,7 +626,9 @@ def analyze_at_type_cert_report():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
         
-        analyzer = ATTipIncelemeAnalyzer()
+        # Create analyzer instance with app context
+        analyzer = ATTipIncelemeAnalyzer(app=app)
+        
         file_ext = os.path.splitext(filepath)[1].lower()
         
         # ÜÇ AŞAMALI AT TYPE CERTIFICATE KONTROLÜ
@@ -789,11 +636,11 @@ def analyze_at_type_cert_report():
         
         if file_ext == '.pdf':
             logger.info("Aşama 1: İlk sayfa AT Type Certificate özgü kelime kontrolü...")
-            if check_strong_keywords_first_pages(filepath):
+            if check_strong_keywords_first_pages(filepath, analyzer.validation_keywords):
                 logger.info("✅ Aşama 1 geçti - AT Type Certificate özgü kelimeler bulundu")
             else:
                 logger.info("Aşama 2: İlk sayfa excluded kelime kontrolü...")
-                if check_excluded_keywords_first_pages(filepath):
+                if check_excluded_keywords_first_pages(filepath, analyzer.validation_keywords):
                     logger.info("❌ Aşama 2'de excluded kelimeler bulundu - AT Type Certificate değil")
                     try:
                         os.remove(filepath)
@@ -828,7 +675,7 @@ def analyze_at_type_cert_report():
                                 'message': 'Dosyadan yeterli metin çıkarılamadı'
                             }), 400
                         
-                        if not validate_document_server(text):
+                        if not validate_document_server(text, analyzer.validation_keywords):
                             try:
                                 os.remove(filepath)
                             except:
@@ -872,7 +719,7 @@ def analyze_at_type_cert_report():
                     'message': 'Dosyadan yeterli metin çıkarılamadı'
                 }), 400
             
-            if not validate_document_server(text):
+            if not validate_document_server(text, analyzer.validation_keywords):
                 try:
                     os.remove(filepath)
                 except:
@@ -970,6 +817,7 @@ def analyze_at_type_cert_report():
         logger.error(f"API endpoint hatası: {str(e)}")
         return jsonify({'error': 'Server error', 'message': str(e)}), 500
 
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     return jsonify({
@@ -978,6 +826,7 @@ def health_check():
         'version': '1.0.0'
     })
 
+
 @app.route('/', methods=['GET'])
 def index():
     return jsonify({
@@ -985,6 +834,17 @@ def index():
         'version': '1.0.0'
     })
 
+
+# ============================================
+# DATABASE INITIALIZATION
+# ============================================
+with app.app_context():
+    db.init_app(app)
+
+
+# ============================================
+# APPLICATION ENTRY POINT (Azure-Friendly)
+# ============================================
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8015))
     logger.info(f"🚀 AT Type Certificate Analyzer API - Port: {port}")

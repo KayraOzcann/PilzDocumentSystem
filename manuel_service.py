@@ -2,6 +2,7 @@
 Manuel/Kullanım Kılavuzu Analiz Servisi
 ========================================
 Azure App Service için optimize edilmiş standalone servis
+Database-Driven Configuration
 
 Endpoint: POST /api/manuel-report
 Health Check: GET /api/health
@@ -28,6 +29,18 @@ from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
 # ============================================
+# DATABASE IMPORTS (YENİ)
+# ============================================
+from flask import current_app
+from database import db, init_db
+from db_loader import load_service_config
+
+# ============================================
+# CONFIG IMPORT (YENİ)
+# ============================================
+from config import Config
+
+# ============================================
 # LOGGING
 # ============================================
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -42,6 +55,20 @@ try:
 except ImportError:
     LANGUAGE_DETECTION_AVAILABLE = False
     logger.warning("langdetect not available")
+
+# ============================================
+# TESSERACT CHECK
+# ============================================
+def check_tesseract_installation():
+    try:
+        version = pytesseract.get_tesseract_version()
+        logger.info(f"Tesseract OCR kurulu - Sürüm: {version}")
+        return True, f"Tesseract v{version}"
+    except Exception as e:
+        logger.error(f"Tesseract OCR kurulu değil: {e}")
+        return False, str(e)
+
+tesseract_available, tesseract_info = check_tesseract_installation()
 
 # ============================================
 # DATA CLASSES
@@ -59,66 +86,40 @@ class ManualAnalysisResult:
 # ANALYZER CLASS
 # ============================================
 class ManualReportAnalyzer:
-    def __init__(self):
+    def __init__(self, app=None):
         logger.info("Kullanma Kılavuzu analiz sistemi başlatılıyor...")
         
-        self.criteria_weights = {
-            "Genel Bilgiler": 10,
-            "Giriş ve Amaç": 5,
-            "Güvenlik Bilgileri": 15,
-            "Ürün Tanıtımı": 10,
-            "Kurulum ve Montaj Bilgileri": 15,
-            "Kullanım Talimatları": 20,
-            "Bakım ve Temizlik": 10,
-            "Arıza Giderme": 15
-        }
-        
-        self.criteria_details = {
-            "Genel Bilgiler": {
-                "kilavuz_adi_kod": {"pattern": r"(?:Kılavuz|Manual|Guide|Kullan[ıi]m\s*K[ıi]lavuzu|User\s*Manual|Operating\s*Manual)", "weight": 5},
-                "urun_modeli": {"pattern": r"(?:Ürün|Product|Model|Seri\s*No|Serial\s*Number|Part\s*Number)", "weight": 3},
-                "revizyon_bilgisi": {"pattern": r"(?:Revizyon|Revision|Rev\.?|Version|v)\s*[:=]?\s*(\d+|[A-Z])", "weight": 2}
-            },
-            "Giriş ve Amaç": {
-                "kilavuz_amaci": {"pattern": r"(?:Amaç|Purpose|Objective|Bu\s*k[ıi]lavuz|This\s*manual|Introduction|Giriş)", "weight": 3},
-                "kapsam": {"pattern": r"(?:Kapsam|Scope|Coverage|Bu\s*dokuman|This\s*document)", "weight": 2}
-            },
-            "Güvenlik Bilgileri": {
-                "genel_guvenlik": {"pattern": r"(?:Güvenlik|Safety|Güvenlik\s*Uyar[ıi]s[ıi]|Safety\s*Warning|UYARI|WARNING|DİKKAT|CAUTION)", "weight": 4},
-                "tehlikeler": {"pattern": r"(?:Tehlike|Hazard|Risk|Tehlikeli|Dangerous|Yaralanma|Injury)", "weight": 4},
-                "guvenlik_prosedur": {"pattern": r"(?:Prosedür|Procedure|Güvenlik\s*Prosedür|Safety\s*Procedure|Uyulmas[ıi]\s*gereken)", "weight": 3},
-                "kkd_gerekliligi": {"pattern": r"(?:KKD|PPE|Personal\s*Protective|Koruyucu\s*Donanım|Protective\s*Equipment|Eldiven|Glove|Gözlük|Goggle|Koruyucu\s*Alet|Koruyucu\s*Ekipman|Safety\s*Equipment|Güvenlik\s*Ekipman|Koruyucu.*?kullan|Protective.*?use|Safety.*?wear|Güvenlik.*?giy|Emniy.*?alet|İş\s*güvenliği\s*ekipman)", "weight": 4}
-            },
-            "Ürün Tanıtımı": {
-                "urun_tanimi": {"pattern": r"(?:Ürün\s*Tan[ıi]m[ıi]|Product\s*Description|Genel\s*Tan[ıi]m|General\s*Description)", "weight": 3},
-                "teknik_ozellikler": {"pattern": r"(?:Teknik\s*Özellik|Technical\s*Specification|Specification|Özellik|Feature)", "weight": 3},
-                "bilesenler": {"pattern": r"(?:Bileşen|Component|Parça|Part|Liste|List|İçerik|Content)", "weight": 2},
-                "gorseller": {"pattern": r"(?:Görsel|Image|Resim|Picture|Şekil|Figure|Fotoğraf|Photo)", "weight": 2}
-            },
-            "Kurulum ve Montaj Bilgileri": {
-                "kurulum_oncesi": {"pattern": r"(?:Kurulum\s*Öncesi|Before\s*Installation|Hazırl[ıi]k|Preparation|Ön\s*hazırl[ıi]k)", "weight": 4},
-                "montaj_talimatlari": {"pattern": r"(?:Montaj|Installation|Assembly|Ad[ıi]m|Step|Talimat|Instruction)", "weight": 4},
-                "gerekli_aletler": {"pattern": r"(?:Alet|Tool|Malzeme|Material|Gerekli|Required|Equipment)", "weight": 3},
-                "kurulum_kontrolu": {"pattern": r"(?:Kontrol|Check|Test|Doğrula|Verify|Kurulum\s*Sonras[ıi]|After\s*Installation)", "weight": 4}
-            },
-            "Kullanım Talimatları": {
-                "calistirma": {"pattern": r"(?:Çal[ıi]şt[ıi]rma|Start|Operation|Açma|Turn\s*On|Power\s*On)", "weight": 5},
-                "kullanim_kilavuzu": {"pattern": r"(?:Kullan[ıi]m|Usage|Use|Operating|Ad[ıi]m\s*ad[ıi]m|Step\s*by\s*step)", "weight": 5},
-                "calisma_modlari": {"pattern": r"(?:Mod|Mode|Ayar|Setting|Çal[ıi]şma\s*Mod|Operating\s*Mode)", "weight": 5},
-                "kullanim_ipuclari": {"pattern": r"(?:İpucu|Tip|Öneri|Recommendation|Doğru\s*kullan[ıi]m|Proper\s*use)", "weight": 5}
-            },
-            "Bakım ve Temizlik": {
-                "duzenli_bakim": {"pattern": r"(?:Bak[ıi]m|Maintenance|Düzenli|Regular|Periyodik|Periodic)", "weight": 3},
-                "temizlik_yontemleri": {"pattern": r"(?:Temizlik|Cleaning|Temizle|Clean|Hijyen|Hygiene)", "weight": 3},
-                "parca_degisimi": {"pattern": r"(?:Parça\s*Değiş|Part\s*Replace|Yedek\s*Parça|Spare\s*Part|Değiştir|Replace)", "weight": 4}
-            },
-            "Arıza Giderme": {
-                "sorun_cozumleri": {"pattern": r"(?:Sorun|Problem|Ar[ıi]za|Fault|Troubleshoot|Çözüm|Solution)", "weight": 5},
-                "hata_kodlari": {"pattern": r"(?:Hata\s*Kod|Error\s*Code|Kod|Code|Alarm|Uyar[ıi]\s*Lambas[ıi]|Warning\s*Light|Acil\s*Durum\s*Buton|Emergency\s*Button|Hata\s*Gösterg|Error\s*Indicator|Uyar[ıi]\s*Sistemi|Warning\s*System|K[ıi]z[ıi]l\s*[Iı]ş[ıi]k|Red\s*Light|Alarm\s*Sistemi|Hata\s*Durumu|Error\s*Status|Aktifleş|Activate)", "weight": 5},
-                "teknik_destek": {"pattern": r"(?:Teknik\s*Destek|Technical\s*Support|Destek|Support|İletişim|Contact|Tel|Phone|Telefon|E-?mail|Mail|Fax|Website|Web|www\.|@|\.com|\.net|\.org|\+90|\+\d{1,3}|\d{3}[-.\s]\d{3}[-.\s]\d{4}|\(\d{3}\)\s*\d{3}[-.\s]\d{4}|0\d{3}\s*\d{3}\s*\d{2}\s*\d{2})", "weight": 3},
-                "teknik_cizimler": {"pattern": r"(?:Çizim|Drawing|Şema|Scheme|Diyagram|Diagram|Plan)", "weight": 2}
-            }
-        }
+        # Flask app context varsa DB'den yükle, yoksa boş başlat
+        if app:
+            with app.app_context():
+                try:
+                    config = load_service_config('manuel_report')
+                    
+                    # DB'den yüklenen veriler
+                    self.criteria_weights = config.get('criteria_weights', {})
+                    self.criteria_details = config.get('criteria_details', {})
+                    self.pattern_definitions = config.get('pattern_definitions', {})
+                    self.validation_keywords = config.get('validation_keywords', {})
+                    self.category_actions = config.get('category_actions', {})
+                    
+                    logger.info(f"✅ Veritabanından yüklendi: {len(self.criteria_weights)} kategori")
+                    
+                except Exception as e:
+                    logger.error(f"⚠️ Veritabanından yükleme başarısız: {e}")
+                    logger.warning("⚠️ Fallback: Boş config kullanılıyor")
+                    self.criteria_weights = {}
+                    self.criteria_details = {}
+                    self.pattern_definitions = {}
+                    self.validation_keywords = {}
+                    self.category_actions = {}
+        else:
+            # Flask app yoksa boş başlat (eski davranış)
+            logger.warning("⚠️ Flask app context yok, boş config kullanılıyor")
+            self.criteria_weights = {}
+            self.criteria_details = {}
+            self.pattern_definitions = {}
+            self.validation_keywords = {}
+            self.category_actions = {}
     
     def detect_language(self, text: str) -> str:
         if not LANGUAGE_DETECTION_AVAILABLE:
@@ -275,14 +276,11 @@ class ManualReportAnalyzer:
             "hazirlayan": "Bulunamadı"
         }
         
-        # Kılavuz adı
-        manual_patterns = [
-            r"(?:Kullan[ıi]m\s*K[ıi]lavuzu)\s*[:=]?\s*([^\n\r]+)",
-            r"(?:User\s*Manual)\s*[:=]?\s*([^\n\r]+)",
-            r"(?:Operating\s*Manual)\s*[:=]?\s*([^\n\r]+)",
-            r"(Manual|K[ıi]lavuz|Guide)"
-        ]
+        # DB'den pattern'leri al
+        extract_values = self.pattern_definitions.get('extract_values', {})
         
+        # Kılavuz adı
+        manual_patterns = extract_values.get('kilavuz_adi', [])
         for pattern in manual_patterns:
             manual_match = re.search(pattern, text, re.IGNORECASE)
             if manual_match:
@@ -290,13 +288,7 @@ class ManualReportAnalyzer:
                 break
         
         # Ürün modeli
-        product_patterns = [
-            r"(?:Model)\s*[:=]?\s*([^\n\r]+)",
-            r"(?:Product)\s*[:=]?\s*([^\n\r]+)",
-            r"(?:Ürün)\s*[:=]?\s*([^\n\r]+)",
-            r"(?:Part\s*Number)\s*[:=]?\s*([^\n\r]+)"
-        ]
-        
+        product_patterns = extract_values.get('urun_modeli', [])
         for pattern in product_patterns:
             product_match = re.search(pattern, text, re.IGNORECASE)
             if product_match:
@@ -304,12 +296,7 @@ class ManualReportAnalyzer:
                 break
         
         # Tarih
-        date_patterns = [
-            r"(?:Hazırlama|Prepared|Date|Tarih)\s*[:=]?\s*(\d{1,2}[./]\d{1,2}[./]\d{4})",
-            r"(\d{1,2}[./]\d{1,2}[./]\d{4})",
-            r"(\d{4}[./]\d{1,2}[./]\d{1,2})"
-        ]
-        
+        date_patterns = extract_values.get('hazırlama_tarihi', [])
         for pattern in date_patterns:
             date_match = re.search(pattern, text, re.IGNORECASE)
             if date_match:
@@ -317,12 +304,7 @@ class ManualReportAnalyzer:
                 break
         
         # Hazırlayan
-        author_patterns = [
-            r"(?:Hazırlayan)\s*[:=]?\s*([^\n\r]+)",
-            r"(?:Prepared\s*by)\s*[:=]?\s*([^\n\r]+)",
-            r"(?:Author)\s*[:=]?\s*([^\n\r]+)"
-        ]
-        
+        author_patterns = extract_values.get('hazirlayan', [])
         for pattern in author_patterns:
             author_match = re.search(pattern, text, re.IGNORECASE)
             if author_match:
@@ -412,21 +394,53 @@ class ManualReportAnalyzer:
 # ============================================
 # HELPER FUNCTIONS
 # ============================================
-def validate_document_server(text):
-    critical_terms = [
-        ["kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu", "user manual"],
-        ["güvenlik", "safety", "uyarı", "warning", "dikkat", "attention", "tehlike", "danger"],
-        ["kurulum", "installation", "montaj", "assembly", "setup", "kurma", "takma", "yerleştirme"],
-        ["kullanım", "operation", "işletim", "çalıştırma", "kullanma", "nasıl kullanılır", "how to use"],
-        ["bakım", "maintenance", "temizlik", "cleaning", "arıza", "troubleshooting", "onarım", "repair"]
-    ]
-    category_found = [any(re.search(rf"\b{term}\b", text, re.IGNORECASE) for term in category) for category in critical_terms]
-    valid = sum(category_found)
-    logger.info(f"Manuel validasyon: {valid}/5 kategori")
-    return valid >= 4
+def validate_document_server(text, validation_keywords):
+    """Server kodunda Manuel doküman validasyonu - DB'den gelen keywords ile"""
+    
+    # DB'den gelen critical_terms
+    critical_terms_data = validation_keywords.get('critical_terms', [])
+    
+    # Liste formatına dönüştür (eski format uyumluluğu)
+    critical_terms = []
+    for item in critical_terms_data:
+        if isinstance(item, dict) and 'keywords' in item:
+            critical_terms.append(item['keywords'])
+        elif isinstance(item, list):
+            critical_terms.append(item)
+    
+    # Eğer DB'den veri gelmediyse, boş validasyon (hata verme)
+    if not critical_terms:
+        logger.warning("⚠️ Critical terms bulunamadı, validasyon atlanıyor")
+        return True  # Varsayılan: geçerli kabul et
+    
+    category_found = []
+    
+    for i, category in enumerate(critical_terms):
+        found_in_category = False
+        for term in category:
+            if re.search(rf"\b{term}\b", text, re.IGNORECASE):
+                found_in_category = True
+                logger.info(f"Manuel Kategori {i+1} bulundu: '{term}'")
+                break
+        category_found.append(found_in_category)
+    
+    valid_categories = sum(category_found)
+    logger.info(f"Manuel doküman validasyonu: {valid_categories}/{len(critical_terms)} kritik kategori bulundu")
+    
+    return valid_categories >= len(critical_terms) - 1  # En az (n-1) kategori bulunmalı
 
-def check_strong_keywords_first_pages(filepath):
-    strong_keywords = ["kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu"]
+
+def check_strong_keywords_first_pages(filepath, validation_keywords):
+    """İlk sayfada Manuel'e özgü kelimeleri OCR ile ara - DB'den gelen keywords ile"""
+    
+    # DB'den strong keywords al
+    strong_keywords = validation_keywords.get('strong_keywords', [])
+    
+    # Eğer DB'den veri gelmediyse, validasyon atla
+    if not strong_keywords:
+        logger.warning("⚠️ Strong keywords bulunamadı, validasyon atlanıyor")
+        return True  # Varsayılan: geçerli kabul et
+    
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=1)
         all_text = ""
@@ -443,25 +457,18 @@ def check_strong_keywords_first_pages(filepath):
         logger.warning(f"OCR hatası: {e}")
         return False
 
-def check_excluded_keywords_first_pages(filepath):
-    excluded = [
-        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219",
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
-        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        "loto",
-        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
-        "espe",
-        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        "montaj", "assembly",
-        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
-        "titreşim", "vibration", "mekanik",
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
-        "topraklama direnci", "grounding", "earthing", "60204","topraklama", "TOPRAKLAMA DİRENCİ",
-    ]
+
+def check_excluded_keywords_first_pages(filepath, validation_keywords):
+    """İlk sayfada istenmeyen rapor türlerinin kelimelerini ara - DB'den"""
+    
+    # DB'den excluded keywords al
+    excluded_keywords = validation_keywords.get('excluded_keywords', [])
+    
+    # Eğer DB'den veri gelmediyse, validasyon atla
+    if not excluded_keywords:
+        logger.warning("⚠️ Excluded keywords bulunamadı, validasyon atlanıyor")
+        return False  # Varsayılan: excluded yok kabul et
+    
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=1)
         all_text = ""
@@ -471,16 +478,18 @@ def check_excluded_keywords_first_pages(filepath):
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
             text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
             all_text += text.lower() + " "
-        found = [kw for kw in excluded if re.search(rf"\b{kw.lower()}\b", all_text)]
+        found = [kw for kw in excluded_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
         return len(found) >= 1
     except Exception as e:
         logger.warning(f"Excluded OCR hatası: {e}")
         return False
 
+
 def get_conclusion_message_manuel(status, percentage):
     if status == "PASS":
         return f"Kullanım kılavuzu yeterli kriterleri sağlamaktadır (%{percentage:.0f})"
     return f"Kullanım kılavuzu yetersiz kriterlere sahip (%{percentage:.0f})"
+
 
 def get_main_issues_manuel(report):
     issues = []
@@ -490,21 +499,16 @@ def get_main_issues_manuel(report):
                 issues.append(f"{category} kategorisinde ciddi eksiklikler")
     return issues[:4]
 
-def check_tesseract_installation():
-    try:
-        version = pytesseract.get_tesseract_version()
-        logger.info(f"Tesseract OCR kurulu - Sürüm: {version}")
-        return True, f"Tesseract v{version}"
-    except Exception as e:
-        logger.error(f"Tesseract OCR kurulu değil: {e}")
-        return False, str(e)
-
-tesseract_available, tesseract_info = check_tesseract_installation()
 
 # ============================================
 # FLASK APP
 # ============================================
 app = Flask(__name__)
+
+# Database configuration (YENİ)
+app.config['SQLALCHEMY_DATABASE_URI'] = Config.SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = Config.SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['SQLALCHEMY_ECHO'] = Config.SQLALCHEMY_ECHO
 
 UPLOAD_FOLDER = 'temp_uploads_manuel'
 ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
@@ -534,17 +538,19 @@ def analyze_manuel_report():
             file.save(filepath)
             logger.info(f"Manuel analizi başlatılıyor: {filename}")
 
-            analyzer = ManualReportAnalyzer()
+            # Create analyzer instance
+            analyzer = ManualReportAnalyzer(app=app)
+            
             file_ext = os.path.splitext(filepath)[1].lower()
             
             # 3 AŞAMALI KONTROL
             if file_ext == '.pdf':
                 logger.info("Aşama 1: Kullanım Kılavuzu özgü kelime kontrolü...")
-                if check_strong_keywords_first_pages(filepath):
+                if check_strong_keywords_first_pages(filepath, analyzer.validation_keywords):
                     logger.info("✅ Aşama 1 geçti")
                 else:
                     logger.info("Aşama 2: Excluded kelime kontrolü...")
-                    if check_excluded_keywords_first_pages(filepath):
+                    if check_excluded_keywords_first_pages(filepath, analyzer.validation_keywords):
                         logger.info("❌ Excluded kelimeler bulundu")
                         try:
                             os.remove(filepath)
@@ -558,7 +564,7 @@ def analyze_manuel_report():
                                 pdf_reader = PyPDF2.PdfReader(f)
                                 text = "".join(page.extract_text() + "\n" for page in pdf_reader.pages)
                             
-                            if not text or len(text.strip()) < 50 or not validate_document_server(text):
+                            if not text or len(text.strip()) < 50 or not validate_document_server(text, analyzer.validation_keywords):
                                 try:
                                     os.remove(filepath)
                                 except:
@@ -647,6 +653,17 @@ def health_check():
 def index():
     return jsonify({'service': 'Manual Report Analyzer API', 'version': '1.0.0', 'endpoints': {'POST /api/manuel-report': 'Manuel analizi', 'GET /api/health': 'Servis sağlık kontrolü'}})
 
+
+# ============================================
+# DATABASE INITIALIZATION
+# ============================================
+with app.app_context():
+    db.init_app(app)
+
+
+# ============================================
+# APPLICATION ENTRY POINT (Azure-Friendly)
+# ============================================
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8004))
     logger.info(f"🚀 Manuel Servisi - Port: {port}")

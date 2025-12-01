@@ -17,7 +17,7 @@ init_db(app)
 # ============================================
 # TODO: AYNI SERVİS KODUNU BURAYA DA YAZIN
 # ============================================
-SERVICE_CODE = 'noise_report'  # TODO: migrate_service_template.py ile aynı olmalı!
+SERVICE_CODE = 'loto_report'  # TODO: migrate_service_template.py ile aynı olmalı! 
 
 print("\n" + "=" * 80)
 print(f"{SERVICE_CODE.upper()} - MİGRATION KONTROL")

@@ -2,6 +2,7 @@
 # HRC KUVVET-BASINÇ ÖLÇÜM RAPORU ANALİZ SERVİSİ
 # Standalone Service - Azure App Service Ready
 # Port: 8013
+# Database-Driven Configuration
 # ============================================
 
 # ============================================
@@ -23,6 +24,18 @@ import pdf2image
 
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
+
+# ============================================
+# DATABASE IMPORTS (YENİ)
+# ============================================
+from flask import current_app
+from database import db, init_db
+from db_loader import load_service_config
+
+# ============================================
+# CONFIG IMPORT (YENİ)
+# ============================================
+from config import Config
 
 # ============================================
 # LOGGING CONFIGURATION
@@ -74,66 +87,41 @@ class HRCAnalysisResult:
 class HRCReportAnalyzer:
     """HRC Kuvvet-Basınç Ölçüm Raporu analiz sınıfı"""
     
-    def __init__(self):
+    def __init__(self, app=None):
         logger.info("HRC Kuvvet-Basınç Ölçüm Raporu analiz sistemi başlatılıyor...")
         logger.info("✅ OCR sistemi aktif - Tüm dosyalar OCR ile işlenmektedir")
         
-        self.criteria_weights = {
-            "Genel Bilgiler": 10,
-            "Test Koşulları ve Senaryo Tanımı": 10,
-            "Ölçüm Noktaları ve Metodoloji": 15,
-            "Kuvvet ve Basınç Ölçüm Sonuçları": 25,
-            "Sınır Değerlerle Karşılaştırma": 20,
-            "Risk Değerlendirmesi ve Sonuç": 10,
-            "Öneriler ve Önlemler": 5,
-            "Ekler ve Kalibrasyon Belgeleri": 5
-        }
-        
-        self.criteria_details = {
-            "Genel Bilgiler": {
-                "test_tarihi": {"pattern": r"(?i)(?:test|ölçüm|analiz|measurement|analysis|tarih|date)[\s\W]*[:=]?\s*(\d{1,2}[\./\-]\d{1,2}[\./\-]\d{2,4})|(\d{1,2}[\./\-]\d{1,2}[\./\-]\d{4})(?:\s*(?:tarih|date))?", "weight": 2},
-                "test_yapan_kurum": {"pattern": r"(?i)(?:test\s*yapan|tested\s*by|ölçüm\s*yapan|measured\s*by|kurum|institution|organization|şirket|company|firma|sorumlu|responsible)[\s\W]*[:=]?\s*([A-ZÇĞİÖŞÜa-züçğıöşü][A-Za-züçğıöşüÇĞİÖŞÜ\s\.\&\-]{3,50})", "weight": 2},
-                "robot_modeli_seri": {"pattern": r"(?i)(?:robot\s*model|robot\s*tip|model|seri\s*no|serial\s*number|s\/n|robot\s*type|tip|robot\s*id)[\s\W]*[:=]?\s*([A-Z0-9\-]+[A-Z0-9\-\s]*)|([A-Z]{2,4}[\-\s]*[0-9]{1,5}[A-Z0-9]*)", "weight": 3},
-                "uygulama_istasyon": {"pattern": r"(?i)(?:uygulama|application|istasyon|station|workstation|iş\s*istasyon|work\s*station|test\s*setup|test\s*düzen|çalışma\s*alan|work\s*area)[\s\W]*[:=]?\s*([A-ZÇĞİÖŞÜa-züçğıöşü][A-Za-züçğıöşüÇĞİÖŞÜ0-9\s\.\-]{3,50})", "weight": 3}
-            },
-            "Test Koşulları ve Senaryo Tanımı": {
-                "robot_hiz_durum": {"pattern": r"(?i)(?:hız|speed|velocity|hızlı|durum|position|pose|duruş|stance|hareket|motion)[\s\W]*[:=]?\s*([0-9.,]+\s*(?:mm\/s|m\/s|%|derece|degree|°|rpm)|[A-ZÇĞİÖŞÜa-züçğıöşü][A-Za-züçğıöşüÇĞİÖŞÜ\s]{3,30})", "weight": 3},
-                "calisma_modu": {"pattern": r"(?i)(?:çalışma\s*mod|work\s*mode|operation\s*mode|manuel|manual|otomatik|automatic|işbirlik|collaborative|cobot|hrc|interaction|mod|mode)", "weight": 2},
-                "temas_bolgeleri": {"pattern": r"(?i)(?:temas\s*bölge|contact\s*area|contact\s*region|vücut\s*bölge|body\s*region|bölge|region|area|kol|arm|el|hand|gövde|body|torso|baş|head|bacak|leg|finger|parmak)", "weight": 3},
-                "cevresel_sartlar": {"pattern": r"(?i)(?:sıcaklık|temperature|ortam|environment|çevre|ambient|celsius|nem|humidity|koşul|condition|şart)[\s\W]*[:=]?\s*([0-9.,]+\s*(?:°c|c|%|derece)|[A-ZÇĞİÖŞÜa-züçğıöşü][A-Za-züçğıöşüÇĞİÖŞÜ\s]{3,30})", "weight": 2}
-            },
-            "Ölçüm Noktaları ve Metodoloji": {
-                "vucut_bolgeleri_iso15066": {"pattern": r"(?i)(?:iso\/ts\s*15066|iso\s*15066|ts\s*15066|vücut\s*bölge|body\s*region|tablo|table|kafa|head|yüz|face|boyun|neck|sırt|back|göğüs|chest|karın|abdomen|pelvis|kol|arm|dirsek|elbow|ön\s*kol|forearm|el|hand|parmak|finger|15066|skull|forehead|temple|masticatory|muscle)", "weight": 5},
-                "olcum_yontemi": {"pattern": r"(?i)(?:ölçüm\s*yöntem|measurement\s*method|test\s*method|yöntem|method|statik|static|dinamik|dynamic|temas|contact|serbest\s*hareket|free\s*motion|engel|obstacle|barrier|prosedür|procedure|ölçüm\s*nokta|measurement\s*point|nokta\s*\d+|point\s*\d+|film|llw|max\s*pressure|mpa)", "weight": 5},
-                "tekrar_sayisi_tutarlilik": {"pattern": r"(?i)(?:tekrar|repeat|iteration|test\s*sayı|test\s*count|n\s*=|n=|örnek\s*sayı|sample\s*count)[\s\W]*[:=]?\s*(\d{1,3})|(?:tutarlılık|consistency|repeatability|reproducibility|tekrarlama)|(?:a1|a2|b1|b2|c1|c2)[\s\W]*[=:]\s*([0-9.,]+)|(?:kuvvet\s*ölçüm|force\s*measurement)[\s\S]{0,50}(?:gelişim|development|progress)|(\d{1,2})\s*(?:nokta|point|ölçüm|measurement)", "weight": 5}
-            },
-            "Kuvvet ve Basınç Ölçüm Sonuçları": {
-                "maksimum_temas_kuvveti": {"pattern": r"(?i)(?:maksimum\s*kuvvet|maximum\s*force|max\s*force|fmax|f\s*max|kuvvet\s*değer|force\s*value|en\s*büyük\s*kuvvet)[\s\W]*[:=]?\s*([0-9.,]+)\s*(?:n|newton|kn)|(?:f[\s\W]*max|fr[\s\W]*max|fs[\s\W]*max)[\s\W]*([0-9.,]+)|(\d{1,3})\s*(?=\s*\-?\s*\d{1,2}\s)|(?:maximum\s*permissible\s*kuvvet|maximum\s*permissible\s*force|izin\s*verilen\s*kuvvet)[\s\S]{0,50}([0-9.,]+)|(?:quasi[\-\s]*static|transient)[\s\S]{0,100}(?:kuvvet|force)[\s\S]{0,50}([0-9.,]+)", "weight": 7},
-                "temas_suresi": {"pattern": r"(?i)(?:temas\s*süre|contact\s*time|contact\s*duration|süre|duration|time|t\s*=|t=|zaman|contact)[\s\W]*[:=]?\s*([0-9.,]+)\s*(?:ms|millisecond|s|second|saniye|msn|sn)|(\d{1,3})\s*(?:ms|s|saniye|sn)\b|(?:süre|duration|time)[\s\W]*(\d{1,3})|(?:transient|quasi[\-\s]*static)[\s\S]{0,50}(?:süre|time|duration)[\s\S]{0,30}([0-9.,]+)", "weight": 6},
-                "basinc_degeri": {"pattern": r"(?i)(?:basınç\s*ts|pressure\s*ts|basınç|pressure|press|baskı)[\s\W]*[:=]?\s*([0-9.,]+)\s*(?:n\/cm²|n\/cm2|pa|kpa|mpa|bar|pascal)|(?:ps[\s\W]*max|p[\s\W]*max|basınç[\s\W]*max)[\s\W]*([0-9.,]+)|(\d{1,3})\s*(?:n\/cm²|n\/cm2|pa|bar)|(?:ts\s*15066)[\s\S]{0,50}(\d{1,3})\s*(?:n\/cm²|n\/cm2)|(?:maximum\s*permissible\s*basınç|maximum\s*permissible\s*pressure|izin\s*verilen\s*basınç)[\s\S]{0,50}([0-9.,]+)|(?:quasi[\-\s]*static|transient)[\s\S]{0,100}(?:basınç|pressure)[\s\S]{0,50}([0-9.,]+)", "weight": 6},
-                "grafiksel_gosterim": {"pattern": r"(?i)(?:grafik|graph|chart|eğri|curve|kuvvet[\-\s]*zaman|force[\-\s]*time|plot|çizim|drawing|şekil\s*\d+|figure\s*\d+|diyagram|diagram|görsel|visual|resim\s*\d+|image\s*\d+|fig\s*\d+|şek\s*\d+|tablo\s*\d+|table\s*\d+|sonuç|result|ölçüm\s*sonuç|measurement\s*result)", "weight": 6}
-            },
-            "Sınır Değerlerle Karşılaştırma": {
-                "iso15066_sinir_karsilastirma": {"pattern": r"(?i)(?:iso\/ts\s*15066|iso\s*15066|ts\s*15066|15066)[\s\S]*?(?:sınır|limit|threshold|eşik|karşılaştırma|comparison|compare|kıyas|standart|uygun|compliant)", "weight": 8},
-                "vucut_bolgesi_limitleri": {"pattern": r"(?i)(?:izin\s*verilen|allowed|permitted|limit|sınır|maksimum\s*izin|maximum\s*allowed|kabul\s*edilebilir|acceptable)[\s\S]*?(?:kuvvet|force|basınç|pressure)", "weight": 6},
-                "asim_risk_isaret": {"pattern": r"(?i)(?:aşım|exceed|over|fazla|limit\s*aş|limit\s*over|risk|tehlike|hazard|warning|uyarı|alert|güvenli\s*değil|not\s*safe|tehlikeli|dangerous)", "weight": 6}
-            },
-           "Risk Değerlendirmesi ve Sonuç": {
-                "risk_seviye_analizi": {"pattern": r"(?i)(?:risk\s*analiz|risk\s*analysis|risk\s*assessment|risk\s*değerlendirme|risk|seviye|level|kategori|category|düşük|low|orta|medium|yüksek|high|değerlendirme|assessment)", "weight": 4},
-                "risk_kabul_edilebilir": {"pattern": r"(?i)(?:kabul\s*edilebilir|acceptable|accept|uygun|suitable|güvenli|safe|güvenlik|safety|onay|approve|red|reject|kabul|uygunluk|compliance)", "weight": 3},
-                "gereken_onlemler": {"pattern": r"(?i)(?:önlem|measure|action|tedbir|hız\s*sınır|speed\s*limit|güvenlik\s*sensör|safety\s*sensor|uç\s*efektör|end\s*effector|koruma|protection|emniyet|security)", "weight": 3}
-            },
-            "Öneriler ve Önlemler": {
-                "emniyet_stratejisi": {"pattern": r"(?i)(?:emniyet\s*stratejisi|safety\s*strategy|strateji|güvenlik\s*stratejisi|hız\s*sınır|speed\s*limit|kuvvet\s*sınır|force\s*limit|yastıklama|padding|koruyucu|protective|eşik\s*değer|threshold\s*value|limit\s*değer|uygun\s*değer|yeşil|green|renk|color|renklendir|colored)", "weight": 2},
-                "operatör_egitimi": {"pattern": r"(?i)(?:operatör|operator|eğitim|training|bilgilendirme|information|uyarı|warning|not|note|kullanıcı|user|personel|personnel|kabul\s*edilebilir|acceptable|uygun|appropriate|yeterli|sufficient)", "weight": 2},
-                "periyodik_test": {"pattern": r"(?i)(?:periyodik|periodic|tekrarlayan|repeated|test\s*tekrar|test\s*repeat|düzenli|regular|planlı|scheduled|rutin|routine|bakım|maintenance|ölçüm\s*tablo|measurement\s*table|tablo|table|değerlendirme|evaluation)", "weight": 1}
-            },
-            "Ekler ve Kalibrasyon Belgeleri": {
-                "kalibrasyon_sertifika": {"pattern": r"(?i)(?:kalibrasyon|calibration|sertifika|certificate|cert|belge|document|iso\s*17025|akreditasyon|accreditation|onay|approval|doğrulama|verification)", "weight": 2},
-                "fotograf_video": {"pattern": r"(?i)(?:fotoğraf|photo|photograph|video|resim|image|picture|görsel|visual|kayıt|record|çekim|shot|dokümantasyon|documentation)", "weight": 2},
-                "test_prosedur_referans": {"pattern": r"(?i)(?:prosedür|procedure|referans|reference|standart|standard|kılavuz|guide|manual|dokümantasyon|documentation|kaynak|source|metod|method)", "weight": 1}
-            }
-        }
+        # Flask app context varsa DB'den yükle, yoksa boş başlat
+        if app:
+            with app.app_context():
+                try:
+                    config = load_service_config('hrc_report')
+                    
+                    # DB'den yüklenen veriler
+                    self.criteria_weights = config.get('criteria_weights', {})
+                    self.criteria_details = config.get('criteria_details', {})
+                    self.pattern_definitions = config.get('pattern_definitions', {})
+                    self.validation_keywords = config.get('validation_keywords', {})
+                    self.category_actions = config.get('category_actions', {})
+                    
+                    logger.info(f"✅ Veritabanından yüklendi: {len(self.criteria_weights)} kategori")
+                    
+                except Exception as e:
+                    logger.error(f"⚠️ Veritabanından yükleme başarısız: {e}")
+                    logger.warning("⚠️ Fallback: Boş config kullanılıyor")
+                    self.criteria_weights = {}
+                    self.criteria_details = {}
+                    self.pattern_definitions = {}
+                    self.validation_keywords = {}
+                    self.category_actions = {}
+        else:
+            # Flask app yoksa boş başlat (eski davranış)
+            logger.warning("⚠️ Flask app context yok, boş config kullanılıyor")
+            self.criteria_weights = {}
+            self.criteria_details = {}
+            self.pattern_definitions = {}
+            self.validation_keywords = {}
+            self.category_actions = {}
     
     def detect_language(self, text: str) -> str:
         """Metin dilini tespit et"""
@@ -311,32 +299,27 @@ class HRCReportAnalyzer:
             "olcum_cihazi": "Bulunamadı"
         }
         
-        robot_patterns = [
-            r"(?i)(?:Robot\s*tip[i]?|Robot\s*type|Robot\s*model)\s*[|\s]\s*([A-Z0-9\-]+(?:[A-Z0-9\-]*))(?=\s|$|\n)",
-            r"([A-Z]{2,4}\-[0-9]{1,3}[A-Z]*)\b"
-        ]
+        # DB'den pattern'leri al
+        extract_values = self.pattern_definitions.get('extract_values', {})
         
+        # ROBOT MODELİ
+        robot_patterns = extract_values.get('robot_modeli', [])
         for pattern in robot_patterns:
             match = re.search(pattern, text)
             if match:
                 values["robot_modeli"] = match.group(1).strip()
                 break
         
-        date_patterns = [
-            r"(?i)(?:Test\s*Tarih|Test\s*Date)\s*[:=]\s*(\d{1,2}[./]\d{1,2}[./]\d{2,4})",
-            r"(\d{1,2}[./]\d{1,2}[./]\d{4})\s*(?:tarih|date)"
-        ]
-        
+        # TEST TARİHİ
+        date_patterns = extract_values.get('test_tarihi', [])
         for pattern in date_patterns:
             match = re.search(pattern, text)
             if match:
                 values["test_tarihi"] = match.group(1).strip()
                 break
 
-        olcum_cihazi_patterns = [
-            r"([A-Z]{3,8}\s+[a-z]{2,6}\s+[A-Z][a-z]+\s+[A-Z0-9]+)(?=\s+\d{4}|\s*\n|\s*$)"
-        ]
-
+        # ÖLÇÜM CİHAZI
+        olcum_cihazi_patterns = extract_values.get('olcum_cihazi', [])
         for pattern in olcum_cihazi_patterns:
             match = re.search(pattern, text)
             if match:
@@ -415,37 +398,52 @@ class HRCReportAnalyzer:
 # ============================================
 # HELPER FUNCTIONS
 # ============================================
-def validate_document_server(text):
-    """Server kodunda HRC doküman validasyonu"""
-    critical_terms = [
-        ["hrc", "collaborative", "işbirlik", "cobot", "kolaboratif", "human robot collaboration"],
-        ["kuvvet", "force", "basınç", "pressure", "temas", "contact", "newton"],
-        ["iso 15066", "iso/ts 15066", "ts 15066", "15066"],
-        ["vücut", "body", "kol", "arm", "el", "hand", "baş", "head", "gövde", "torso", "boyun", "neck"]
-    ]
+def validate_document_server(text, validation_keywords):
+    """Server kodunda HRC doküman validasyonu - DB'den gelen keywords ile"""
     
-    category_found = [
-        any(re.search(rf"\b{term}\b", text, re.IGNORECASE) for term in category)
-        for category in critical_terms
-    ]
+    # DB'den gelen critical_terms
+    critical_terms_data = validation_keywords.get('critical_terms', [])
+    
+    # Liste formatına dönüştür (eski format uyumluluğu)
+    critical_terms = []
+    for item in critical_terms_data:
+        if isinstance(item, dict) and 'keywords' in item:
+            critical_terms.append(item['keywords'])
+        elif isinstance(item, list):
+            critical_terms.append(item)
+    
+    # Eğer DB'den veri gelmediyse, boş validasyon (hata verme)
+    if not critical_terms:
+        logger.warning("⚠️ Critical terms bulunamadı, validasyon atlanıyor")
+        return True  # Varsayılan: geçerli kabul et
+    
+    category_found = []
+    
+    for i, category in enumerate(critical_terms):
+        found_in_category = False
+        for term in category:
+            if re.search(rf"\b{term}\b", text, re.IGNORECASE):
+                found_in_category = True
+                logger.info(f"HRC Kategori {i+1} bulundu: '{term}'")
+                break
+        category_found.append(found_in_category)
     
     valid_categories = sum(category_found)
-    logger.info(f"HRC doküman validasyonu: {valid_categories}/4 kritik kategori bulundu")
+    logger.info(f"HRC doküman validasyonu: {valid_categories}/{len(critical_terms)} kritik kategori bulundu")
     
-    return valid_categories >= 4
+    return valid_categories >= len(critical_terms)
 
 
-def check_strong_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada HRC'ye özgü kelimeleri OCR ile ara"""
-    strong_keywords = [
-        "hrc",
-        "cobot",
-        "robot",
-        "çarpışma",
-        "collaborative",
-        "kolaboratif",
-        "sd conta"
-    ]
+def check_strong_keywords_first_pages(filepath, validation_keywords):
+    """İlk 1-2 sayfada HRC'ye özgü kelimeleri OCR ile ara - DB'den gelen keywords ile"""
+    
+    # DB'den strong keywords al
+    strong_keywords = validation_keywords.get('strong_keywords', [])
+    
+    # Eğer DB'den veri gelmediyse, validasyon atla
+    if not strong_keywords:
+        logger.warning("⚠️ Strong keywords bulunamadı, validasyon atlanıyor")
+        return True  # Varsayılan: geçerli kabul et
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=2)
@@ -468,26 +466,16 @@ def check_strong_keywords_first_pages(filepath):
         return False
 
 
-def check_excluded_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara"""
-    excluded_keywords = [
-        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm", "enclosure", "wrp-", "light curtain", "contactors", "controller",
-        "espe",
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
-        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
-        "loto",
-        "lvd", "TOPRAKLAMA SÜREKLİLİK", "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
-        "montaj", "assembly",
-        "topraklama direnci", "grounding", "earthing", "60204", "topraklama", "TOPRAKLAMA DİRENCİ",
-        "bakım", "maintenance", "servis", "service", "bakim", "MAINTENCE",
-        "titreşim", "vibration", "mekanik",
-        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
-    ]
+def check_excluded_keywords_first_pages(filepath, validation_keywords):
+    """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara - DB'den"""
+    
+    # DB'den excluded keywords al
+    excluded_keywords = validation_keywords.get('excluded_keywords', [])
+    
+    # Eğer DB'den veri gelmediyse, validasyon atla
+    if not excluded_keywords:
+        logger.warning("⚠️ Excluded keywords bulunamadı, validasyon atlanıyor")
+        return False  # Varsayılan: excluded yok kabul et
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=200, first_page=1, last_page=2)
@@ -542,6 +530,11 @@ def get_main_issues_hrc(analysis_result):
 # ============================================
 app = Flask(__name__)
 
+# Database configuration (YENİ)
+app.config['SQLALCHEMY_DATABASE_URI'] = Config.SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = Config.SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['SQLALCHEMY_ECHO'] = Config.SQLALCHEMY_ECHO
+
 UPLOAD_FOLDER = 'temp_uploads_hrc'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'doc', 'txt'}
 
@@ -573,20 +566,22 @@ def analyze_hrc_report():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
         logger.info(f"HRC Kuvvet-Basınç Raporu kontrol ediliyor: {filename}")
-        analyzer = HRCReportAnalyzer()
+        
+        # Create analyzer instance
+        analyzer = HRCReportAnalyzer(app=app)
 
-                # ÜÇ AŞAMALI HRC KONTROLÜ
+        # ÜÇ AŞAMALI HRC KONTROLÜ
         logger.info(f"Üç aşamalı HRC kontrolü başlatılıyor: {filename}")
         file_ext = os.path.splitext(filepath)[1].lower()
 
         if file_ext == '.pdf':
             # PDF için üç aşamalı kontrol (OCR dahil)
             logger.info("Aşama 1: İlk sayfa HRC özgü kelime kontrolü...")
-            if check_strong_keywords_first_pages(filepath):
+            if check_strong_keywords_first_pages(filepath, analyzer.validation_keywords):
                 logger.info("✅ Aşama 1 geçti - HRC özgü kelimeler bulundu")
             else:
                 logger.info("Aşama 2: İlk sayfa excluded kelime kontrolü...")
-                if check_excluded_keywords_first_pages(filepath):
+                if check_excluded_keywords_first_pages(filepath, analyzer.validation_keywords):
                     logger.info("❌ Aşama 2'de excluded kelimeler bulundu - HRC değil")
                     try:
                         os.remove(filepath)
@@ -605,7 +600,6 @@ def analyze_hrc_report():
                     # AŞAMA 3: PyPDF2 ile tam doküman kontrolü
                     logger.info("Aşama 3: Tam doküman critical terms kontrolü...")
                     try:
-                        import PyPDF2
                         with open(filepath, 'rb') as pdf_file:
                             pdf_reader = PyPDF2.PdfReader(pdf_file)
                             text = ""
@@ -622,7 +616,7 @@ def analyze_hrc_report():
                                 'message': 'Dosyadan yeterli metin çıkarılamadı'
                             }), 400
                         
-                        if not validate_document_server(text):
+                        if not validate_document_server(text, analyzer.validation_keywords):
                             try:
                                 os.remove(filepath)
                             except:
@@ -667,7 +661,7 @@ def analyze_hrc_report():
                     'message': 'Dosyadan yeterli metin çıkarılamadı'
                 }), 400
             
-            if not validate_document_server(text):
+            if not validate_document_server(text, analyzer.validation_keywords):
                 try:
                     os.remove(filepath)
                 except:
@@ -764,6 +758,16 @@ def index():
     })
 
 
+# ============================================
+# DATABASE INITIALIZATION
+# ============================================
+with app.app_context():
+    db.init_app(app)
+
+
+# ============================================
+# APPLICATION ENTRY POINT (Azure-Friendly)
+# ============================================
 if __name__ == '__main__':
     logger.info("=" * 60)
     logger.info("HRC Kuvvet-Basınç Ölçüm Raporu Analiz Servisi")

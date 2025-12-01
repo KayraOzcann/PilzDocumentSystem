@@ -20,6 +20,18 @@ from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
 # ============================================
+# DATABASE IMPORTS (YENİ)
+# ============================================
+from flask import current_app
+from database import db, init_db
+from db_loader import load_service_config
+
+# ============================================
+# CONFIG IMPORT (YENİ)
+# ============================================
+from config import Config
+
+# ============================================
 # LOGGING CONFIGURATION
 # ============================================
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -43,54 +55,24 @@ class TopraklamaAnalysisResult:
 # ANALYZER CLASS
 # ============================================
 class EN60204TopraklamaRaporuAnaliz:
-    def __init__(self):
+    def __init__(self, app=None):
         logger.info("EN 60204-1 Topraklama Ölçüm Raporu Analiz Sistemi başlatılıyor...")
 
-        self.criteria_weights = {
-            "Şebeke Tipi (TN/TT/IT)": 15,
-            "Ölçüm Sonuçları (R veya Zs değerleri)": 20,
-            "Zs Hesabı ve Karşılaştırması (TN için)": 20,
-            "Koruma Cihazı Bilgileri (MCB/RCD)": 10,
-            "Ölçüm Metodu ve Koşulları": 8,
-            "Ölçüm Cihazı ve Kalibrasyon": 7,
-            "Yetkili Kişi / İmza-Kaşe": 2,
-            "Tesis Bilgileri ve Ölçüm Tarihi": 3,
-            "Sonuç ve Yorum": 15
-        }
+        if not app:
+            raise ValueError("❌ Flask app context gerekli!")
 
-        self.criteria_details = {
-            "Şebeke Tipi (TN/TT/IT)": {
-                "sebeke_tipi": {"pattern": r"(TN-S|TN-C|TN-C-S|TT|IT)\s*sistem|Şebeke\s*Tipi.*?(TN|TT|IT)", "weight": 15}
-            },
-            "Ölçüm Sonuçları (R veya Zs değerleri)": {
-                "topraklama_direnci": {"pattern": r"([0-9,.]+)\s*Ω|ohm|([0-9,.]+)\s*Ohm", "weight": 10},
-                "zs_degeri": {"pattern": r"Zs\s*[:=]\s*([0-9,.]+)\s*Ω|Z_s\s*[:=]\s*([0-9,.]+)", "weight": 10}
-            },
-            "Zs Hesabı ve Karşılaştırması (TN için)": {
-                "zs_karsilastirma": {"pattern": r"Zs\s*≤|izin\s*verilen\s*Zs|maksimum\s*Zs|Zs\s*karşılaştırma", "weight": 20}
-            },
-            "Koruma Cihazı Bilgileri (MCB/RCD)": {
-                "koruma_cihazi": {"pattern": r"(MCB|RCD|sigorta|breaker|açma\s*cihazı|B\s*tip|C\s*tip|D\s*tip)", "weight": 10}
-            },
-            "Ölçüm Metodu ve Koşulları": {
-                "olcum_metodu": {"pattern": r"(3\s*nokta|4\s*nokta|klemp|Wenner|ölçüm\s*yöntemi|metod)", "weight": 5},
-                "olcum_kosullari": {"pattern": r"(sıcaklık|nem|zemin|hava|koşul|ortam)", "weight": 3}
-            },
-            "Ölçüm Cihazı ve Kalibrasyon": {
-                "cihaz_bilgisi": {"pattern": r"(marka|model|seri\s*no|cihaz)", "weight": 3},
-                "kalibrasyon": {"pattern": r"kalibrasyon|calibration|EN\s*60204-1.*18\.2\.1", "weight": 4}
-            },
-            "Yetkili Kişi / İmza-Kaşe": {
-                "yetkili_kisi": {"pattern": r"(elektrik\s*mühendisi|uzman|yetkili|imza|kaşe)", "weight": 2}
-            },
-            "Tesis Bilgileri ve Ölçüm Tarihi": {
-                "tesis_bilgisi": {"pattern": r"(tesis|işletme|sahne|lokasyon|yer)", "weight": 2},
-                "olcum_tarihi": {"pattern": r"(\d{1,2}[./]\d{1,2}[./]\d{2,4})|tarih|date", "weight": 1}
-            },
-            "Sonuç ve Yorum": {
-                "sonuc_yorum": {"pattern": r"(uygun|uygun\s*değil|geçerli|geçersiz|sonuç|yorum|kabul)", "weight": 15}
-            }
-        }
+        with app.app_context():
+            config = load_service_config('grounding_report')
+        
+            self.criteria_weights = config.get('criteria_weights', {})
+            self.criteria_details = config.get('criteria_details', {})
+            self.pattern_definitions = config.get('pattern_definitions', {})
+            self.validation_keywords = config.get('validation_keywords', {})
+            self.category_actions = config.get('category_actions', {})
+        
+            if not self.criteria_weights:
+                raise ValueError("❌ DB'den criteria_weights yüklenemedi!")
+        
 
     def extract_text_with_ocr(self, file_path: str) -> str:
         """OCR ile metin çıkarımı (PDF veya görsel)"""
@@ -219,6 +201,10 @@ class EN60204TopraklamaRaporuAnaliz:
 
     def extract_specific_values(self, text: str) -> Dict[str, Any]:
         """Spesifik değerleri çıkar"""
+
+         # DB'den extract_values pattern'lerini al
+        extract_patterns = self.pattern_definitions.get('extract_values', {})
+
         values = {
             "sebeke_tipi": "Bulunamadı",
             "olcum_tarihi": "Bulunamadı",
@@ -229,35 +215,17 @@ class EN60204TopraklamaRaporuAnaliz:
             "sonuc": "Bulunamadı"
         }
 
-        # Şebeke tipi
-        match = re.search(r"(TN-S|TN-C|TN-C-S|TT|IT)\s*sistem|Şebeke\s*Tipi.*?(TN|TT|IT)", text, re.IGNORECASE)
-        if match:
-            values["sebeke_tipi"] = match.group(1).upper() if match.group(1) else match.group(2).upper()
-
-        # Tarih
-        match = re.search(r"(\d{1,2}[./]\d{1,2}[./]\d{2,4})", text)
-        if match:
-            values["olcum_tarihi"] = match.group(1)
-
-        # Topraklama direnci
-        match = re.search(r"([0-9,.]+)\s*Ω", text)
-        if match:
-            values["topraklama_direnci"] = match.group(1) + " Ω"
-
-        # Zs
-        match = re.search(r"Zs\s*[:=]\s*([0-9,.]+)\s*Ω", text, re.IGNORECASE)
-        if match:
-            values["zs_degeri"] = match.group(1) + " Ω"
-
-        # Cihaz
-        match = re.search(r"(Marka|Model)\s*[:=]\s*([A-Za-z0-9\- ]+)", text, re.IGNORECASE)
-        if match:
-            values["olcum_cihazi"] = match.group(2).strip()
-
-        # Kalibrasyon
-        match = re.search(r"Kalibrasyon.*?(\d{1,2}[./]\d{1,2}[./]\d{2,4})", text, re.IGNORECASE)
-        if match:
-            values["kalibrasyon_tarihi"] = match.group(1)
+         # DB'den gelen pattern'leri kullan
+        for key, patterns_list in extract_patterns.items():
+            if key in values:
+                for pattern in patterns_list:
+                    match = re.search(pattern, text, re.IGNORECASE)
+                    if match:
+                        if match.lastindex and match.lastindex > 0:
+                            values[key] = match.group(1).strip()
+                        else:
+                            values[key] = match.group(0).strip()
+                        break
 
         # Sonuç
         if re.search(r"uygun\s*değil|geçersiz|kabul\s*edilmez", text, re.IGNORECASE):
@@ -293,48 +261,12 @@ class EN60204TopraklamaRaporuAnaliz:
         return recommendations
 
     def generate_improvement_actions(self, analysis_results: Dict, scores: Dict) -> List[str]:
-        """İyileştirme önerileri oluştur"""
+        """İyileştirme önerileri oluştur - DB'den"""
         actions = []
         sorted_categories = sorted(scores["category_scores"].items(), key=lambda x: x[1]["percentage"])
 
-        category_actions = {
-            "Şebeke Tipi (TN/TT/IT)": [
-                "Şebeke tipini (TN-S, TN-C, TN-C-S, TT, IT) mutlaka belirtiniz",
-                "Sistem tipine göre ölçüm kriterlerini açıklayınız"
-            ],
-            "Ölçüm Sonuçları (R veya Zs değerleri)": [
-                "Tüm ölçüm noktaları için ayrı ayrı değerler veriniz",
-                "Topraklama direnci ve Zs değerlerini açıkça yazınız"
-            ],
-            "Zs Hesabı ve Karşılaştırması (TN için)": [
-                "TN sistemlerde Zs hesabını yapınız",
-                "İzin verilen maksimum Zs değeri ile karşılaştırınız"
-            ],
-            "Koruma Cihazı Bilgileri (MCB/RCD)": [
-                "Kullanılan koruma cihazlarının tip ve değerlerini belirtiniz",
-                "Açma karakteristiğini (B, C, D tipi) yazınız"
-            ],
-            "Ölçüm Metodu ve Koşulları": [
-                "Ölçüm yöntemini (3 nokta, 4 nokta, klemp) açıklayınız",
-                "Ölçüm koşullarını (sıcaklık, nem, zemin) belirtiniz"
-            ],
-            "Ölçüm Cihazı ve Kalibrasyon": [
-                "Cihazın marka, model, seri numarasını yazınız",
-                "Kalibrasyon belgesi ve tarihini ekleyiniz"
-            ],
-            "Yetkili Kişi / İmza-Kaşe": [
-                "Ölçümü yapan yetkili kişinin bilgilerini ve imzasını ekleyiniz",
-                "Kaşe ile resmiyet sağlayınız"
-            ],
-            "Tesis Bilgileri ve Ölçüm Tarihi": [
-                "Tesis adı ve lokasyon bilgilerini belirtiniz",
-                "Ölçüm tarihini açıkça yazınız"
-            ],
-            "Sonuç ve Yorum": [
-                "Ölçüm sonuçlarının uygunluk durumunu değerlendiriniz",
-                "Gerekli düzeltici faaliyetleri öneriniz"
-            ]
-        }
+        # DB'den category_actions al
+        category_actions = self.category_actions
 
         for category, score_data in sorted_categories[:5]:
             if score_data["percentage"] < 70:
@@ -403,15 +335,23 @@ class EN60204TopraklamaRaporuAnaliz:
 # ============================================
 # HELPER FUNCTIONS (Server Validasyon)
 # ============================================
-def validate_document_server(text):
-    """Server kodunda doküman validasyonu - Topraklama için"""
+def validate_document_server(text, validation_keywords):
+    """Server kodunda doküman validasyonu - DB'den keywords"""
     
-    critical_terms = [
-        ["topraklama", "grounding", "earthing", "earth", "zs", "r değeri", "toprak direnci"],
-        ["ohm", "ω", "milliohm", "mω", "direnç", "resistance", "impedans", "impedance"],
-        ["en 60204", "60204", "tn", "tt", "it", "şebeke", "network", "system"],
-        ["mcb", "rcd", "rcbo", "sigorta", "fuse", "koruma", "protection", "ölçüm", "measurement"]
-    ]
+    # DB'den critical_terms al
+    critical_terms_data = validation_keywords.get('critical_terms', [])
+    
+    if not critical_terms_data:
+        logger.error("❌ DB'den critical_terms yüklenemedi!")
+        raise ValueError("Critical terms bulunamadı")
+    
+    # Liste formatına dönüştür
+    critical_terms = []
+    for item in critical_terms_data:
+        if isinstance(item, dict) and 'keywords' in item:
+            critical_terms.append(item['keywords'])
+        elif isinstance(item, list):
+            critical_terms.append(item)
     
     category_found = []
     
@@ -431,14 +371,13 @@ def validate_document_server(text):
     return valid_categories >= 3
 
 
-def check_strong_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada özgü kelimeleri OCR ile ara - Topraklama için"""
-    strong_keywords = [
-        "topraklama direnci",
-        "toprak direnci",
-        "grounding resistance",
-        "TOPRAKLAMA DİRENCİ",
-    ]
+def check_strong_keywords_first_pages(filepath, validation_keywords):
+    """İlk sayfa kontrol - DB'den keywords"""
+    strong_keywords = validation_keywords.get('strong_keywords', [])
+
+    if not strong_keywords:
+        logger.error("❌ DB'den strong_keywords yüklenemedi!")
+        raise ValueError("Strong keywords bulunamadı")
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=1)
@@ -465,26 +404,13 @@ def check_strong_keywords_first_pages(filepath):
         return False
 
 
-def check_excluded_keywords_first_pages(filepath):
-    """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara"""
-    excluded_keywords = [
-        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık","ışık şiddeti",
-        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "enclosure","wrp-","light curtain","contactors","controller",
-        "espe",
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
-        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
-        "loto",
-        "lvd","TOPRAKLAMA SÜREKLİLİK", "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "TOPRAKLAMA ILETKENLERI","topraklama iletkenleri", "topraklama sureklilik", "KESİT UYGUNLUĞU", "kesit uygunlugu", "kesit uygunluğu", "kesıt uygunluğu",
-        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
-        "montaj", "assembly",
-        "bakım", "maintenance", "servis", "service","bakim","MAINTENANCE",
-        "titreşim", "vibration", "mekanik",
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
-    ]
+def check_excluded_keywords_first_pages(filepath, validation_keywords):
+    """İlk sayfa excluded kontrol - DB'den keywords"""
+    excluded_keywords = validation_keywords.get('excluded_keywords', [])
+    
+    if not excluded_keywords:
+        logger.error("❌ DB'den excluded_keywords yüklenemedi!")
+        raise ValueError("Excluded keywords bulunamadı")
     
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=200, first_page=1, last_page=2)
@@ -549,6 +475,11 @@ def get_main_issues_topraklama(analysis_result):
 # ============================================
 app = Flask(__name__)
 
+# Database configuration (YENİ)
+app.config['SQLALCHEMY_DATABASE_URI'] = Config.SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = Config.SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['SQLALCHEMY_ECHO'] = Config.SQLALCHEMY_ECHO
+
 UPLOAD_FOLDER = 'temp_uploads_topraklama'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'doc', 'txt'}
 
@@ -587,7 +518,7 @@ def analyze_topraklama_report():
             file.save(filepath)
             logger.info(f"Topraklama Ölçüm Raporu kontrol ediliyor: {filename}")
 
-            analyzer = EN60204TopraklamaRaporuAnaliz()
+            analyzer = EN60204TopraklamaRaporuAnaliz(app=app)  # app parametresi ekle
             
             # ÜÇ AŞAMALI TOPRAKLAMA KONTROLÜ
             logger.info(f"Üç aşamalı topraklama kontrolü başlatılıyor: {filename}")
@@ -595,11 +526,11 @@ def analyze_topraklama_report():
 
             if file_ext == '.pdf':
                 logger.info("Aşama 1: İlk sayfa topraklama özgü kelime kontrolü...")
-                if check_strong_keywords_first_pages(filepath):
+                if check_strong_keywords_first_pages(filepath, analyzer.validation_keywords):
                     logger.info("✅ Aşama 1 geçti - Topraklama özgü kelimeler bulundu")
                 else:
                     logger.info("Aşama 2: İlk sayfa excluded kelime kontrolü...")
-                    if check_excluded_keywords_first_pages(filepath):
+                    if check_excluded_keywords_first_pages(filepath, analyzer.validation_keywords):
                         logger.info("❌ Aşama 2'de excluded kelimeler bulundu - Topraklama değil")
                         try:
                             os.remove(filepath)
@@ -626,7 +557,7 @@ def analyze_topraklama_report():
                                     pass
                                 return jsonify({'error': 'Text extraction failed', 'message': 'Dosyadan yeterli metin çıkarılamadı'}), 400
                             
-                            if not validate_document_server(text):
+                            if not validate_document_server(text, analyzer.validation_keywords):
                                 try:
                                     os.remove(filepath)
                                 except:
@@ -660,7 +591,7 @@ def analyze_topraklama_report():
                         pass
                     return jsonify({'error': 'Text extraction failed', 'message': 'Dosyadan yeterli metin çıkarılamadı'}), 400
                 
-                if not validate_document_server(text):
+                if not validate_document_server(text, analyzer.validation_keywords):
                     try:
                         os.remove(filepath)
                     except:
@@ -771,6 +702,13 @@ def index():
             'GET /': 'Bu bilgi sayfası'
         }
     })
+
+# ============================================
+# DATABASE INITIALIZATION
+# ============================================
+with app.app_context():
+    db.init_app(app)
+    logger.info("✅ Database bağlantısı kuruldu")
 
 
 # ============================================

@@ -20,6 +20,18 @@ from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
 # ============================================
+# DATABASE IMPORTS (YENİ)
+# ============================================
+from flask import current_app
+from database import db, init_db
+from db_loader import load_service_config
+
+# ============================================
+# CONFIG IMPORT (YENİ)
+# ============================================
+from config import Config
+
+# ============================================
 # LOGGING CONFIGURATION
 # ============================================
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -35,6 +47,20 @@ except ImportError:
     LANGUAGE_DETECTION_AVAILABLE = False
     logger.warning("⚠️ Dil tespiti için: pip install langdetect")
 
+# ============================================
+# TESSERACT CHECK
+# ============================================
+def check_tesseract_installation():
+    """Tesseract kontrolü"""
+    try:
+        version = pytesseract.get_tesseract_version()
+        logger.info(f"Tesseract OCR kurulu - Sürüm: {version}")
+        return True, f"Tesseract v{version}"
+    except Exception as e:
+        logger.error(f"Tesseract OCR kurulu değil: {e}")
+        return False, str(e)
+
+tesseract_available, tesseract_info = check_tesseract_installation()
 
 # ============================================
 # ANALİZ SINIFI - DATA CLASSES
@@ -66,58 +92,40 @@ class ESPEAnalysisResult:
 class ESPEReportAnalyzer:
     """ESPE rapor analiz sınıfı"""
     
-    def __init__(self):
-        self.criteria_weights = {
-            "Genel Rapor Bilgileri": 10,
-            "Koruma Cihazı (ESPE) Bilgileri": 10,
-            "Makine Duruş Performansı Ölçümü": 25,
-            "Güvenlik Mesafesi Hesabı": 25,
-            "Görsel ve Teknik Dökümantasyon": 5,
-            "Sonuç ve Öneriler": 10
-        }
+    def __init__(self, app=None):
+        logger.info("ESPE Rapor analiz sistemi başlatılıyor...")
         
-        self.criteria_details = {
-            "Genel Rapor Bilgileri": {
-                "proje_adi_numarasi": {"pattern": r"(?:Proje\s*(?:Ad[ıi]|No|Numaras[ıi])[:]*\s*([A-Z]?\d+(?:\.\d+)?)|Project\s*(?:Name|No|Number)[:]*\s*([A-Z]?\d+)|C\d{2}\.\d{3})", "weight": 2},
-                "olcum_tarihi": {"pattern": r"(?:Ölçüm\s*Tarihi|Measurement\s*Date|Messdatum|\d{1,2}[./]\d{1,2}[./]\d{4})", "weight": 2},
-                "rapor_tarihi": {"pattern": r"(?:Rapor\s*Tarihi|Report\s*Date|Berichtsdatum|\d{1,2}[./]\d{1,2}[./]\d{4})", "weight": 1},
-                "makine_adi": {"pattern": r"(?:Makine\s*Ad[ıi][:]*\s*(T\d+\s*-\s*MCC\d+|T\d+|MCC\d+)|Machine\s*Name[:]*\s*(T\d+\s*-\s*MCC\d+))", "weight": 2},
-                "hat_bolge": {"pattern": r"(?:Hat|Line|Linie|Bölge|Area|Bereich|Zone|Jaws|\d+\.?\s*Hat)", "weight": 1},
-                "olcum_yapan": {"pattern": r"(?:Hazırlayan|Ölçümü\s*Yapan|Prepared\s*by|Measured\s*by|Erstellt\s*von|Gemessen\s*von|Pilz|Firma|Company)", "weight": 1},
-                "imza_onay": {"pattern": r"(?:İmza|Signature|Onay|Approval|İnceleyen|Reviewed)", "weight": 1}
-            },
-            "Koruma Cihazı (ESPE) Bilgileri": {
-                "cihaz_tipi": {"pattern": r"(?:Işık\s*Perdesi|Light\s*Curtain|Lichtvorhang|ESPE|Safety\s*Device|Alan\s*Tarayıcı)", "weight": 3},
-                "kategori": {"pattern": r"(?:Kategori|Category|Kategorie|Cat\s*[234])", "weight": 2},
-                "koruma_yuksekligi": {"pattern": r"(?:Koruma\s*Yüksekliği|Protection\s*Height|Schutzhöhe|\d{3,4}\s*mm)", "weight": 3},
-                "cozunurluk": {"pattern": r"(?:Çözünürlük|Resolution|Auflösung|d\s*değeri|\d{1,2}\s*mm)", "weight": 2}
-            },
-            "Makine Duruş Performansı Ölçümü": {
-                "olcum_metodu": {"pattern": r"(?:Ölçüm\s*Metodu|Test\s*Prosedürü|Measurement\s*Method|Test\s*Procedure|ESPE\s*Ölçüm|Yapılan.*?Ölçüm)", "weight": 4},
-                "test_sayisi": {"pattern": r"(?:Test\s*Sayısı|Tekrarlanabilirlik|Repeatability|Test\s*Count|\d+\s*test|\d+\s*ölçüm)", "weight": 4},
-                "durus_suresi_min": {"pattern": r"Min\s*(\d{2,3})|Minimum\s*(\d{2,3})|En\s*Az\s*(\d{2,3})", "weight": 6},
-                "durus_suresi_max": {"pattern": r"Maks?\.?\s*(\d{2,3})|Max\.?\s*(\d{2,3})|Maximum\s*(\d{2,3})|En\s*Fazla\s*(\d{2,3})", "weight": 6},
-                "durus_mesafesi": {"pattern": r"(?:Duruş\s*Mesafesi|Durma\s*Mesafesi|Stopping\s*Distance|Anhalteweg|STD|\d{2,4}\s*mm)", "weight": 5}
-            },
-            "Güvenlik Mesafesi Hesabı": {
-                "formula_s": {"pattern": r"S\s*=\s*\([^)]*[KT][^)]*\)", "weight": 8},
-                "k_sabiti": {"pattern": r"(?:K\s*=\s*(\d{4})|2000\s*mm/s|1600\s*mm/s)", "weight": 5},
-                "c_sabiti": {"pattern": r"C\s*=\s*8\s*[×x*]\s*\(\s*d\s*[-–]\s*14\s*\)", "weight": 4},
-                "t_durus_suresi": {"pattern": r"(?:T\s*[:=]|Duruş\s*Süresi|Stopping\s*Time)", "weight": 4},
-                "uygunluk_kontrolu": {"pattern": r"(?:Mevcut\s*mesafe|≥|>=|UYGUN|SUITABLE|UYGUNSUZ|UNSUITABLE)", "weight": 2},
-                "alternatif_hesap": {"pattern": r"(?:500\s*mm|K\s*=\s*1600)", "weight": 2}
-            },
-            "Görsel ve Teknik Dökümantasyon": {
-                "makine_espe_fotograf": {"pattern": r"(?:Görsel|Fotoğraf|Resim|Photo|Image|Picture|Bild|Foto)", "weight": 3},
-                "mesafe_olcumu_gorseli": {"pattern": r"(?:Mesafe|Distance|Ölçüm|Measurement).*?(?:Görsel|işaretli|Marked)", "weight": 2}
-            },
-            "Sonuç ve Öneriler": {
-                "tehlike_tanimi": {"pattern": r"(?:Tehlikeli?\s*Hareket|Dangerous\s*Movement|Gefährliche\s*Bewegung|Tehlike|fikstür|pres|kapı|hareket)", "weight": 3},
-                "uygunluk_degerlendirme": {"pattern": r"(?:Uygun|Suitable|Geeignet|Uygunsuz|Unsuitable|Ungeeignet)", "weight": 2},
-                "iyilestirme_onerileri": {"pattern": r"(?:Öneri|Recommendation|Empfehlung|İyileştir|Improve|Verbessern|mesafe\s*arttır)", "weight": 3},
-                "en_iso_baglanti": {"pattern": r"EN\s*ISO\s*13855", "weight": 2}
-            }
-        }
+        # Flask app context varsa DB'den yükle, yoksa boş başlat
+        if app:
+            with app.app_context():
+                try:
+                    config = load_service_config('espe_report')
+                    
+                    # DB'den yüklenen veriler
+                    self.criteria_weights = config.get('criteria_weights', {})
+                    self.criteria_details = config.get('criteria_details', {})
+                    self.pattern_definitions = config.get('pattern_definitions', {})
+                    self.validation_keywords = config.get('validation_keywords', {})
+                    self.category_actions = config.get('category_actions', {})
+                    
+                    logger.info(f"✅ Veritabanından yüklendi: {len(self.criteria_weights)} kategori")
+                    
+                except Exception as e:
+                    logger.error(f"⚠️ Veritabanından yükleme başarısız: {e}")
+                    logger.warning("⚠️ Fallback: Boş config kullanılıyor")
+                    self.criteria_weights = {}
+                    self.criteria_details = {}
+                    self.pattern_definitions = {}
+                    self.validation_keywords = {}
+                    self.category_actions = {}
+        else:
+            # Flask app yoksa boş başlat (eski davranış)
+            logger.warning("⚠️ Flask app context yok, boş config kullanılıyor")
+            self.criteria_weights = {}
+            self.criteria_details = {}
+            self.pattern_definitions = {}
+            self.validation_keywords = {}
+            self.category_actions = {}
     
     def detect_language(self, text: str) -> str:
         """Metnin dilini tespit et"""
@@ -139,29 +147,14 @@ class ESPEReportAnalyzer:
             return "unknown"
 
     def get_multilingual_patterns(self, criterion: str, detected_lang: str) -> List[str]:
-        """Tespit edilen dile göre ek pattern'ler döndür"""
-        additional_patterns = {
-            'turkish': {
-                'proje_adi_numarasi': [r"Proje\s*No", r"Belge\s*No", r"Döküman"],
-                'makine_adi': [r"Makine\s*Adı", r"Ekipman", r"Cihaz"],
-                'olcum_tarihi': [r"Ölçüm\s*Tarihi", r"Test\s*Tarihi"],
-                'tehlike_tanimi': [r"Tehlikeli", r"Risk", r"Tehlike"]
-            },
-            'english': {
-                'proje_adi_numarasi': [r"Project\s*No", r"Document\s*No", r"Report\s*No"],
-                'makine_adi': [r"Machine\s*Name", r"Equipment", r"Device"],
-                'olcum_tarihi': [r"Measurement\s*Date", r"Test\s*Date"],
-                'tehlike_tanimi': [r"Dangerous", r"Hazardous", r"Risk"]
-            },
-            'german': {
-                'proje_adi_numarasi': [r"Projekt\s*Nr", r"Dokument\s*Nr", r"Bericht\s*Nr"],
-                'makine_adi': [r"Maschinen\s*Name", r"Ausrüstung", r"Gerät"],
-                'olcum_tarihi': [r"Messdatum", r"Testdatum"],
-                'tehlike_tanimi': [r"Gefährlich", r"Risiko", r"Gefahr"]
-            }
-        }
+        """Tespit edilen dile göre ek pattern'ler döndür - DB'den"""
+        # DB'den additional_patterns al
+        additional_patterns_data = self.pattern_definitions.get('additional_patterns', {})
         
-        return additional_patterns.get(detected_lang, {}).get(criterion, [])
+        # Dil bazlı pattern'leri al
+        lang_patterns = additional_patterns_data.get(detected_lang, {})
+        
+        return lang_patterns.get(criterion, [])
 
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         """PDF'den metin çıkarma"""
@@ -190,10 +183,15 @@ class ESPEReportAnalyzer:
     
     def check_report_date_validity(self, text: str) -> Tuple[bool, str, str]:
         """Rapor tarihinin geçerliliğini kontrol etme"""
-        date_patterns = [
-            r"Ölçüm\s*Tarihi\s*[:=]\s*(\d{2}[./]\d{2}[./]\d{4})",
-            r"(\d{2}[./]\d{2}[./]\d{4})"
-        ]
+        # DB'den date_patterns al
+        date_patterns = self.pattern_definitions.get('extract_values', {}).get('date_patterns', [])
+        
+        if not date_patterns:
+            # Fallback pattern'ler
+            date_patterns = [
+                r"Ölçüm\s*Tarihi\s*[:=]\s*(\d{2}[./]\d{2}[./]\d{4})",
+                r"(\d{2}[./]\d{2}[./]\d{4})"
+            ]
         
         for pattern in date_patterns:
             matches = re.findall(pattern, text)
@@ -235,13 +233,7 @@ class ESPEReportAnalyzer:
             
             # Özel durum: Durma zamanları için tablo formatı arama
             if not matches and criterion_name in ['durus_suresi_min', 'durus_suresi_max']:
-                table_patterns = [
-                    r"Min\s*(\d{2,3})",
-                    r"Maks?\s*(\d{2,3})", 
-                    r"(\d{2,3})\s*(?=.*(?:Min|Maks?))",
-                    r"(\d{2,3})\s*(?=.*\d{2,3}.*(?:Min|Maks?))",
-                    r"(?:Durma\s*Zamanı|STT).*?(\d{2,3})"
-                ]
+                table_patterns = self.pattern_definitions.get('extract_values', {}).get('table_patterns', [])
                 
                 for table_pattern in table_patterns:
                     table_matches = re.findall(table_pattern, text, re.IGNORECASE | re.MULTILINE)
@@ -251,11 +243,7 @@ class ESPEReportAnalyzer:
             
             # Özel durum: Ölçüm metodu için geniş arama
             if not matches and criterion_name == 'olcum_metodu':
-                method_patterns = [
-                    r"(?:Yapılan.*?Ölçüm|ESPE.*?Ölçüm|Test.*?Prosedür)",
-                    r"(?:Durma\s*Zamanı|STT|STD)",
-                    r"(?:Tehlikeli\s*Hareket|Mevcut\s*Emniyet)"
-                ]
+                method_patterns = self.pattern_definitions.get('extract_values', {}).get('method_patterns', [])
                 
                 for method_pattern in method_patterns:
                     method_matches = re.findall(method_pattern, text, re.IGNORECASE | re.MULTILINE)
@@ -268,29 +256,18 @@ class ESPEReportAnalyzer:
                 found = True
                 score = weight
             else:
-                # Genel fallback pattern'ler
-                general_patterns = {
-                    "proje_adi_numarasi": r"[A-Z]\d{2}\.\d{3}",
-                    "makine_adi": r"(?:T\d+|MCC\d+)",
-                    "cihaz_tipi": r"(?:Light|Işık|Licht|ESPE)",
-                    "marka_model": r"(?:DataLogic|SAFEasy|Pilz|Sick|Banner|Omron|Keyence)",
-                    "formula_s": r"S\s*=",
-                    "tehlike_tanimi": r"(?:Dangerous|Tehlike|Gefahr|fikstür|kapı|hareket)",
-                    "k_sabiti": r"(?:2000|1600)",
-                    "uygunluk_kontrolu": r"(?:UYGUN|SUITABLE|UYGUNSUZ|UNSUITABLE)",
-                    "olcum_metodu": r"(?:ESPE|Ölçüm|Test|Measurement)",
-                    "durus_suresi_min": r"(?:Min|\d{2,3}(?=.*\d{2,3}))",
-                    "durus_suresi_max": r"(?:Maks?|\d{2,3}(?=.*Min))",
-                    "test_sayisi": r"(?:Test|Tekrar|\d+)"
-                }
+                # Genel fallback pattern'ler - DB'den
+                general_patterns = self.pattern_definitions.get('general_patterns', {})
+                general_pattern_list = general_patterns.get(criterion_name, [])
                 
-                general_pattern = general_patterns.get(criterion_name)
-                if general_pattern:
-                    general_matches = re.findall(general_pattern, text, re.IGNORECASE)
-                    if general_matches:
-                        content = f"Genel eşleşme bulundu: {general_matches[0]}"
-                        found = True
-                        score = weight // 2  # Kısmi puan
+                if general_pattern_list:
+                    for general_pattern in general_pattern_list:
+                        general_matches = re.findall(general_pattern, text, re.IGNORECASE)
+                        if general_matches:
+                            content = f"Genel eşleşme bulundu: {general_matches[0]}"
+                            found = True
+                            score = weight // 2  # Kısmi puan
+                            break
                     else:
                         content = "Bulunamadı"
                         found = False
@@ -312,71 +289,46 @@ class ESPEReportAnalyzer:
         return results
     
     def extract_specific_values(self, text: str) -> Dict[str, Any]:
-        """Spesifik değerleri çıkarma"""
+        """Spesifik değerleri çıkarma - DB'den pattern'lerle"""
         values = {}
         
-        # Çoklu dil değer pattern'leri
-        value_patterns = {
-            "proje_no": r"(C\d{2}\.\d{3})",
-            "olcum_tarihi": r"(\d{1,2}[./]\d{1,2}[./]\d{4})",
-            "makine_adi": r"(?:Makine\s*Ad[ıi][:]*\s*(T\d+\s*-\s*MCC\d+))",
-            "hat_bolge": r"(?:Jaws\s*\d+|Hat.*?[:=]\s*([^\n\r]+))",
-            "koruma_yuksekligi": r"(\d{3,4})\s*mm",
-            "cozunurluk": r"(\d{1,2})\s*mm",
-            "durus_suresi_min": r"Min\.?\s*(\d{2,3})|Minimum\s*(\d{2,3})",
-            "durus_suresi_max": r"Maks?\.?\s*(\d{2,3})|Max\.?\s*(\d{2,3})|Maximum\s*(\d{2,3})|(\d{2,3})\s*(?=.*Maks?)|(\d{2,3})\s*(?=.*Max)",
-            "mevcut_mesafe": r"(\d{2,4})\s*mm",
-            "hesaplanan_mesafe": r"(?:S\s*=\s*(\d{2,4})|(\d{2,4})\s*mm)",
-            "durum": r"(UYGUNSUZ|UYGUN)",
-            "tehlikeli_hareket": r"(?:Takım\s*tezgahı|kapı\s*kapanma|fikstür|tehlikeli\s*hareket)",
-            "k_sabiti": r"(?:K\s*=\s*(\d{4})|2000|1600)",
-            "formula_s": r"(S\s*=\s*\([^)]+\))",
-            "formula_c": r"(C\s*=\s*8\s*[×x*]\s*\([^)]+\))",
-            "en_iso_13855": r"(EN\s*ISO\s*13855)"
-        }
+        # DB'den value_patterns al
+        value_patterns = self.pattern_definitions.get('value_patterns', {})
         
         # Dil tespiti
         detected_lang = self.detect_language(text)
         
-        for key, pattern in value_patterns.items():
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            if matches:
-                # Özel durum: durum için UYGUNSUZ varsa onu tercih et
-                if key == "durum" and len(matches) > 1:
-                    uygunsuz_found = any("UYGUNSUZ" in str(m).upper() for m in matches)
-                    if uygunsuz_found:
-                        values[key] = "UYGUNSUZ"
+        for key, pattern_list in value_patterns.items():
+            for pattern in pattern_list:
+                matches = re.findall(pattern, text, re.IGNORECASE)
+                if matches:
+                    # Özel durum: durum için UYGUNSUZ varsa onu tercih et
+                    if key == "durum" and len(matches) > 1:
+                        uygunsuz_found = any("UYGUNSUZ" in str(m).upper() for m in matches)
+                        if uygunsuz_found:
+                            values[key] = "UYGUNSUZ"
+                        else:
+                            if isinstance(matches[0], tuple):
+                                values[key] = next((m for m in matches[0] if m), matches[0][0]).strip()
+                            else:
+                                values[key] = matches[0].strip()
                     else:
                         if isinstance(matches[0], tuple):
                             values[key] = next((m for m in matches[0] if m), matches[0][0]).strip()
                         else:
                             values[key] = matches[0].strip()
-                else:
-                    if isinstance(matches[0], tuple):
-                        values[key] = next((m for m in matches[0] if m), matches[0][0]).strip()
-                    else:
-                        values[key] = matches[0].strip()
+                    break
             else:
-                # Fallback: Basit pattern'ler
-                fallback_patterns = {
-                    "proje_no": r"C\d{2}\.\d{3}",
-                    "olcum_tarihi": r"\d{1,2}[./]\d{1,2}[./]\d{4}",
-                    "cihaz_tipi": r"(?:Işık\s*Perdesi|Light\s*Curtain|Lichtvorhang)",
-                    "durum": r"(?:durumu[:]*\s*(UYGUNSUZ|UYGUN)|(?:UYGUNSUZ|UYGUN)(?=\s|$))",
-                    "makine_adi": r"(?:T\d+\s*-\s*MCC\d+)",
-                    "hat_bolge": r"(?:Jaws|\d+\.?\s*Hat)",
-                    "koruma_yuksekligi": r"\d{3,4}\s*mm",
-                    "cozunurluk": r"\d{1,2}\s*mm",
-                    "durus_suresi_min": r"(?:Min|(\d{2,3})(?=.*\d{2,3}))",
-                    "durus_suresi_max": r"(?:Maks?|(\d{2,3})(?=.*Min))",
-                    "olcum_metodu": r"(?:ESPE|Ölçüm|Test|Measurement)"
-                }
+                # Fallback: Basit pattern'ler - DB'den
+                fallback_patterns = self.pattern_definitions.get('fallback_patterns', {})
+                fallback_pattern_list = fallback_patterns.get(key, [])
                 
-                fallback_pattern = fallback_patterns.get(key)
-                if fallback_pattern:
-                    fallback_matches = re.findall(fallback_pattern, text, re.IGNORECASE)
-                    if fallback_matches:
-                        values[key] = fallback_matches[0].strip()
+                if fallback_pattern_list:
+                    for fallback_pattern in fallback_pattern_list:
+                        fallback_matches = re.findall(fallback_pattern, text, re.IGNORECASE)
+                        if fallback_matches:
+                            values[key] = fallback_matches[0].strip()
+                            break
                     else:
                         values[key] = "Bulunamadı"
                 else:
@@ -550,38 +502,42 @@ class ESPEReportAnalyzer:
         }
         
         return report
-    
+
+
 # ============================================
 # HELPER FUNCTIONS (Server Validasyon)
 # ============================================
-def validate_document_server(text):
-    """ESPE doküman validasyonu"""
-    critical_terms = [
-        # ESPE temel terimleri
-        ["espe", "electro-sensitive", "koruyucu", "protective", "equipment", "ekipman"],
-        
-        # Güvenlik sistemi terimleri
-        ["güvenlik", "safety", "sistem", "system", "emniyet", "security", "korunum", "protection"],
-        
-        # Elektrik ve sensör terimleri
-        ["elektrik", "electrical", "sensör", "sensor", "dedektör", "detector", "monitoring", "izleme"],
-        
-        # Risk ve analiz terimleri
-        ["risk", "analiz", "analysis", "değerlendirme", "assessment", "kontrol", "control"],
-        
-        # Standart ve test terimleri
-        ["standart", "standard", "test", "muayene", "inspection", "performans", "performance"]
-    ]
+def validate_document_server(text, validation_keywords):
+    """ESPE doküman validasyonu - DB'den gelen keywords ile"""
+    
+    # DB'den gelen critical_terms
+    critical_terms_data = validation_keywords.get('critical_terms', [])
+    
+    # Liste formatına dönüştür
+    critical_terms = []
+    for item in critical_terms_data:
+        if isinstance(item, dict) and 'keywords' in item:
+            critical_terms.append(item['keywords'])
+        elif isinstance(item, list):
+            critical_terms.append(item)
+    
+    if not critical_terms:
+        logger.warning("⚠️ Critical terms bulunamadı, validasyon atlanıyor")
+        return True
     
     category_found = [any(re.search(rf"\b{term}\b", text, re.IGNORECASE) for term in category) for category in critical_terms]
     valid = sum(category_found)
-    logger.info(f"ESPE validasyon: {valid}/5 kategori")
-    return valid >= 4
+    logger.info(f"ESPE validasyon: {valid}/{len(critical_terms)} kategori")
+    return valid >= len(critical_terms) - 1
 
 
-def check_strong_keywords_first_pages(filepath):
-    """İlk sayfada ESPE özgü kelime kontrolü - OCR"""
-    strong_keywords = ["espe"]
+def check_strong_keywords_first_pages(filepath, validation_keywords):
+    """İlk sayfada ESPE özgü kelime kontrolü - OCR - DB'den keywords"""
+    strong_keywords = validation_keywords.get('strong_keywords', [])
+    
+    if not strong_keywords:
+        logger.warning("⚠️ Strong keywords bulunamadı, validasyon atlanıyor")
+        return True
     
     try:
         Image.MAX_IMAGE_PIXELS = None
@@ -605,57 +561,13 @@ def check_strong_keywords_first_pages(filepath):
         return False
 
 
-def check_excluded_keywords_first_pages(filepath):
-    """İlk sayfada excluded keyword kontrolü - OCR"""
-    excluded = [
-        # Aydınlatma raporu
-        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
-        
-        # Hidrolik devre şeması
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219",
-        
-        # Pnömatik devre şeması
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
-        
-        # İSG periyodik kontrol
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        
-        # AT Uygunluk Beyanı
-        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
-        
-        # LVD raporu
-        "lvd", "TOPRAKLAMA SÜREKLİLİK",  "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        
-        # LOTO raporu
-        "loto",
-        
-        # Manuel/kullanım kılavuzu
-        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
-        
-        # Gürültü ölçüm raporu
-        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        
-        # HRC raporu
-        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        
-        # Elektrik devre şeması
-        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
-        
-        # Montaj talimatları
-        "montaj", "assembly",
-        
-        # Bakım talimatları
-        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
-        
-        # Mekanik titreşim raporu
-        "titreşim", "vibration", "mekanik",
-        
-        # AT tip inceleme sertifikası
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
-        
-        # EN 60204-1 topraklama raporu
-        "topraklama direnci", "grounding", "earthing", "60204", "topraklama",
-    ]
+def check_excluded_keywords_first_pages(filepath, validation_keywords):
+    """İlk sayfada excluded keyword kontrolü - OCR - DB'den"""
+    excluded_keywords = validation_keywords.get('excluded_keywords', [])
+    
+    if not excluded_keywords:
+        logger.warning("⚠️ Excluded keywords bulunamadı, validasyon atlanıyor")
+        return False
     
     try:
         Image.MAX_IMAGE_PIXELS = None
@@ -671,7 +583,7 @@ def check_excluded_keywords_first_pages(filepath):
             text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng')
             all_text += text.lower() + " "
         
-        found = [kw for kw in excluded if re.search(rf"\b{kw.lower()}\b", all_text)]
+        found = [kw for kw in excluded_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
         logger.info(f"Excluded: {len(found)} kelime bulundu")
         return len(found) >= 1
     except Exception as e:
@@ -697,25 +609,14 @@ def get_main_issues_espe(report):
 
 
 # ============================================
-# TESSERACT CHECK
-# ============================================
-def check_tesseract_installation():
-    """Tesseract kontrolü"""
-    try:
-        version = pytesseract.get_tesseract_version()
-        logger.info(f"Tesseract OCR kurulu - Sürüm: {version}")
-        return True, f"Tesseract v{version}"
-    except Exception as e:
-        logger.error(f"Tesseract OCR kurulu değil: {e}")
-        return False, str(e)
-
-tesseract_available, tesseract_info = check_tesseract_installation()
-
-
-# ============================================
 # FLASK SERVİS KATMANI - CONFIGURATION
 # ============================================
 app = Flask(__name__)
+
+# Database configuration (YENİ)
+app.config['SQLALCHEMY_DATABASE_URI'] = Config.SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = Config.SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['SQLALCHEMY_ECHO'] = Config.SQLALCHEMY_ECHO
 
 UPLOAD_FOLDER = 'temp_uploads_espe'
 ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
@@ -751,17 +652,19 @@ def analyze_espe_report():
             file.save(filepath)
             logger.info(f"ESPE analizi başlatılıyor: {filename}")
 
-            analyzer = ESPEReportAnalyzer()
+            # Create analyzer instance
+            analyzer = ESPEReportAnalyzer(app=app)
+            
             file_ext = os.path.splitext(filepath)[1].lower()
             
             # 3 AŞAMALI KONTROL
             if file_ext == '.pdf':
                 logger.info("Aşama 1: ESPE özgü kelime kontrolü...")
-                if check_strong_keywords_first_pages(filepath):
+                if check_strong_keywords_first_pages(filepath, analyzer.validation_keywords):
                     logger.info("✅ Aşama 1 geçti")
                 else:
                     logger.info("Aşama 2: Excluded kelime kontrolü...")
-                    if check_excluded_keywords_first_pages(filepath):
+                    if check_excluded_keywords_first_pages(filepath, analyzer.validation_keywords):
                         logger.info("❌ Excluded kelimeler bulundu")
                         try:
                             os.remove(filepath)
@@ -779,7 +682,7 @@ def analyze_espe_report():
                                 pdf_reader = PyPDF2.PdfReader(f)
                                 text = "".join(page.extract_text() + "\n" for page in pdf_reader.pages)
                             
-                            if not text or len(text.strip()) < 50 or not validate_document_server(text):
+                            if not text or len(text.strip()) < 50 or not validate_document_server(text, analyzer.validation_keywords):
                                 try:
                                     os.remove(filepath)
                                 except:
@@ -899,6 +802,13 @@ def index():
 
 
 # ============================================
+# DATABASE INITIALIZATION
+# ============================================
+with app.app_context():
+    db.init_app(app)
+
+
+# ============================================
 # APPLICATION ENTRY POINT (Azure-Friendly)
 # ============================================
 if __name__ == '__main__':
@@ -914,6 +824,3 @@ if __name__ == '__main__':
     logger.info("=" * 60)
     
     app.run(host='0.0.0.0', port=port, debug=False)
-        
-        
-    

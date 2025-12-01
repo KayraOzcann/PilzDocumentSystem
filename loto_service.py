@@ -2,6 +2,7 @@
 LOTO Prosedürü Analiz Servisi
 ==============================
 Azure App Service için optimize edilmiş standalone servis
+Database-driven configuration ile dinamik pattern yönetimi
 
 Endpoint: POST /api/loto-report
 Health Check: GET /api/health
@@ -24,8 +25,19 @@ from PIL import Image
 import pdf2image
 import pytesseract
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, current_app
 from werkzeug.utils import secure_filename
+
+# ============================================
+# DATABASE IMPORTS (YENİ)
+# ============================================
+from database import db, init_db
+from db_loader import load_service_config
+
+# ============================================
+# CONFIG IMPORT (YENİ)
+# ============================================
+from config import Config
 
 # ============================================
 # LOGGING
@@ -59,65 +71,40 @@ class LOTOAnalysisResult:
 # ANALYZER CLASS
 # ============================================
 class LOTOReportAnalyzer:
-    def __init__(self):
-        self.criteria_weights = {
-            "Genel Rapor Bilgileri": 10,
-            "Tesis ve Makine Tanımı": 10,
-            "LOTO Politikası Değerlendirmesi": 10,
-            "Enerji Kaynakları Analizi": 25,
-            "İzolasyon Noktaları ve Prosedürler": 25,
-            "Teknik Değerlendirme ve Sonuçlar": 15,
-            "Dokümantasyon ve Referanslar": 5
-        }
+    def __init__(self, app=None):
+        logger.info("LOTO Prosedür Analiz Sistemi başlatılıyor...")
         
-        self.criteria_details = {
-            "Genel Rapor Bilgileri": {
-                "proje_adi_belge_no": {"pattern": r"(?:Proje\s*Ad[ıi]|Project\s*Name|Belge\s*(?:No|Numaras[ıi])|Document\s*(?:No|Number)|LOTO|Lockout|Tagout|Lock\s*out|Tag\s*out)", "weight": 2},
-                "rapor_tarihi_versiyon": {"pattern": r"(?:Rapor\s*Tarihi|Report\s*Date|Date|Tarih|Versiyon|Version|Rev\.?|v)\s*[:=]?\s*(\d{1,2}[./]\d{1,2}[./]\d{4}|\d+|[A-Z])", "weight": 2},
-                "hazirlayan_firma": {"pattern": r"(?:Hazırlayan|Prepared\s*by|Company|Firma|Consultant|Contractor)\s*[:=]?\s*([^\n\r]+)", "weight": 2},
-                "musteri_bilgileri": {"pattern": r"(?:Müşteri|Customer|Client|Tesis\s*Ad[ıi]|Facility\s*Name|Plant\s*Name|Adres|Address|Location)", "weight": 2},
-                "imza_onay": {"pattern": r"(?:İmza|Signature|Onay|Approval|İnceleyen|Reviewed|Authorized|Yetkili|Checked\s*by|Approved\s*by)", "weight": 2}
-            },
-            "Tesis ve Makine Tanımı": {
-                "tesis_bilgileri": {"pattern": r"(?:Tesis|Facility|Plant|Factory|Site)\s*(?:Ad[ıi]|Name|Lokasyon|Location|Information)", "weight": 2},
-                "makine_tanimi": {"pattern": r"(?:Makine|Machine|Equipment)\s*(?:Tan[ıi]m[ıi]|Description|Details|Information|ne\s*işe\s*yarad[ıi]ğ[ıi]|what\s*it\s*does)", "weight": 2},
-                "makine_teknik_bilgi": {"pattern": r"(?:Üretici|Manufacturer|Seri\s*No|Serial\s*(?:No|Number)|Model|Üretim\s*Tarihi|Production\s*Date|Ekipman\s*Tipi|Equipment\s*Type)", "weight": 2},
-                "makine_fotograflari": {"pattern": r"(?:Fotoğraf|Photo|Image|Görsel|Picture|Genel\s*Görünüm|General\s*View|Visual|Figure)", "weight": 2},
-                "lokasyon_konumu": {"pattern": r"(?:Lokasyon|Location|Konum|Position|Site|Tesisteki\s*konum|Plant\s*location)", "weight": 2}
-            },
-            "LOTO Politikası Değerlendirmesi": {
-                "mevcut_politika": {"pattern": r"(?:Politika|Policy|LOTO\s*Policy|Prosedür|Procedure|Mevcut.*?politika|Current.*?policy|Existing.*?policy)", "weight": 2},
-                "politika_uygunluk": {"pattern": r"(?:Kontrol\s*Listesi|Checklist|Check\s*list|16\s*madde|16\s*items|Evet|Hayır|Yes|No|M\.D|Pass|Fail)", "weight": 3},
-                "prosedur_degerlendirme": {"pattern": r"(?:Prosedür|Procedure|5\s*madde|5\s*items|Değerlendirme|Assessment|İnceleme|Review|Evaluation)", "weight": 2},
-                "personel_gorusme": {"pattern": r"(?:Personel|Personnel|Staff|Görüşme|Interview|Çalışan|Employee|Worker|7\s*madde|7\s*items)", "weight": 2},
-                "egitim_durumu": {"pattern": r"(?:Eğitim|Training|Education|Kurs|Course|LOTO.*?eğitim|LOTO.*?training)", "weight": 1}
-            },
-            "Enerji Kaynakları Analizi": {
-                "enerji_kaynagi_tanimlama": {"pattern": r"(?:Enerji\s*Kaynağ[ıi]|Energy\s*Source|Power\s*Source|Elektrik|Electric|Electrical|Pn[öo]matik|Pneumatic|Hidrolik|Hydraulic|Su|Water|Steam|Thermal|Mechanical)", "weight": 6},
-                "izolasyon_cihazi_bilgi": {"pattern": r"(?:İzolasyon\s*Cihaz[ıi]|Isolation.*?Device|Isolating.*?Device|Switch|Valve|Vana|Şalter|Breaker|Disconnect)", "weight": 6},
-                "cihaz_durumu_kontrol": {"pattern": r"(?:Çalış[ıt][ıa]rılabilirlik|Operability|Kilitlenebilirlik|Lockability|Lockable|Tahliye\s*edilebilirlik|Drainable|Working|Lock|Drain|Test)", "weight": 6},
-                "kilitleme_ekipman": {"pattern": r"(?:Kilit|Lock|Padlock|Etiket|Tag|Label|Valf\s*Kit|Valve\s*Kit|Ölçüm\s*Cihaz[ıi]|Measuring\s*Device|Tester)", "weight": 4},
-                "uygunsuz_enerji_tablosu": {"pattern": r"(?:Uygunsuz\s*Enerji|Unsuitable.*?Energy|Hazardous.*?Energy|Enerji.*?Özet|Energy.*?Summary|Energy.*?Table)", "weight": 3}
-            },
-            "İzolasyon Noktaları ve Prosedürler": {
-                "izolasyon_noktalari_tablo": {"pattern": r"(?:İzolasyon\s*Nokta|Isolation.*?Point|Isolation.*?Location|Layout|Şema|Diagram|Scheme|Drawing)", "weight": 6},
-                "prosedur_detaylari": {"pattern": r"(?:Prosedür\s*Detay|Procedure.*?Detail|Step.*?by.*?step|Enerji\s*Kesme|Energy.*?Cut|Energy.*?Shut.*?off|Ad[ıi]m|Step)", "weight": 6},
-                "mevcut_prosedur_analiz": {"pattern": r"(?:Mevcut\s*Prosedür|Current.*?Procedure|Existing.*?Procedure|Var\s*olan|As.*?is)", "weight": 4},
-                "tavsiyeler": {"pattern": r"(?:Tavsiye|Recommendation|Suggest|İyileştirme|Improvement|Enhance|Yeni\s*Ekipman|New.*?Equipment)", "weight": 5},
-                "izolasyon_fotograflari": {"pattern": r"(?:İzolasyon.*?Fotoğraf|Isolation.*?Photo|Kilit.*?Etiket|Lock.*?Tag|Valf.*?Kit|Valve.*?Kit|Visual.*?Evidence)", "weight": 4}
-            },
-            "Teknik Değerlendirme ve Sonuçlar": {
-                "kabul_edilebilirlik": {"pattern": r"(?:Kabul\s*Edilebilir|Acceptable|Accept|LOTO\s*Uygun|LOTO.*?Suitable|Suitable|Evet|Hayır|Yes|No|Pass|Fail)", "weight": 4},
-                "bulgular_yorumlar": {"pattern": r"(?:BULGULAR|FINDINGS|YORUMLAR|COMMENTS|Bulgu|Finding|Yorum|Comment|Observation|Eksiklik|Deficiency|Tehlike|Hazard|Risk|gözlemlenmiştir|öngörülmektedir|sebebiyet|değiştirilmesi\s*gerekmektedir|observed|noted|identified)", "weight": 3},
-                "sonuc_tablolari": {"pattern": r"(?:Sonuç\s*Tablo|Result.*?Table|Summary.*?Table|Makine\s*Özet|Machine.*?Summary|Conclusion)", "weight": 3},
-                "oneriler": {"pattern": r"(?:Öneri|Recommendation|Recommend|İyileştirme|Improvement|Improve|Genel\s*Değerlendirme|General.*?Assessment|gerekmektedir|konmalıdır|yapılmalı|sağlanmalı|gerçekleşmeli|LOTO\s*uygunluğunun\s*sağlanması|tahliye\s*yapabilen|kilitlenebilen|should\s*be|must\s*be|need\s*to)", "weight": 3},
-                "mevzuat_uygunlugu": {"pattern": r"(?:2006/42/EC|2009/104/EC|98/37/EC|2014/35/EU|Direktif|Directive|Mevzuat|Regulation|Compliance|Standard|EN\s*ISO)", "weight": 2}
-            },
-            "Dokümantasyon ve Referanslar": {
-                "mevzuat_referanslari": {"pattern": r"(?:2006/42/EC|2009/104/EC|98/37/EC|2014/35/EU|AB\s*Direktif|EU.*?Directive|European.*?Directive|Makine\s*Emniyeti|Machinery\s*Safety|İş\s*Ekipmanları|Work\s*Equipment|Direktifi?|Mevzuat\s*[Rr]eferans|Legal.*?Requirement|Yasal.*?Mevzuat|Legal.*?Reference|Tablo.*?AB.*?Mevzuat|Regulation)", "weight": 3},
-                "normatif_referanslar": {"pattern": r"(?:EN\s*ISO|ISO|12100|60204|4414|14118|13849|13855|Standard|Norm|Technical.*?Standard|Safety.*?Standard)", "weight": 2}
-            }
-        }
+        # Flask app context varsa DB'den yükle, yoksa boş başlat
+        if app:
+            with app.app_context():
+                try:
+                    config = load_service_config('loto_report')
+                    
+                    # DB'den yüklenen veriler
+                    self.criteria_weights = config.get('criteria_weights', {})
+                    self.criteria_details = config.get('criteria_details', {})
+                    self.pattern_definitions = config.get('pattern_definitions', {})
+                    self.validation_keywords = config.get('validation_keywords', {})
+                    self.category_actions = config.get('category_actions', {})
+                    
+                    logger.info(f"✅ Veritabanından yüklendi: {len(self.criteria_weights)} kategori")
+                    
+                except Exception as e:
+                    logger.error(f"⚠️ Veritabanından yükleme başarısız: {e}")
+                    logger.warning("⚠️ Fallback: Boş config kullanılıyor")
+                    self.criteria_weights = {}
+                    self.criteria_details = {}
+                    self.pattern_definitions = {}
+                    self.validation_keywords = {}
+                    self.category_actions = {}
+        else:
+            # Flask app yoksa boş başlat (eski davranış)
+            logger.warning("⚠️ Flask app context yok, boş config kullanılıyor")
+            self.criteria_weights = {}
+            self.criteria_details = {}
+            self.pattern_definitions = {}
+            self.validation_keywords = {}
+            self.category_actions = {}
     
     def detect_language(self, text: str) -> str:
         if not LANGUAGE_DETECTION_AVAILABLE:
@@ -277,29 +264,14 @@ class LOTOReportAnalyzer:
             return ""
     
     def detect_document_type(self, text: str) -> str:
-        """Belge türünü tespit et"""
-        analysis_indicators = [
-            r"(?:analiz|analysis)\s+(?:rapor|report)",
-            r"(?:bulgular|findings)",
-            r"(?:sonuç|result|conclusion)",
-            r"(?:değerlendirme|assessment|evaluation)",
-            r"(?:kabul\s*edilebilir|acceptable)",
-            r"(?:uygun|suitable|compliant)",
-            r"(?:mevzuat|regulation|directive)",
-            r"(?:teknik\s*değerlendirme|technical\s*assessment)"
-        ]
+        """Belge türünü tespit et - DB'den gelen pattern'ler ile"""
         
-        procedure_indicators = [
-            r"(?:prosedür|procedure)",
-            r"(?:talimat|instruction)",
-            r"(?:adım|step)",
-            r"(?:zone|alan)\s*\d+",
-            r"(?:bakım|maintenance)\s+(?:operasyon|operation)",
-            r"turn\s+off",
-            r"cut\s+off",
-            r"attach\s+(?:a\s+)?(?:lock|kilit)",
-            r"obtaining\s+(?:the\s+)?necessary\s+permissions"
-        ]
+        # DB'den pattern'leri al
+        extract_values = self.pattern_definitions.get('extract_values', {})
+        
+      
+        analysis_indicators = extract_values.get('analysis_indicators', [])
+        procedure_indicators = extract_values.get('procedure_indicators', [])
         
         analysis_count = sum(1 for pattern in analysis_indicators 
                            if re.search(pattern, text, re.IGNORECASE))
@@ -371,15 +343,11 @@ class LOTOReportAnalyzer:
         return procedure_adaptations.get(criterion_name, 0)
 
     def check_date_validity(self, text: str) -> Dict[str, Any]:
-        """Rapor tarihini bul"""
-        date_patterns = [
-            r"(?:Rapor\s*Tarihi|Report\s*Date|Date\s*of\s*Report)\s*[:=]?\s*(\d{1,2})[./\-](\d{1,2})[./\-](\d{4})",
-            r"(?:Tarih|Date|Issue\s*Date|Prepared\s*on)\s*[:=]?\s*(\d{1,2})[./\-](\d{1,2})[./\-](\d{4})",
-            r"(\d{1,2})[./\-](\d{1,2})[./\-](\d{4})",
-            r"(\d{4})[./\-](\d{1,2})[./\-](\d{1,2})",
-            r"(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})",
-            r"(\d{1,2})\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})"
-        ]
+        """Rapor tarihini bul - DB'den gelen pattern'ler ile"""
+        
+        # DB'den date pattern'lerini al
+        extract_values = self.pattern_definitions.get('extract_values', {})
+        date_patterns = extract_values.get('date_patterns', [])
         
         for pattern in date_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
@@ -447,7 +415,7 @@ class LOTOReportAnalyzer:
         }
 
     def extract_specific_values(self, text: str) -> Dict[str, Any]:
-        """Spesifik değerleri çıkar"""
+        """Spesifik değerleri çıkar - DB'den gelen pattern'ler ile"""
         values = {
             "proje_adi": "Bulunamadı",
             "rapor_tarihi": "Bulunamadı",
@@ -455,47 +423,30 @@ class LOTOReportAnalyzer:
             "kabul_durumu": "Bulunamadı"
         }
         
-        # Proje adı
-        project_patterns = [
-            r"(?:Proje\s*Ad[ıi]|Project\s*Name)\s*[:=]\s*([^\n\r]+)",
-            r"(?:Belge\s*Ad[ıi]|Document\s*Title|Report\s*Title)\s*[:=]\s*([^\n\r]+)",
-            r"LOTO.*?(?:Report|Rapor).*?([A-Z][A-Za-z\s0-9]+)",
-            r"Lockout.*?Tagout.*?([A-Z][A-Za-z\s0-9]+)",
-            r"(?:Title|Başlık)\s*[:=]\s*([^\n\r]+)"
-        ]
+        # DB'den pattern'leri al
+        extract_values = self.pattern_definitions.get('extract_values', {})
         
+        # Eğer DB'den veri gelmediyse, boş liste kullan
+        project_patterns = extract_values.get('proje_adi', [])
+        date_patterns = extract_values.get('rapor_tarihi', [])
+        company_patterns = extract_values.get('hazirlayan_firma', [])
+        acceptance_patterns = extract_values.get('kabul_durumu', [])
+        
+        # PROJE ADI
         for pattern in project_patterns:
             project_match = re.search(pattern, text, re.IGNORECASE)
             if project_match:
                 values["proje_adi"] = project_match.group(1).strip()[:50]
                 break
         
-        # Rapor tarihi
-        date_patterns = [
-            r"(?:Rapor\s*Tarihi|Report\s*Date|Date\s*of\s*Report)\s*[:=]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            r"(?:Tarih|Date)\s*[:=]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            r"(?:Issue\s*Date|Prepared\s*on)\s*[:=]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            r"(\d{1,2}[./\-]\d{1,2}[./\-]\d{4})",
-            r"(\d{4}[./\-]\d{1,2}[./\-]\d{1,2})"
-        ]
-        
+        # RAPOR TARİHİ
         for pattern in date_patterns:
             date_match = re.search(pattern, text, re.IGNORECASE)
             if date_match:
                 values["rapor_tarihi"] = date_match.group(1)
                 break
         
-        # Hazırlayan firma
-        company_patterns = [
-            r"(?:Raporu\s*Hazırlayan|Hazırlayan|Prepared\s*by|Consultant|Company|Contractor|Firma)\s*[:=]?\s*([^\n\r]+)",
-            r"(?:Prepared\s*for|Client|Customer|Müşteri)\s*[:=]?\s*([^\n\r]+)",
-            r"PILZ\s+MAKİNE\s+EMNİYET\s+OTOMASYON",
-            r"PILZ.*?OTOMASYON",
-            r"(?:Prepared|Hazırlayan).*?(PILZ[^\n\r]*)",
-            r"(PILZ\s+[A-Z\s]+OTOMASYON)",
-            r"(?:Engineering|Consultant|Mühendislik)\s*[:=]?\s*([^\n\r]+)"
-        ]
-        
+        # HAZIRLAYAN FİRMA
         for pattern in company_patterns:
             company_match = re.search(pattern, text, re.IGNORECASE)
             if company_match:
@@ -505,14 +456,7 @@ class LOTOReportAnalyzer:
                     values["hazirlayan_firma"] = company_match.group().strip()[:50]
                 break
         
-        # Kabul durumu
-        acceptance_patterns = [
-            r"(?:Kabul\s*Edilebilir|Acceptable|Accept)\s*[:=]?\s*(EVET|YES|HAYIR|NO|True|False)",
-            r"(?:Compliance|Uygunluk)\s*[:=]?\s*(UYGUN|UYGUNSUZ|SUITABLE|UNSUITABLE|COMPLIANT|NON.*?COMPLIANT)",
-            r"(?:Status|Durum|Result|Sonuç)\s*[:=]?\s*(PASS|FAIL|GEÇERLİ|GEÇERSİZ|APPROVED|REJECTED)",
-            r"(UYGUN|UYGUNSUZ|SUITABLE|UNSUITABLE|PASS|FAIL|GEÇERLİ|GEÇERSİZ)"
-        ]
-        
+        # KABUL DURUMU
         for pattern in acceptance_patterns:
             acceptance_match = re.search(pattern, text, re.IGNORECASE)
             if acceptance_match:
@@ -631,21 +575,39 @@ class LOTOReportAnalyzer:
 # ============================================
 # HELPER FUNCTIONS
 # ============================================
-def validate_document_server(text):
-    critical_terms = [
-        ["loto", "lockout", "tagout", "kilitleme", "etiketleme", "lockout tagout"],
-        ["enerji", "energy", "izolasyon", "isolation", "kaynaklar", "sources", "elektrik", "mekanik"],
-        ["prosedür", "procedure", "güvenlik", "safety", "iş güvenliği", "work safety", "önlem", "precaution"],
-        ["makine", "machine", "ekipman", "equipment", "sistem", "system", "tesis", "facility"],
-        ["kontrol", "control", "değerlendirme", "evaluation", "analiz", "analysis", "risk", "hazard"]
-    ]
+def validate_document_server(text, validation_keywords):
+    """Server kodunda doküman validasyonu - DB'den gelen keywords ile"""
+    
+    # DB'den gelen critical_terms
+    critical_terms_data = validation_keywords.get('critical_terms', {})
+    
+    # Liste formatına dönüştür
+    critical_terms = []
+    for key, value in critical_terms_data.items():
+        if key.startswith('category_') and isinstance(value, list):
+            critical_terms.append(value)
+    
+    # Eğer DB'den veri gelmediyse, boş validasyon
+    if not critical_terms:
+        logger.warning("⚠️ Critical terms bulunamadı, validasyon atlanıyor")
+        return True
+    
     category_found = [any(re.search(rf"\b{term}\b", text, re.IGNORECASE) for term in category) for category in critical_terms]
     valid = sum(category_found)
-    logger.info(f"LOTO validasyon: {valid}/5 kategori")
-    return valid >= 4
+    logger.info(f"LOTO validasyon: {valid}/{len(critical_terms)} kategori")
+    return valid >= len(critical_terms) - 1  # En az (n-1) kategori
 
-def check_strong_keywords_first_pages(filepath):
-    strong_keywords = ["loto"]
+def check_strong_keywords_first_pages(filepath, validation_keywords):
+    """İlk sayfada LOTO özgü kelimeleri OCR ile ara - DB'den"""
+    
+    # DB'den strong keywords al
+    strong_keywords = validation_keywords.get('strong_keywords', [])
+    
+    # Eğ DB'den veri gelmediyse, validasyon atla
+    if not strong_keywords:
+        logger.warning("⚠️ Strong keywords bulunamadı, validasyon atlanıyor")
+        return True
+    
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=1)
         all_text = ""
@@ -662,25 +624,17 @@ def check_strong_keywords_first_pages(filepath):
         logger.warning(f"OCR hatası: {e}")
         return False
 
-def check_excluded_keywords_first_pages(filepath):
-    excluded = [
-        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219","teknik resim","tasarım",
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
-        "lvd", "TOPRAKLAMA SÜREKLİLİK", "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm","enclosure","wrp-","light curtain","contactors","controller",
-        "espe",
-        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide","kılavuzu",
-        "montaj", "assembly",
-        "bakım", "maintenance", "servis", "service","bakim","MAINTENCE",
-        "titreşim", "vibration", "mekanik",
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
-        "topraklama direnci", "grounding", "earthing", "60204", "topraklama", "TOPRAKLAMA DİRENCİ",
-    ]
+def check_excluded_keywords_first_pages(filepath, validation_keywords):
+    """İlk 1-2 sayfada istenmeyen rapor türlerinin kelimelerini ara - DB'den"""
+    
+    # DB'den excluded keywords al
+    excluded_keywords = validation_keywords.get('excluded_keywords', [])
+    
+    # Eğer DB'den veri gelmediyse, validasyon atla
+    if not excluded_keywords:
+        logger.warning("⚠️ Excluded keywords bulunamadı, validasyon atlanıyor")
+        return False
+    
     try:
         pages = pdf2image.convert_from_path(filepath, dpi=300, first_page=1, last_page=2)
         all_text = ""
@@ -690,7 +644,7 @@ def check_excluded_keywords_first_pages(filepath):
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
             text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
             all_text += text.lower() + " "
-        found = [kw for kw in excluded if re.search(rf"\b{kw.lower()}\b", all_text)]
+        found = [kw for kw in excluded_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
         return len(found) >= 2
     except Exception as e:
         logger.warning(f"Excluded OCR hatası: {e}")
@@ -725,6 +679,12 @@ tesseract_available, tesseract_info = check_tesseract_installation()
 # ============================================
 app = Flask(__name__)
 
+# Database configuration (YENİ)
+app.config['SQLALCHEMY_DATABASE_URI'] = Config.SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = Config.SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['SQLALCHEMY_ECHO'] = Config.SQLALCHEMY_ECHO
+
+# Upload configuration
 UPLOAD_FOLDER = 'temp_uploads_loto'
 ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
 
@@ -739,6 +699,7 @@ def allowed_file(filename):
 
 @app.route('/api/loto-report', methods=['POST'])
 def analyze_loto_report():
+    """LOTO Prosedürü analiz API endpoint'i - 3 Aşamalı Validasyon"""
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
@@ -753,53 +714,85 @@ def analyze_loto_report():
             file.save(filepath)
             logger.info(f"LOTO analizi başlatılıyor: {filename}")
 
-            analyzer = LOTOReportAnalyzer()
+            # Create analyzer instance with app context
+            analyzer = LOTOReportAnalyzer(app=app)
+            
             file_ext = os.path.splitext(filepath)[1].lower()
             
-            # 3 AŞAMALI KONTROL
+            # ÜÇ AŞAMALI LOTO KONTROLÜ
+            logger.info(f"Üç aşamalı LOTO kontrolü başlatılıyor: {filename}")
+            
             if file_ext == '.pdf':
-                logger.info("Aşama 1: LOTO özgü kelime kontrolü...")
-                if check_strong_keywords_first_pages(filepath):
-                    logger.info("✅ Aşama 1 geçti")
+                # PDF için üç aşamalı kontrol (OCR dahil)
+                logger.info("Aşama 1: İlk sayfa LOTO özgü kelime kontrolü...")
+                if check_strong_keywords_first_pages(filepath, analyzer.validation_keywords):
+                    logger.info("✅ Aşama 1 geçti - LOTO özgü kelimeler bulundu")
                 else:
-                    logger.info("Aşama 2: Excluded kelime kontrolü...")
-                    if check_excluded_keywords_first_pages(filepath):
-                        logger.info("❌ Excluded kelimeler bulundu")
+                    logger.info("Aşama 2: İlk sayfa excluded kelime kontrolü...")
+                    if check_excluded_keywords_first_pages(filepath, analyzer.validation_keywords):
+                        logger.info("❌ Aşama 2'de excluded kelimeler bulundu - LOTO değil")
                         try:
                             os.remove(filepath)
                         except:
                             pass
                         return jsonify({
                             'error': 'Invalid document type',
-                            'message': 'Bu dosya LOTO prosedürü değil'
+                            'message': 'Bu dosya LOTO prosedürü değil (farklı rapor türü tespit edildi)',
+                            'details': {
+                                'filename': filename,
+                                'document_type': 'OTHER_REPORT_TYPE',
+                                'required_type': 'LOTO_PROSEDURU'
+                            }
                         }), 400
                     else:
-                        logger.info("Aşama 3: Tam doküman kontrolü...")
+                        # AŞAMA 3: PyPDF2 ile tam doküman kontrolü
+                        logger.info("Aşama 3: Tam doküman critical terms kontrolü...")
                         try:
                             with open(filepath, 'rb') as f:
                                 pdf_reader = PyPDF2.PdfReader(f)
                                 text = "".join(page.extract_text() + "\n" for page in pdf_reader.pages)
                             
-                            if not text or len(text.strip()) < 50 or not validate_document_server(text):
+                            if not text or len(text.strip()) < 50:
+                                try:
+                                    os.remove(filepath)
+                                except:
+                                    pass
+                                return jsonify({
+                                    'error': 'Text extraction failed',
+                                    'message': 'Dosyadan yeterli metin çıkarılamadı'
+                                }), 400
+                            
+                            if not validate_document_server(text, analyzer.validation_keywords):
                                 try:
                                     os.remove(filepath)
                                 except:
                                     pass
                                 return jsonify({
                                     'error': 'Invalid document type',
-                                    'message': 'Yüklediğiniz dosya LOTO prosedürü değil!'
+                                    'message': 'Yüklediğiniz dosya LOTO prosedürü değil! Lütfen geçerli bir LOTO prosedürü yükleyiniz.',
+                                    'details': {
+                                        'filename': filename,
+                                        'document_type': 'NOT_LOTO_REPORT',
+                                        'required_type': 'LOTO_PROSEDURU'
+                                    }
                                 }), 400
+                                
                         except Exception as e:
                             logger.error(f"Aşama 3 hatası: {e}")
                             try:
                                 os.remove(filepath)
                             except:
                                 pass
-                            return jsonify({'error': 'Analysis failed'}), 500
+                            return jsonify({
+                                'error': 'Analysis failed',
+                                'message': 'Dosya analizi sırasında hata oluştu'
+                            }), 500
 
-            logger.info(f"LOTO analizi yapılıyor: {filename}")
+            # Buraya kadar geldiyse LOTO prosedürü, şimdi analizi yap
+            logger.info(f"LOTO prosedürü doğrulandı, analiz başlatılıyor: {filename}")
             report = analyzer.analyze_loto_report(filepath)
             
+            # Clean up
             try:
                 os.remove(filepath)
             except:
@@ -848,6 +841,7 @@ def analyze_loto_report():
                 'success': True,
                 'message': 'LOTO Prosedürü başarıyla analiz edildi',
                 'analysis_service': 'loto_report',
+                'service_description': 'LOTO Raporu Analizi',
                 'data': response_data
             })
 
@@ -866,25 +860,69 @@ def analyze_loto_report():
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
+    """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
         'service': 'LOTO Report Analyzer API',
         'version': '1.0.0',
+        'upload_folder': UPLOAD_FOLDER,
+        'max_file_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024),
+        'supported_formats': list(ALLOWED_EXTENSIONS),
+        'ocr_support': tesseract_available,
         'report_type': 'LOTO_PROSEDURU'
     })
 
 @app.route('/', methods=['GET'])
 def index():
+    """Ana sayfa - API bilgileri"""
     return jsonify({
         'service': 'LOTO Report Analyzer API',
         'version': '1.0.0',
+        'description': 'LOTO Prosedürlerini analiz eden REST API servisi',
         'endpoints': {
             'POST /api/loto-report': 'LOTO prosedür analizi',
-            'GET /api/health': 'Servis sağlık kontrolü'
+            'GET /api/health': 'Servis sağlık kontrolü',
+            'GET /': 'Bu bilgi sayfası'
+        },
+        'usage': {
+            'upload_format': 'multipart/form-data',
+            'file_field': 'file',
+            'supported_types': list(ALLOWED_EXTENSIONS),
+            'max_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
         }
     })
 
+# ============================================
+# DATABASE INITIALIZATION
+# ============================================
+with app.app_context():
+    db.init_app(app)
+
+# ============================================
+# APPLICATION ENTRY POINT (Azure-Friendly)
+# ============================================
 if __name__ == '__main__':
+    logger.info("=" * 60)
+    logger.info("LOTO Prosedür Analiz Servisi")
+    logger.info("=" * 60)
+    logger.info(f"📁 Upload klasörü: {UPLOAD_FOLDER}")
+    logger.info(f"📊 Desteklenen formatlar: {', '.join(ALLOWED_EXTENSIONS)}")
+    logger.info(f"📏 Maksimum dosya boyutu: {app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB")
+    logger.info("")
+    logger.info("🔗 API Endpoints:")
+    logger.info("  POST /api/loto-report - LOTO prosedür analizi")
+    logger.info("  GET /api/health - Servis sağlık kontrolü")
+    logger.info("  GET / - API bilgileri")
+    logger.info("=" * 60)
+    
+    # Azure App Service PORT environment variable (default: 8005)
     port = int(os.environ.get('PORT', 8005))
-    logger.info(f"🚀 LOTO Servisi - Port: {port}")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    
+    logger.info(f"🚀 Servis başlatılıyor - Port: {port}")
+    logger.info("=" * 60)
+    
+    app.run(
+        host='0.0.0.0',
+        port=port,
+        debug=False  # Production için debug=False
+    )

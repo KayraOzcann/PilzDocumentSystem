@@ -340,16 +340,40 @@ class AdvancedElectricCircuitAnalyzer:
             return []
 
     def detect_components_in_images(self, images: List[Any], circuit_type: str) -> List[ComponentDetection]:
-        """Detect electrical components in images"""
+        """Detect electrical components in images - OPTIMIZED VERSION"""
         try:
             detected_components = []
             templates = self.component_templates.get(circuit_type, {})
             
-            for img_data in images:
+            logger.info(f"Görsel bileşen analizi başlıyor... Toplam {len(images)} sayfa taranacak.")
+
+            # --- OPTİMİZASYON 1: Şablonları ÖNCEDEN hazırla (Pre-calculate) ---
+            # Her döngüde tekrar tekrar resim oluşturmamak için hafızaya alıyoruz.
+            cached_templates = {}
+            for comp_type, labels in templates.items():
+                cached_templates[comp_type] = []
+                for label in labels:
+                    # Şablonu bir kere oluştur
+                    template = np.zeros((50, 100), dtype=np.uint8)
+                    cv2.putText(template, label, (10, 30),
+                              cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+                    cached_templates[comp_type].append((label, template))
+            # ------------------------------------------------------------------
+
+            for i, img_data in enumerate(images):
+                # Kullanıcıyı bilgilendir (Hangi sayfada olduğunu gör)
+                if i % 5 == 0 or i == len(images) - 1:
+                    logger.info(f"Görsel analiz: Sayfa {i+1}/{len(images)} işleniyor...")
+
                 try:
                     nparr = np.frombuffer(img_data['data'], np.uint8)
                     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                    
+                    if img is None: continue
+
                     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    
+                    # Gürültü azaltma ve eşikleme
                     binary = cv2.adaptiveThreshold(
                         gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                         cv2.THRESH_BINARY, 11, 2
@@ -359,37 +383,48 @@ class AdvancedElectricCircuitAnalyzer:
                         binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
                     )
                     
+                    # Sayfadaki her bir kontur (şekil) için
                     for contour in contours:
                         x, y, w, h = cv2.boundingRect(contour)
+                        
+                        # --- OPTİMİZASYON 2: Çok küçük veya çok büyük alanları atla ---
+                        # Sadece makul boyuttaki şekilleri kontrol et
+                        if w < 30 or h < 30 or w > 500 or h > 500:
+                            continue
+                            
                         roi = gray[y:y+h, x:x+w]
                         
-                        if w < 20 or h < 20:
-                            continue
-                        
-                        for comp_type, labels in templates.items():
-                            for label in labels:
-                                template = np.zeros((50, 100), dtype=np.uint8)
-                                cv2.putText(template, label, (10, 30),
-                                          cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
-                                
-                                result = cv2.matchTemplate(roi, template, cv2.TM_CCOEFF_NORMED)
-                                _, confidence, _, _ = cv2.minMaxLoc(result)
-                                
-                                if confidence > 0.8:
-                                    detected_components.append(
-                                        ComponentDetection(
-                                            component_type=comp_type,
-                                            label=label,
-                                            position=(x+w//2, y+h//2),
-                                            confidence=float(confidence),
-                                            bounding_box=(x, y, w, h)
+                        # Hazırladığımız şablonları kullanarak eşleştirme yap
+                        for comp_type, label_data in cached_templates.items():
+                            for label, template in label_data:
+                                # Boyut kontrolü (ROI şablondan küçükse hata verir, atla)
+                                if roi.shape[0] < template.shape[0] or roi.shape[1] < template.shape[1]:
+                                    continue
+
+                                try:
+                                    result = cv2.matchTemplate(roi, template, cv2.TM_CCOEFF_NORMED)
+                                    _, confidence, _, _ = cv2.minMaxLoc(result)
+                                    
+                                    if confidence > 0.8:
+                                        detected_components.append(
+                                            ComponentDetection(
+                                                component_type=comp_type,
+                                                label=label,
+                                                position=(x+w//2, y+h//2),
+                                                confidence=float(confidence),
+                                                bounding_box=(x, y, w, h)
+                                            )
                                         )
-                                    )
+                                except Exception:
+                                    continue
+
                 except Exception as e:
-                    logger.warning(f"Component detection failed: {e}")
+                    logger.warning(f"Sayfa {i+1} görsel analiz hatası: {e}")
                     continue
             
+            logger.info(f"Görsel analiz bitti. Toplam tespit: {len(detected_components)}")
             return detected_components
+            
         except Exception as e:
             logger.error(f"Component detection error: {e}")
             return []
@@ -397,17 +432,16 @@ class AdvancedElectricCircuitAnalyzer:
     def determine_circuit_type(self, text: str, images: List[Any]) -> Tuple[str, float]:
         return "electric", 1.0
 
-    def analyze_criteria(self, text: str, images: List[Any], category: str, 
-                        circuit_type: str) -> Dict[str, CircuitAnalysisResult]:
+    # ESKİ HALİ YERİNE BUNU KULLAN
+    def analyze_criteria(self, text: str, ocr_text: str, detected_components: List[ComponentDetection], 
+                        category: str) -> Dict[str, CircuitAnalysisResult]:
         results = {}
         criteria = self.electric_criteria_details.get(category, {})
         
-        combined_text = text
-        if images:
-            ocr_results = self.perform_ocr_on_images(images)
-            combined_text += " " + " ".join(ocr_results)
+        # OCR zaten yapıldı, sadece birleştiriyoruz
+        combined_text = text + " " + ocr_text
         
-        detected_components = self.detect_components_in_images(images, circuit_type)
+        # Componentler zaten bulundu, tekrar aramıyoruz
         
         for criterion_name, criterion_data in criteria.items():
             pattern = criterion_data["pattern"]
@@ -415,6 +449,7 @@ class AdvancedElectricCircuitAnalyzer:
             
             text_matches = re.findall(pattern, combined_text, re.IGNORECASE | re.MULTILINE)
             
+            # detected_components parametre olarak geldi
             relevant_components = [comp for comp in detected_components 
                                  if self._is_relevant_component(comp, criterion_name)]
             
@@ -583,9 +618,24 @@ class AdvancedElectricCircuitAnalyzer:
         images = self.extract_images_from_pdf(pdf_path)
         circuit_type, _ = self.determine_circuit_type(text, images)
 
+        # --- PERFORMANS DÜZELTMESİ BAŞLANGIÇ ---
+        # OCR ve Görüntü İşlemeyi sadece 1 kez yapıyoruz!
+        logger.info("OCR ve Görsel Analiz tek seferlik çalıştırılıyor...")
+        
+        ocr_text = ""
+        if images:
+            ocr_results = self.perform_ocr_on_images(images)
+            ocr_text = " ".join(ocr_results)
+            
+        detected_components = self.detect_components_in_images(images, circuit_type)
+        logger.info(f"Görsel analiz tamamlandı. Tespit edilen bileşen sayısı: {len(detected_components)}")
+        # --- PERFORMANS DÜZELTMESİ BİTİŞ ---
+
         analysis_results = {}
+        # Artık döngü içinde ağır işlem yok, sadece karşılaştırma var
         for category in self.electric_criteria_weights.keys():
-            analysis_results[category] = self.analyze_criteria(text, images, category, circuit_type)
+            # Yeni parametreleri gönderiyoruz
+            analysis_results[category] = self.analyze_criteria(text, ocr_text, detected_components, category)
 
         scores = self.calculate_scores(analysis_results, circuit_type)
         extracted_values = self.extract_specific_values(text, circuit_type)

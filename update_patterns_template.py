@@ -24,7 +24,7 @@ init_db(app)
 # ============================================
 # TODO: SERVİS KODUNU AYARLAYIN
 # ============================================
-DOCUMENT_TYPE_CODE = 'noise_report'  # TODO: Değiştirin (örn: 'vibration_report', 'electric_circuit')
+DOCUMENT_TYPE_CODE = 'grounding_report'  # TODO: Değiştirin (örn: 'vibration_report', 'electric_circuit')
 
 # ============================================
 # TODO: GÜNCELLENECEK PATTERN'LERİ TANIMLAYIN
@@ -37,10 +37,9 @@ DOCUMENT_TYPE_CODE = 'noise_report'  # TODO: Değiştirin (örn: 'vibration_repo
 # }
 
 UPDATED_PATTERNS = {
-    "date_extraction": {
-        "date_patterns": [
-            r"(?:Ölçüm\s*Tarihi|İnceleme\s*Tarihi|Tarih)\s*[:=]?\s*(\d{1,2}[./]\d{2}[./]\d{4})",
-            r"(\d{1,2}[./]\d{2}[./]\d{4})"
+    "extract_values": {
+        "olcum_tarihi": [
+            r"(\d{1,2}[./]\d{1,2}[./]\d{2,4})"
         ]
     }
 }
