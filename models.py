@@ -15,6 +15,7 @@ class DocumentType(db.Model):
     service_file = db.Column(db.String(100))
     endpoint = db.Column(db.String(100))
     icon = db.Column(db.String(50))
+    app_variable_name = db.Column(db.String(100))  
     is_active = db.Column(db.Boolean, default=True, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

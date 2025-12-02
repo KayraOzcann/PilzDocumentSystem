@@ -4473,5 +4473,446 @@
     },
     "comments": [],
     "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket51",
+    "ticket_id": "titresim_20251202_111318",
+    "document_name": "Coca_Cola_Titresim_Olcum_Raporu.pdf",
+    "document_type": "MEKANIK_TITRESIM_OLCUM_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/Coca_Cola_Titresim_Olcum_Raporu.pdf",
+    "opening_date": "2025-12-02T11:13:18.169922",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 80.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 80.0
+      },
+      "category_scores": {
+        "Değerlendirme, Yorum ve Önlemler": {
+          "max_score": 20,
+          "percentage": 60.0,
+          "score": 12.0,
+          "status": "CONDITIONAL"
+        },
+        "Ekler ve Görseller": {
+          "max_score": 5,
+          "percentage": 60.0,
+          "score": 3.0,
+          "status": "CONDITIONAL"
+        },
+        "Rapor Kimlik Bilgileri": {
+          "max_score": 10,
+          "percentage": 60.0,
+          "score": 6.0,
+          "status": "CONDITIONAL"
+        },
+        "Titreşim Türleri ve Yasal Değerler": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Ölçüm Cihazı ve Kalibrasyon Bilgileri": {
+          "max_score": 10,
+          "percentage": 60.0,
+          "score": 6.0,
+          "status": "CONDITIONAL"
+        },
+        "Ölçüm Metodolojisi ve Uygulanan Standartlar": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Ölçüm Ortam, Makine ve Çalışan Bilgileri": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Ölçüm Sonuçları ve Analizler": {
+          "max_score": 20,
+          "percentage": 90.0,
+          "score": 18.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "a8_degeri": "Bulunamadı",
+        "firma_adi": "Bulunamadı",
+        "olcum_cihazi": "Bulunamadı",
+        "olcum_tarihi": "28.11.2023",
+        "rapor_numarasi": "Bulunamadı",
+        "rapor_tarihi": "Rapor tarihi ayrı belirtilmemiş",
+        "titresim_turu": "El-Kol Titreşimi",
+        "yasal_uygunluk": "UYGUN"
+      },
+      "recommendations": [
+        "❌ RAPOR GEÇERSİZ: Ölçüm tarihi 1 yıldan eski"
+      ],
+      "summary": {
+        "conclusion": "Mekanik titreşim ölçüm raporu TS EN ISO 5349 ve TS ISO 2631 standartlarına uygundur (%80)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket52",
+    "ticket_id": "titresim_20251202_114216",
+    "document_name": "Coca_Cola_Titresim_Olcum_Raporu.pdf",
+    "document_type": "MEKANIK_TITRESIM_OLCUM_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/Coca_Cola_Titresim_Olcum_Raporu.pdf",
+    "opening_date": "2025-12-02T11:42:16.227894",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 80.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 80.0
+      },
+      "category_scores": {
+        "Değerlendirme, Yorum ve Önlemler": {
+          "max_score": 20,
+          "percentage": 60.0,
+          "score": 12.0,
+          "status": "CONDITIONAL"
+        },
+        "Ekler ve Görseller": {
+          "max_score": 5,
+          "percentage": 60.0,
+          "score": 3.0,
+          "status": "CONDITIONAL"
+        },
+        "Rapor Kimlik Bilgileri": {
+          "max_score": 10,
+          "percentage": 60.0,
+          "score": 6.0,
+          "status": "CONDITIONAL"
+        },
+        "Titreşim Türleri ve Yasal Değerler": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Ölçüm Cihazı ve Kalibrasyon Bilgileri": {
+          "max_score": 10,
+          "percentage": 60.0,
+          "score": 6.0,
+          "status": "CONDITIONAL"
+        },
+        "Ölçüm Metodolojisi ve Uygulanan Standartlar": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Ölçüm Ortam, Makine ve Çalışan Bilgileri": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Ölçüm Sonuçları ve Analizler": {
+          "max_score": 20,
+          "percentage": 90.0,
+          "score": 18.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "a8_degeri": "Bulunamadı",
+        "firma_adi": "Bulunamadı",
+        "olcum_cihazi": "Bulunamadı",
+        "olcum_tarihi": "28.11.2023",
+        "rapor_numarasi": "Bulunamadı",
+        "rapor_tarihi": "Rapor tarihi ayrı belirtilmemiş",
+        "titresim_turu": "El-Kol Titreşimi",
+        "yasal_uygunluk": "UYGUN"
+      },
+      "recommendations": [
+        "❌ RAPOR GEÇERSİZ: Ölçüm tarihi 1 yıldan eski"
+      ],
+      "summary": {
+        "conclusion": "Mekanik titreşim ölçüm raporu TS EN ISO 5349 ve TS ISO 2631 standartlarına uygundur (%80)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket53",
+    "ticket_id": "hrc_20251202_114414",
+    "document_name": "C23.234_-_SD_Conta_Robotu_HRC_Olcumu_Raporu_.pdf",
+    "document_type": "HRC_KUVVET_BASINC_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/C23.234_-_SD_Conta_Robotu_HRC_Olcumu_Raporu_.pdf",
+    "opening_date": "2025-12-02T11:44:14.838820",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 82.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 82.0
+      },
+      "category_scores": {
+        "Ekler ve Kalibrasyon Belgeleri": {
+          "max_score": 5,
+          "percentage": 80.0,
+          "score": 4.0,
+          "status": "PASS"
+        },
+        "Genel Bilgiler": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Kuvvet ve Basınç Ölçüm Sonuçları": {
+          "max_score": 25,
+          "percentage": 64.0,
+          "score": 16.0,
+          "status": "FAIL"
+        },
+        "Risk Değerlendirmesi ve Sonuç": {
+          "max_score": 10,
+          "percentage": 100.0,
+          "score": 10.0,
+          "status": "PASS"
+        },
+        "Sınır Değerlerle Karşılaştırma": {
+          "max_score": 20,
+          "percentage": 70.0,
+          "score": 14.0,
+          "status": "PASS"
+        },
+        "Test Koşulları ve Senaryo Tanımı": {
+          "max_score": 10,
+          "percentage": 80.0,
+          "score": 8.0,
+          "status": "PASS"
+        },
+        "Ölçüm Noktaları ve Metodoloji": {
+          "max_score": 15,
+          "percentage": 100.0,
+          "score": 15.0,
+          "status": "PASS"
+        },
+        "Öneriler ve Önlemler": {
+          "max_score": 5,
+          "percentage": 100.0,
+          "score": 5.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "olcum_cihazi": "PROB ms Set 9A000012",
+        "robot_modeli": "GRX-10iA",
+        "test_tarihi": "17.05.2024"
+      },
+      "recommendations": [
+        "✅ HRC Kuvvet-Basınç Raporu GEÇERLİ (Toplam: %82.0)",
+        "🟢 Genel Bilgiler bölümü yeterli (%100.0)",
+        "🟢 Test Koşulları ve Senaryo Tanımı bölümü yeterli (%80.0)",
+        "🟢 Ölçüm Noktaları ve Metodoloji bölümü yeterli (%100.0)",
+        "🟡 Kuvvet ve Basınç Ölçüm Sonuçları bölümü geliştirilmeli (%64.0)",
+        "🟢 Sınır Değerlerle Karşılaştırma bölümü yeterli (%70.0)",
+        "🟢 Risk Değerlendirmesi ve Sonuç bölümü yeterli (%100.0)",
+        "🟢 Öneriler ve Önlemler bölümü yeterli (%100.0)",
+        "🟢 Ekler ve Kalibrasyon Belgeleri bölümü yeterli (%80.0)"
+      ],
+      "summary": {
+        "conclusion": "HRC kuvvet-basınç raporu EN ISO 10218 ve ISO/TS 15066 standartlarına uygundur (%82)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket54",
+    "ticket_id": "at_20251202_125357",
+    "document_name": "2004.106-EC_Declaration_of_Conformity-V524B_Knee_pad_punch_machine-EN-Ver0.pdf",
+    "document_type": "AT_UYGUNLUK_BEYANI",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/2004.106-EC_Declaration_of_Conformity-V524B_Knee_pad_punch_machine-EN-Ver0.pdf",
+    "opening_date": "2025-12-02T12:53:57.893774",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 97.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "total_points": 97.0
+      },
+      "category_scores": {
+        "Kritik Bilgiler": {
+          "max_score": 60,
+          "percentage": 100.0,
+          "score": 60.0,
+          "status": "PASS"
+        },
+        "Standartlar ve Belgeler": {
+          "max_score": 15,
+          "percentage": 80.0,
+          "score": 12.0,
+          "status": "PASS"
+        },
+        "Zorunlu Teknik Bilgiler": {
+          "max_score": 25,
+          "percentage": 100.0,
+          "score": 25.0,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "Beyan Tarihi": "Bulunamadı",
+        "Direktif Referansı": "Bulunamadı",
+        "Makine Açıklaması": "V524B Knee pad punching machine",
+        "Makine Modeli": "V524B",
+        "Pozisyon": "Pilz Ireland \nCork Business",
+        "Seri Numarası": "A2306F-012",
+        "Uygulanan Standartlar": "ISO 13849-1, ISO 13849-1:, EN 60204-1:",
+        "Yetkili Kişi": "and title Pilz Ireland \nCork Business",
+        "Üretici Adresi": "Bulunamadı",
+        "Üretici Adı": "Pilz Ireland",
+        "Üretim Yılı": "2024"
+      },
+      "recommendations": [
+        "✅ AT Uygunluk Beyanı yeterli"
+      ],
+      "summary": {
+        "conclusion": "AT uygunluk beyanı 2006/42/EC direktifine uygun (%97)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
+  },
+  {
+    "ticket_no": "ticket55",
+    "ticket_id": "espe_20251202_125427",
+    "document_name": "E21.207_-_Chin_Fong_-_Arka_Taraf_Isk_Perdesi_ESPE_Raporu_V0_1.pdf",
+    "document_type": "ESPE_RAPORU",
+    "document_url": "https://safetyexpert.app/fileupload/Account_103/Machine_4879/E21.207_-_Chin_Fong_-_Arka_Taraf_Isk_Perdesi_ESPE_Raporu_V0_1.pdf",
+    "opening_date": "2025-12-02T12:54:27.631481",
+    "last_updated": null,
+    "closing_date": null,
+    "status": "Kapalı",
+    "responsible": "Savaş Bey",
+    "analysis_result": {
+      "overall_score": {
+        "max_points": 100,
+        "percentage": 80.0,
+        "status": "PASS",
+        "status_tr": "GEÇERLİ",
+        "text_quality": "good",
+        "total_points": 80.0
+      },
+      "category_scores": {
+        "Genel Rapor Bilgileri": {
+          "max_points": 10,
+          "normalized_score": 8.0,
+          "percentage": 80.0,
+          "points_earned": 8.0,
+          "status": "PASS"
+        },
+        "Görsel ve Teknik Dökümantasyon": {
+          "max_points": 5,
+          "normalized_score": 5.0,
+          "percentage": 100.0,
+          "points_earned": 5,
+          "status": "PASS"
+        },
+        "Güvenlik Mesafesi Hesabı": {
+          "max_points": 25,
+          "normalized_score": 25.0,
+          "percentage": 100.0,
+          "points_earned": 25,
+          "status": "PASS"
+        },
+        "Koruma Cihazı (ESPE) Bilgileri": {
+          "max_points": 10,
+          "normalized_score": 10.0,
+          "percentage": 100.0,
+          "points_earned": 10.0,
+          "status": "PASS"
+        },
+        "Makine Duruş Performansı Ölçümü": {
+          "max_points": 25,
+          "normalized_score": 25.0,
+          "percentage": 100.0,
+          "points_earned": 25.0,
+          "status": "PASS"
+        },
+        "Sonuç ve Öneriler": {
+          "max_points": 10,
+          "normalized_score": 7.0,
+          "percentage": 70.0,
+          "points_earned": 7,
+          "status": "PASS"
+        }
+      },
+      "extracted_values": {
+        "cozunurluk": "90",
+        "durum": "uygun",
+        "durus_suresi_max": "70",
+        "durus_suresi_min": "120",
+        "en_iso_13855": "EN ISO 13855",
+        "formula_c": "C = 8 x ( d - 14 )",
+        "formula_s": "S = (2000 x T)",
+        "hat_bolge": "Sakarya Fabrikası",
+        "hesaplanan_mesafe": "1190",
+        "k_sabiti": "",
+        "koruma_yuksekligi": "1190",
+        "makine_adi": "Bulunamadı",
+        "mevcut_mesafe": "1190",
+        "olcum_tarihi": "10.03.2024",
+        "proje_no": "Bulunamadı",
+        "tehlikeli_hareket": "Tehlikeli hareket"
+      },
+      "recommendations": [
+        "✅ Genel Rapor Bilgileri bölümü yeterli (%80.0)",
+        "✅ Koruma Cihazı (ESPE) Bilgileri bölümü yeterli (%100.0)",
+        "✅ Makine Duruş Performansı Ölçümü bölümü yeterli (%100.0)",
+        "✅ Güvenlik Mesafesi Hesabı bölümü yeterli (%100.0)",
+        "✅ Görsel ve Teknik Dökümantasyon bölümü yeterli (%100.0)",
+        "⚠️ Sonuç ve Öneriler bölümü geliştirilmeli (%70.0)"
+      ],
+      "summary": {
+        "conclusion": "ESPE raporu standartlara uygun (%80)",
+        "is_valid": true,
+        "main_issues": []
+      }
+    },
+    "comments": [],
+    "inspector_comment": ""
   }
 ]

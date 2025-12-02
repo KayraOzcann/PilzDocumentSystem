@@ -877,7 +877,12 @@ def analyze_aydinlatma_report():
             if 'error' in report:
                 return jsonify({'error': 'Analysis failed', 'message': report['error']}), 400
 
-            overall_percentage = report['ozet']['yuzde']
+            if 'puanlama' in report and 'percentage' in report['puanlama']:
+                overall_percentage = report['puanlama']['percentage']
+            elif 'ozet' in report and 'yuzde' in report['ozet']:
+                overall_percentage = report['ozet']['yuzde']
+            else:
+                overall_percentage = 0
             status = "PASS" if overall_percentage >= 70 else "FAIL"
             
             response_data = {

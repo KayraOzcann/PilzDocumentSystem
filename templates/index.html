@@ -62,23 +62,6 @@
                             <div class="select-wrap" style="margin-top:1.3rem;">
                                 <select id="documentType" name="document_type" required>
                                     <option value="">-- Rapor türünü seçiniz --</option>
-                                    <option value="electric_circuit">🔌 Elektrik Devre Şeması Analizi</option>
-                                    <option value="espe_report">📋 ESPE Raporu Analizi</option>
-                                    <option value="noise_report">🔊 Gürültü Ölçüm Raporu Analizi</option>
-                                    <option value="manuel_report">📖 Manuel/Kullanım Kılavuzu Analizi</option>
-                                    <option value="loto_report">🔒 LOTO Raporu Analizi</option>
-                                    <option value="lvd_report">⚡ LVD Raporu Analizi</option>
-                                    <option value="at_declaration">🔍 AT Tip Muayene Analizi</option>
-                                    <option value="isg_periodic_control">🛡️ İSG Periyodik Kontrol Analizi</option>
-                                    <option value="pneumatic_circuit">💨 Pnömatik Devre Şeması Analizi</option>
-                                    <option value="hydraulic_circuit">🔧 Hidrolik Devre Şeması Analizi</option>
-                                    <option value="assembly_instructions">🔨 Montaj Talimatları Analizi</option>
-                                    <option value="grounding_report">🌍 EN 60204-1 Topraklama Raporu Analizi</option>
-                                    <option value="hrc_report">🤖 HRC Kuvvet-Basınç Raporu Analizi</option>
-                                    <option value="maintenance_instructions">🔧 Bakım Talimatları Analizi</option>
-                                    <option value="vibration_report">📳 Mekanik Titreşim Raporu Analizi</option>
-                                    <option value="lighting_report">💡 Aydınlatma Raporu Analizi</option>
-                                    <option value="at_type_report">📜 AT Tip İnceleme Sertifikası Analizi</option>
                                 </select>
                                 <i class="fa-solid fa-angle-down"></i>
                             </div>
@@ -643,16 +626,29 @@
         // Load document types dynamically
         async function loadDocumentTypes() {
             try {
-                const response = await fetch('/api/services');
+                const response = await fetch('/api/document-types'); // YENİ ENDPOINT
                 const data = await response.json();
                 
-                if (data.success && data.services) {
-                    // Document types are already hardcoded with emojis
-                    // but we could update them dynamically if needed
-                    console.log('Available services:', data.services);
+                if (data.success && data.document_types) {
+                    const select = document.getElementById('documentType');
+                    
+                    // Mevcut option'ları temizle (ilk default option hariç)
+                    while (select.options.length > 1) {
+                        select.remove(1);
+                    }
+                    
+                    // Database'den gelen tipleri ekle
+                    data.document_types.forEach(type => {
+                        const option = document.createElement('option');
+                        option.value = type.code;
+                        option.textContent = `${type.icon || '📄'} ${type.name}`;
+                        select.appendChild(option);
+                    });
+                    
+                    console.log('Document types yüklendi:', data.document_types.length);
                 }
             } catch (error) {
-                console.error('Error loading services:', error);
+                console.error('Document types yükleme hatası:', error);
             }
         }
 

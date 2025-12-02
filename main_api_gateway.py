@@ -1,4 +1,3 @@
-
 # ============================================
 # IMPORTS - STANDARD LIBRARIES
 # ============================================
@@ -6,10 +5,13 @@ from flask import Flask, request, jsonify, render_template
 from werkzeug.utils import secure_filename
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import atexit
 import time
+
+from database import db, init_db
+from models import DocumentType, Ticket, TicketComment
 
 # ============================================
 # LOGGING CONFIGURATION
@@ -22,62 +24,46 @@ logger = logging.getLogger(__name__)
 # ============================================
 FILE_BASE_URL = "https://safetyexpert.app/fileupload/Account_103/Machine_4879/"
 
+DOCUMENT_HANDLERS = {}
 
-# ============================================
-# IMPORTS - SERVİS DOSYALARI
-# ============================================
-# TODO: Her yeni servis dosyası eklendiğinde buraya import ekle
 
-# Titreşim servisi 
-from titresim_service import app as titresim_app
+def load_document_handlers():
+    """
+    Database'den document type'ları ve service import'larını yükle
+    """
+    global DOCUMENT_HANDLERS
+    
+    try:
+        from models import DocumentType
+        
+        doc_types = DocumentType.query.filter_by(is_active=True).all()
+        
+        for dt in doc_types:
+            try:
+                # Database'den: service_file = "titresim_service.py"
+                module_name = dt.service_file.replace('.py', '')
+                
+                # Dinamik import
+                module = __import__(module_name, fromlist=['app'])
+                service_app = getattr(module, 'app')
+                
+                DOCUMENT_HANDLERS[dt.code] = {
+                    'app': service_app,
+                    'endpoint': dt.endpoint,
+                    'description': dt.description
+                }
+                
+                logger.info(f"✅ Loaded: {dt.code} → {module_name}")
+                
+            except Exception as e:
+                logger.error(f"❌ {dt.code} import hatası: {str(e)}")
+        
+        logger.info(f"📋 Total handlers loaded: {len(DOCUMENT_HANDLERS)}")
+        
+    except Exception as e:
+        logger.error(f"❌ Document handlers yüklenemedi: {str(e)}")
+        raise
 
-# Elektrik servisi 
-from elektrik_service import app as elektrik_app
-
-# ESPE servisi
-from espe_service import app as espe_app
-
-# Gürültü servisi
-from gurultu_service import app as gurultu_app
-
-# Manuel/Kullanım Kılavuzu servisi 
-from manuel_service import app as manuel_app
-
-# LOTO servisi 
-from loto_service import app as loto_app
-
-#at-declaration servisi
-from at_declaration_service import app as at_declaration_app
-
-# LVD servisi
-from lvd_service import app as lvd_app
-
-# Aydınlatma servisi
-from aydinlatma_service import app as aydinlatma_app
-
-# İSG Periyodik Kontrol servisi
-from isg_service import app as isg_app
-
-# Pnömatik Devre Şeması servisi
-from pnomatic_service import app as pnomatic_app
-
-# Hidrolik servisi
-from hidrolik_service import app as hidrolik_app
-
-# Montaj servisi
-from montaj_service import app as montaj_app
-
-# HRC servisi
-from hrc_service import app as hrc_app
-
-# Bakım servisi
-from bakim_service import app as bakim_app
-
-# AT Type servisi
-from at_tip_service import app as at_tip_app
-
-# Topraklama servisi
-from topraklama_service import app as topraklama_app
 
 # ============================================
 # FLASK APP CONFIGURATION
@@ -96,138 +82,24 @@ app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32MB
 
 
 # ============================================
-# DOCUMENT TYPE MAPPING
-# ============================================
-# TODO: Her yeni servis için buraya mapping ekle
-
-DOCUMENT_HANDLERS = {
-    # Titreşim 
-    'vibration_report': {
-        'app': titresim_app,
-        'endpoint': '/api/titresim-report',
-        'description': 'Mekanik Titreşim Ölçüm Raporu Analizi'
-    },
-    
-    # Elektrik 
-    'electric_circuit': {
-        'app': elektrik_app,
-        'endpoint': '/api/elektrik-report',
-        'description': 'Elektrik Devre Şeması Analizi'
-    },
-
-    # ESPE 
-    'espe_report': {
-        'app': espe_app,
-        'endpoint': '/api/espe-report',
-        'description': 'ESPE Raporu Analizi'
-    },
-    
-    # Gürültü
-    'noise_report': {
-        'app': gurultu_app,
-        'endpoint': '/api/noise-report',
-        'description': 'Gürültü Ölçüm Raporu Analizi'
-    },
-    
-    # Manuel 
-    'manuel_report': {
-        'app': manuel_app,
-        'endpoint': '/api/manuel-report',
-        'description': 'Manuel/Kullanım Kılavuzu Analizi'
-    },
-
-    # LOTO 
-    'loto_report': {
-        'app': loto_app,
-        'endpoint': '/api/loto-report',
-        'description': 'LOTO Prosedürü Analizi'
-    },
-
-    # AT Declaration
-    'at_declaration': {
-        'app': at_declaration_app,
-        'endpoint': '/api/at-declaration',
-        'description': 'AT Declaration Belgesi Analizi'
-    },
-
-    # LVD
-    'lvd_report': {
-        'app': lvd_app,
-        'endpoint': '/api/lvd-report',
-        'description': 'LVD Topraklama Süreklilik Raporu Analizi'
-    },
-
-    # Aydınlatma
-    'lighting_report': {
-        'app': aydinlatma_app,
-        'endpoint': '/api/aydinlatma-report',
-        'description': 'Aydınlatma Ölçüm Raporu Analizi'
-    },
-
-    # İSG Periyodik Kontrol
-    'isg_periodic_control': {
-        'app': isg_app,
-        'endpoint': '/api/isg-control',
-        'description': 'İSG Periyodik Kontrol Raporu Analizi'
-    },
-
-    # Pnömatik Devre Şeması
-    'pneumatic_circuit': {
-        'app': pnomatic_app,
-        'endpoint': '/api/pnomatic-control',
-        'description': 'Pnömatik Devre Şeması Analizi'
-    },
-
-    # Hidrolik Devre Şeması
-    'hydraulic_circuit': {
-        'app': hidrolik_app,
-        'endpoint': '/api/hydraulic-control',
-        'description': 'Hidrolik Devre Şeması Analizi'
-    },
-
-    # Montaj Talimatları
-    'assembly_instructions': {
-        'app': montaj_app,
-        'endpoint': '/api/assembly-instructions',
-        'description': 'Montaj Talimatları Analizi'
-    },
-
-    # HRC Kuvvet-Basınç 
-    'hrc_report': {
-        'app': hrc_app,
-        'endpoint': '/api/hrc-report',
-        'description': 'HRC Kuvvet-Basınç Raporu Analizi'
-    },
-
-    # Bakım Talimatları
-    'maintenance_instructions': {
-        'app': bakim_app,
-        'endpoint': '/api/bakimtalimatlari-report',
-        'description': 'Bakım Talimatları Analizi'
-    },
-
-    # AT Type
-    'at_type_report': {
-        'app': at_tip_app,
-        'endpoint': '/api/at-type-cert-report',
-        'description': 'AT Tip Belgesi Analizi'
-    },
-    
-    # Topraklama Ölçüm Raporu
-    'grounding_report': {
-        'app': topraklama_app,
-        'endpoint': '/api/topraklama-report',
-        'description': 'Topraklama Ölçüm Raporu Analizi'
-    },
-}
-
-
-# ============================================
 # HELPER FUNCTIONS
 # ============================================
 def allowed_file(filename):
     """Dosya uzantısı kontrolü"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def generate_ticket_no():
+    """Yeni ticket numarası oluştur (sıralı)"""
+    last_ticket = Ticket.query.order_by(Ticket.id.desc()).first()
+    if last_ticket:
+        # Son ticket_no'dan sayıyı çıkar (örn: "ticket5" -> 5)
+        try:
+            last_num = int(last_ticket.ticket_no.replace('ticket', ''))
+            return f"ticket{last_num + 1}"
+        except:
+            return f"ticket{Ticket.query.count() + 1}"
+    return "ticket1"
 
 
 # ============================================
@@ -236,9 +108,8 @@ def allowed_file(filename):
 @app.route('/api/analyze', methods=['POST'])
 def analyze_document():
     """
-    Ana analiz endpoint'i - Basitleştirilmiş Azure versiyonu
+    Ana analiz endpoint'i - PostgreSQL ile
     
-    Diğer ekip bu endpoint'i kullanıyor:
     POST /api/analyze
     {
         "file": <binary>,
@@ -323,69 +194,53 @@ def analyze_document():
         # Servis'ten gelen cevabı al
         result = response.get_json()
         
-        # 6. OTOMATIK TICKET OLUŞTUR
+        # 6. OTOMATIK TICKET OLUŞTUR (PostgreSQL)
         if result and 'data' in result:
             try:
-                ticket_data = {
-                    'inspector_name': '',
-                    'inspector_comment': '',
-                    'document_name': result['data'].get('filename', filename),
-                    'analysis_data': result['data']
-                }
+                analysis_data = result['data']
+                analysis_id = analysis_data.get('analysis_id')
                 
-                tickets_dir = 'tickets'
-                if not os.path.exists(tickets_dir):
-                    os.makedirs(tickets_dir)
-                
-                tickets_file = os.path.join(tickets_dir, 'tickets.json')
-                
-                tickets = []
-                if os.path.exists(tickets_file):
-                    try:
-                        with open(tickets_file, 'r', encoding='utf-8') as f:
-                            tickets = json.load(f)
-                    except:
-                        tickets = []
-                
-                analysis_id = ticket_data['analysis_data'].get('analysis_id')
-                existing_ticket = next((t for t in tickets if t.get('ticket_id') == analysis_id), None)
+                # Mevcut ticket var mı kontrol et
+                existing_ticket = Ticket.query.filter_by(ticket_id=analysis_id).first()
                 
                 if not existing_ticket:
-                    ticket_no = f"ticket{len(tickets) + 1}"
+                    # Yeni ticket oluştur
+                    ticket_no = generate_ticket_no()
                     
-                    new_ticket = {
-                        'ticket_no': ticket_no,
-                        'ticket_id': analysis_id,
-                        'document_name': ticket_data['analysis_data'].get('filename', 'Bilinmiyor'),
-                        'document_type': ticket_data['analysis_data'].get('file_type', 'Bilinmiyor'),
-                        'document_url': custom_document_url if custom_document_url else f"{FILE_BASE_URL}{ticket_data['analysis_data'].get('filename', filename)}",
-                        'opening_date': datetime.now().isoformat(),
-                        'last_updated': None,
-                        'closing_date': None,
-                        'status': 'İnceleniyor' if initial_comment else 'Kapalı',
-                        'responsible': 'Savaş Bey',
-                        'analysis_result': {
-                            'overall_score': ticket_data['analysis_data'].get('overall_score', {}),
-                            'category_scores': ticket_data['analysis_data'].get('category_scores', {}),
-                            'extracted_values': ticket_data['analysis_data'].get('extracted_values', {}),
-                            'recommendations': ticket_data['analysis_data'].get('recommendations', []),
-                            'summary': ticket_data['analysis_data'].get('summary', '')
-                        },
-                        'comments': [
-                            {
-                                'comment_id': 'comment_1',
-                                'author': comment_author if comment_author else 'Anonim Kullanıcı',
-                                'text': initial_comment,
-                                'timestamp': datetime.now().isoformat()
-                            }
-                        ] if initial_comment else [],
-                        'inspector_comment': ''
-                    }
+                    new_ticket = Ticket(
+                        ticket_no=ticket_no,
+                        ticket_id=analysis_id,
+                        document_name=analysis_data.get('filename', filename),
+                        document_type=analysis_data.get('file_type', 'Bilinmiyor'),
+                        document_url=custom_document_url if custom_document_url else f"{FILE_BASE_URL}{analysis_data.get('filename', filename)}",
+                        opening_date=datetime.now(),
+                        status='İnceleniyor' if initial_comment else 'Kapalı',
+                        responsible='Savaş Bey',
+                        analysis_result={
+                            'overall_score': analysis_data.get('overall_score', {}),
+                            'category_scores': analysis_data.get('category_scores', {}),
+                            'extracted_values': analysis_data.get('extracted_values', {}),
+                            'recommendations': analysis_data.get('recommendations', []),
+                            'summary': analysis_data.get('summary', '')
+                        }
+                    )
                     
-                    tickets.append(new_ticket)
+                    db.session.add(new_ticket)
+                    db.session.flush()  # ID'yi al
                     
-                    with open(tickets_file, 'w', encoding='utf-8') as f:
-                        json.dump(tickets, f, ensure_ascii=False, indent=2)
+                    # İlk yorum varsa ekle
+                    if initial_comment:
+                        first_comment = TicketComment(
+                            ticket_id=new_ticket.id,
+                            comment_id='comment_1',
+                            author=comment_author if comment_author else 'Anonim Kullanıcı',
+                            text=initial_comment,
+                            timestamp=datetime.now()
+                        )
+                        db.session.add(first_comment)
+                        new_ticket.last_updated = datetime.now()
+                    
+                    db.session.commit()
                     
                     logger.info(f"Otomatik ticket oluşturuldu: {ticket_no} (ID: {analysis_id})")
                     
@@ -393,12 +248,13 @@ def analyze_document():
                     result['ticket_no'] = ticket_no
                     result['ticket_id'] = analysis_id
                 else:
-                    logger.info(f"Bu analiz için ticket zaten var: {existing_ticket.get('ticket_no')}")
+                    logger.info(f"Bu analiz için ticket zaten var: {existing_ticket.ticket_no}")
                     result['ticket_created'] = False
-                    result['ticket_no'] = existing_ticket.get('ticket_no')
-                    result['ticket_id'] = existing_ticket.get('ticket_id')
+                    result['ticket_no'] = existing_ticket.ticket_no
+                    result['ticket_id'] = existing_ticket.ticket_id
                     
             except Exception as e:
+                db.session.rollback()
                 logger.error(f"Otomatik ticket oluşturma hatası: {str(e)}")
                 result['ticket_error'] = str(e)
         
@@ -411,6 +267,7 @@ def analyze_document():
             'error': 'Internal server error',
             'message': str(e)
         }), 500
+
 
 # ============================================
 # SERVICE INFORMATION ENDPOINT
@@ -441,59 +298,81 @@ def get_services():
             'success': False,
             'message': str(e)
         }), 500
+
     
 # ============================================
-# TICKET MANAGEMENT ENDPOINTS
+# TICKET MANAGEMENT ENDPOINTS (PostgreSQL)
 # ============================================
 @app.route('/api/tickets', methods=['GET'])
 def get_tickets():
-    """Tüm tickets'ları döndür (filtreleme ile)"""
+    """Tüm tickets'ları döndür (filtreleme ile) - PostgreSQL"""
     try:
-        tickets_file = os.path.join('tickets', 'tickets.json')
+        # Base query
+        query = Ticket.query
         
-        if not os.path.exists(tickets_file):
-            return jsonify([])
-        
-        with open(tickets_file, 'r', encoding='utf-8') as f:
-            tickets = json.load(f)
-
         # Filtreleme parametreleri
         status_filter = request.args.get('status', '')
         date_from = request.args.get('date_from', '')
         date_to = request.args.get('date_to', '')
-        responsible_filter = request.args.get('responsible', '').lower()
+        responsible_filter = request.args.get('responsible', '')
         
         # Filtrele
         if status_filter:
-            tickets = [t for t in tickets if t.get('status') == status_filter]
-
+            query = query.filter(Ticket.status == status_filter)
+        
         if date_from:
             date_from_obj = datetime.fromisoformat(date_from)
-            tickets = [t for t in tickets 
-                      if datetime.fromisoformat(t.get('opening_date', '')) >= date_from_obj]
+            query = query.filter(Ticket.opening_date >= date_from_obj)
         
         if date_to:
             date_to_obj = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
-            tickets = [t for t in tickets 
-                      if datetime.fromisoformat(t.get('opening_date', '')) <= date_to_obj]
+            query = query.filter(Ticket.opening_date <= date_to_obj)
         
         if responsible_filter:
-            tickets = [t for t in tickets 
-                      if responsible_filter in t.get('responsible', '').lower()]
-            
-        # Sırala (en yeni önce)
-        tickets.sort(key=lambda x: x.get('opening_date', ''), reverse=True)
+            query = query.filter(Ticket.responsible.ilike(f'%{responsible_filter}%'))
         
-        return jsonify(tickets)
+        # Sırala (en yeni önce)
+        tickets = query.order_by(Ticket.opening_date.desc()).all()
+        
+        # Response formatı (frontend ile uyumlu)
+        result = []
+        for ticket in tickets:
+            # Yorumları çek
+            comments = TicketComment.query.filter_by(ticket_id=ticket.id).order_by(TicketComment.timestamp).all()
+            
+            result.append({
+                'ticket_no': ticket.ticket_no,
+                'ticket_id': ticket.ticket_id,
+                'document_name': ticket.document_name,
+                'document_type': ticket.document_type,
+                'document_url': ticket.document_url,
+                'opening_date': ticket.opening_date.isoformat(),
+                'last_updated': ticket.last_updated.isoformat() if ticket.last_updated else None,
+                'closing_date': ticket.closing_date.isoformat() if ticket.closing_date else None,
+                'status': ticket.status,
+                'responsible': ticket.responsible,
+                'analysis_result': ticket.analysis_result,
+                'comments': [
+                    {
+                        'comment_id': c.comment_id,
+                        'author': c.author,
+                        'text': c.text,
+                        'timestamp': c.timestamp.isoformat()
+                    }
+                    for c in comments
+                ]
+            })
+        
+        return jsonify(result)
         
     except Exception as e:
         logger.error(f"Tickets okunurken hata: {str(e)}")
-        return jsonify([])
+        return jsonify([]), 500
 
 
 @app.route('/api/update-ticket', methods=['POST'])
 def update_ticket():
-    """Ticket bilgilerini güncelle (status, responsible, vb.)"""
+    """Ticket bilgilerini güncelle (status, responsible, vb.) - PostgreSQL"""
     try:
         data = request.get_json()
         
@@ -517,61 +396,53 @@ def update_ticket():
                 'message': 'Güncellenecek alan belirtilmedi'
             }), 400
         
-        tickets_file = os.path.join('tickets', 'tickets.json')
-        
-        if not os.path.exists(tickets_file):
-            return jsonify({'success': False, 'message': 'Tickets bulunamadı'}), 404
-        
-        with open(tickets_file, 'r', encoding='utf-8') as f:
-            tickets = json.load(f)
-        
         # HYBRID ARAMA: Önce ticket_id, sonra ticket_no
         ticket = None
         if ticket_id:
-            ticket = next((t for t in tickets if t.get('ticket_id') == ticket_id), None)
+            ticket = Ticket.query.filter_by(ticket_id=ticket_id).first()
         
         if not ticket and ticket_no:
-            ticket = next((t for t in tickets if t.get('ticket_no') == ticket_no), None)
+            ticket = Ticket.query.filter_by(ticket_no=ticket_no).first()
         
         if not ticket:
             return jsonify({'success': False, 'message': 'Ticket bulunamadı'}), 404
         
-        old_status = ticket.get('status')
+        old_status = ticket.status
         
         # Status güncelleme
         if new_status:
-            ticket['status'] = new_status
+            ticket.status = new_status
             
             # Kapalı statüsüne ÇEVRİLDİYSE kapanma tarihini ekle
             if new_status == 'Kapalı' and old_status != 'Kapalı':
-                ticket['closing_date'] = datetime.now().isoformat()
+                ticket.closing_date = datetime.now()
             
             # Kapalı'dan başka bir statüye GEÇİLDİYSE kapanma tarihini sil
             elif new_status != 'Kapalı' and old_status == 'Kapalı':
-                ticket['closing_date'] = None
+                ticket.closing_date = None
         
         # Sorumlu güncelleme
         if new_responsible:
-            ticket['responsible'] = new_responsible
+            ticket.responsible = new_responsible
         
         # Son güncelleme tarihini ekle
-        ticket['last_updated'] = datetime.now().isoformat()
+        ticket.last_updated = datetime.now()
         
-        with open(tickets_file, 'w', encoding='utf-8') as f:
-            json.dump(tickets, f, ensure_ascii=False, indent=2)
+        db.session.commit()
         
-        logger.info(f"Ticket güncellendi: {ticket.get('ticket_no')} (ID: {ticket.get('ticket_id')})")
+        logger.info(f"Ticket güncellendi: {ticket.ticket_no} (ID: {ticket.ticket_id})")
         
         return jsonify({'success': True, 'message': 'Ticket başarıyla güncellendi'})
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Ticket güncelleme hatası: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @app.route('/api/add-comment', methods=['POST'])
 def add_comment():
-    """Ticket'a yeni yorum ekle (HYBRID: ticket_id veya ticket_no)"""
+    """Ticket'a yeni yorum ekle - PostgreSQL"""
     try:
         data = request.get_json()
         
@@ -592,59 +463,59 @@ def add_comment():
                 'message': 'İsim ve yorum boş olamaz'
             }), 400
         
-        tickets_file = os.path.join('tickets', 'tickets.json')
-        
-        if not os.path.exists(tickets_file):
-            return jsonify({'success': False, 'message': 'Tickets bulunamadı'}), 404
-        
-        with open(tickets_file, 'r', encoding='utf-8') as f:
-            tickets = json.load(f)
-        
         # HYBRID ARAMA
         ticket = None
         if ticket_id:
-            ticket = next((t for t in tickets if t.get('ticket_id') == ticket_id), None)
+            ticket = Ticket.query.filter_by(ticket_id=ticket_id).first()
         
         if not ticket and ticket_no:
-            ticket = next((t for t in tickets if t.get('ticket_no') == ticket_no), None)
+            ticket = Ticket.query.filter_by(ticket_no=ticket_no).first()
         
         if not ticket:
             return jsonify({'success': False, 'message': 'Ticket bulunamadı'}), 404
         
-        if 'comments' not in ticket:
-            ticket['comments'] = []
+        # Mevcut yorum sayısını bul
+        existing_comments_count = TicketComment.query.filter_by(ticket_id=ticket.id).count()
+        comment_id = f"comment_{existing_comments_count + 1}"
         
-        comment_id = f"comment_{len(ticket['comments']) + 1}"
+        # Yeni yorum oluştur
+        new_comment = TicketComment(
+            ticket_id=ticket.id,
+            comment_id=comment_id,
+            author=author,
+            text=text,
+            timestamp=datetime.now()
+        )
         
-        new_comment = {
-            'comment_id': comment_id,
-            'author': author,
-            'text': text,
-            'timestamp': datetime.now().isoformat()
-        }
+        db.session.add(new_comment)
         
-        ticket['comments'].append(new_comment)
-        ticket['last_updated'] = datetime.now().isoformat()
+        # Ticket'ın last_updated'ini güncelle
+        ticket.last_updated = datetime.now()
         
-        with open(tickets_file, 'w', encoding='utf-8') as f:
-            json.dump(tickets, f, ensure_ascii=False, indent=2)
+        db.session.commit()
         
-        logger.info(f"Yorum eklendi: {ticket.get('ticket_no')} - {author}")
+        logger.info(f"Yorum eklendi: {ticket.ticket_no} - {author}")
         
         return jsonify({
             'success': True,
             'message': 'Yorum başarıyla eklendi',
-            'comment': new_comment
+            'comment': {
+                'comment_id': comment_id,
+                'author': author,
+                'text': text,
+                'timestamp': new_comment.timestamp.isoformat()
+            }
         })
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Yorum ekleme hatası: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @app.route('/api/delete-ticket', methods=['POST'])
 def delete_ticket():
-    """Ticket'ı sil (HYBRID: ticket_id veya ticket_no)"""
+    """Ticket'ı sil - PostgreSQL (cascade ile yorumlar da silinir)"""
     try:
         data = request.get_json()
         
@@ -657,38 +528,24 @@ def delete_ticket():
                 'message': 'ticket_id veya ticket_no gerekli'
             }), 400
         
-        tickets_file = os.path.join('tickets', 'tickets.json')
-        
-        if not os.path.exists(tickets_file):
-            return jsonify({'success': False, 'message': 'Tickets bulunamadı'}), 404
-        
-        with open(tickets_file, 'r', encoding='utf-8') as f:
-            tickets = json.load(f)
-        
         # HYBRID ARAMA
-        ticket_index = None
-        
+        ticket = None
         if ticket_id:
-            for i, t in enumerate(tickets):
-                if t.get('ticket_id') == ticket_id:
-                    ticket_index = i
-                    break
+            ticket = Ticket.query.filter_by(ticket_id=ticket_id).first()
         
-        if ticket_index is None and ticket_no:
-            for i, t in enumerate(tickets):
-                if t.get('ticket_no') == ticket_no:
-                    ticket_index = i
-                    break
+        if not ticket and ticket_no:
+            ticket = Ticket.query.filter_by(ticket_no=ticket_no).first()
         
-        if ticket_index is None:
+        if not ticket:
             return jsonify({'success': False, 'message': 'Ticket bulunamadı'}), 404
         
-        deleted_ticket = tickets.pop(ticket_index)
+        ticket_no_deleted = ticket.ticket_no
         
-        with open(tickets_file, 'w', encoding='utf-8') as f:
-            json.dump(tickets, f, ensure_ascii=False, indent=2)
+        # Sil (cascade sayesinde yorumlar da silinir)
+        db.session.delete(ticket)
+        db.session.commit()
         
-        logger.info(f"Ticket silindi: {deleted_ticket.get('ticket_no')}")
+        logger.info(f"Ticket silindi: {ticket_no_deleted}")
         
         return jsonify({
             'success': True,
@@ -696,6 +553,7 @@ def delete_ticket():
         })
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Ticket silme hatası: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
@@ -777,8 +635,8 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'service': 'PILZ Report Checker API Gateway',
-        'version': '3.0.0-azure',
-        'architecture': 'direct-import',
+        'version': '3.0.0-azure-db',
+        'architecture': 'database-driven',
         'available_document_types': list(DOCUMENT_HANDLERS.keys()),
         'total_services': len(DOCUMENT_HANDLERS)
     })
@@ -789,13 +647,13 @@ def api_info():
     """API documentation"""
     return jsonify({
         'service': 'PILZ Report Checker API Gateway',
-        'version': '3.0.0-azure',
-        'description': 'Unified API for document analysis services - Azure optimized',
-        'architecture': 'Direct Import (No subprocess, no dynamic ports)',
+        'version': '3.0.0-azure-db',
+        'description': 'Unified API for document analysis services - PostgreSQL powered',
+        'architecture': 'Database-driven (PostgreSQL)',
         'endpoints': {
             'POST /api/analyze': 'Analyze any supported document type',
             'GET /api/tickets': 'List all tickets (with filters)',
-            'POST /api/update-ticket-status': 'Update ticket status',
+            'POST /api/update-ticket': 'Update ticket status/responsible',
             'POST /api/add-comment': 'Add comment to ticket',
             'POST /api/delete-ticket': 'Delete ticket',
             'POST /api/save-evaluation': 'Save analysis evaluation',
@@ -827,13 +685,57 @@ def index():
 
 
 # ============================================
+# DOCUMENT TYPES ENDPOINT
+# ============================================
+@app.route('/api/document-types', methods=['GET'])
+def get_document_types():
+    """Database'den aktif document type'ları döndür"""
+    try:
+        # Aktif document type'ları çek
+        doc_types = DocumentType.query.filter_by(is_active=True).order_by(DocumentType.name).all()
+        
+        return jsonify({
+            'success': True,
+            'document_types': [
+                {
+                    'code': dt.code,
+                    'name': dt.name,
+                    'description': dt.description,
+                    'icon': dt.icon,
+                    'endpoint': dt.endpoint
+                }
+                for dt in doc_types
+            ],
+            'total': len(doc_types)
+        })
+        
+    except Exception as e:
+        logger.error(f"Document types hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+# ============================================
+# DATABASE INITIALIZATION
+# ============================================
+# Database'i başlat
+init_db(app)
+
+
+# ============================================
 # APPLICATION ENTRY POINT (Azure-Friendly)
 # ============================================
 if __name__ == '__main__':
     logger.info("=" * 60)
-    logger.info("PILZ Report Checker - Main API Gateway (Azure)")
+    logger.info("PILZ Report Checker - Main API Gateway (PostgreSQL)")
     logger.info("=" * 60)
-    logger.info(f"🔧 Mimari: Direct Import (No subprocess)")
+
+    with app.app_context():
+        load_document_handlers()
+
+    logger.info(f"🔧 Mimari: Database-driven (PostgreSQL)")
     logger.info(f"📁 Upload klasörü: {UPLOAD_FOLDER}")
     logger.info(f"📊 Desteklenen formatlar: {', '.join(ALLOWED_EXTENSIONS)}")
     logger.info(f"📏 Maksimum dosya boyutu: {app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB")
