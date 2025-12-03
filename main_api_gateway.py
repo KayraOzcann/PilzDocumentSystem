@@ -723,6 +723,10 @@ def get_document_types():
 # Database'i başlat
 init_db(app)
 
+with app.app_context():
+    load_document_handlers()
+    logger.info(f"✅ Gunicorn için {len(DOCUMENT_HANDLERS)} handler yüklendi")
+
 
 # ============================================
 # APPLICATION ENTRY POINT (Azure-Friendly)
@@ -731,9 +735,6 @@ if __name__ == '__main__':
     logger.info("=" * 60)
     logger.info("PILZ Report Checker - Main API Gateway (PostgreSQL)")
     logger.info("=" * 60)
-
-    with app.app_context():
-        load_document_handlers()
 
     logger.info(f"🔧 Mimari: Database-driven (PostgreSQL)")
     logger.info(f"📁 Upload klasörü: {UPLOAD_FOLDER}")
