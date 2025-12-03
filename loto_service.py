@@ -615,7 +615,7 @@ def check_strong_keywords_first_pages(filepath, validation_keywords):
             opencv_image = cv2.cvtColor(np.array(page), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng')
             all_text += text.lower() + " "
         found = [kw for kw in strong_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
         logger.info(f"İlk sayfa: {len(found)} LOTO kelime bulundu")
@@ -642,7 +642,7 @@ def check_excluded_keywords_first_pages(filepath, validation_keywords):
             opencv_image = cv2.cvtColor(np.array(page), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             processed = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng', timeout=15)
+            text = pytesseract.image_to_string(processed, config='--oem 3 --psm 6 -l tur+eng')
             all_text += text.lower() + " "
         found = [kw for kw in excluded_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
         return len(found) >= 2
