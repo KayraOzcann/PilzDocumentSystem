@@ -66,9 +66,14 @@
                                 <i class="fa-solid fa-angle-down"></i>
                             </div>
 
-                        <div class="actions">
-                            <button id="analyzeBtn" class="btn-primary" type="submit" disabled><i class="fa-solid fa-magnifying-glass"></i> Analiz Et</button>
-                        </div>
+                            <div class="actions" style="display: flex; gap: 0.8rem;">
+                                <button id="analyzeBtn" class="btn-primary" type="submit" disabled>
+                                    <i class="fa-solid fa-magnifying-glass"></i> Analiz Et
+                                </button>
+                                <button type="button" class="btn-add-doc-type" onclick="openAddDocTypeModal()" style="margin: 0;">
+                                    <i class="fa-solid fa-plus-circle"></i> Döküman Türü Ekle
+                                </button>
+                            </div>
                     </form>
                     <div id="loading" class="loading">
                         <div class="spinner"></div>
@@ -621,35 +626,6 @@
             
             // Scroll to top
             window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        // Load document types dynamically
-        async function loadDocumentTypes() {
-            try {
-                const response = await fetch('/api/document-types'); // YENİ ENDPOINT
-                const data = await response.json();
-                
-                if (data.success && data.document_types) {
-                    const select = document.getElementById('documentType');
-                    
-                    // Mevcut option'ları temizle (ilk default option hariç)
-                    while (select.options.length > 1) {
-                        select.remove(1);
-                    }
-                    
-                    // Database'den gelen tipleri ekle
-                    data.document_types.forEach(type => {
-                        const option = document.createElement('option');
-                        option.value = type.code;
-                        option.textContent = `${type.icon || '📄'} ${type.name}`;
-                        select.appendChild(option);
-                    });
-                    
-                    console.log('Document types yüklendi:', data.document_types.length);
-                }
-            } catch (error) {
-                console.error('Document types yükleme hatası:', error);
-            }
         }
 
         // Değerlendirme bölümü fonksiyonları
@@ -1773,6 +1749,385 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadDocumentTypes();
         });
+    </script>
+    <!-- Add Document Type Modal -->
+    <div id="addDocTypeModal" class="modal-overlay" style="display:none;" onclick="closeAddDocTypeModal(event)">
+        <div class="modal-content modal-large" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-plus-circle"></i> Yeni Döküman Türü Ekle</h3>
+                <button onclick="closeAddDocTypeModal()" class="modal-close">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addDocTypeForm">
+                    <!-- Temel Bilgiler -->
+                    <div class="form-section">
+                        <h4><i class="fa-solid fa-info-circle"></i> Temel Bilgiler</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Döküman Türü Adı *</label>
+                                <input type="text" id="docTypeName" placeholder="Örn: Yangın Söndürme Raporu" required />
+                            </div>
+                            <div class="form-group">
+                                <label>Icon *</label>
+                                <select id="docTypeIcon" required>
+                                    <option value="">Seçiniz</option>
+                                    <option value="🔥">🔥 Yangın</option>
+                                    <option value="💧">💧 Su/Hidrolik</option>
+                                    <option value="⚡">⚡ Elektrik</option>
+                                    <option value="🔧">🔧 Mekanik</option>
+                                    <option value="🔊">🔊 Ses/Gürültü</option>
+                                    <option value="💡">💡 Aydınlatma</option>
+                                    <option value="📋">📋 Genel Rapor</option>
+                                    <option value="🔒">🔒 Güvenlik</option>
+                                    <option value="🤖">🤖 Robot</option>
+                                    <option value="📄">📄 Döküman</option>
+                                    <option value="🔍">🔍 İnceleme</option>
+                                    <option value="✅">✅ Onay</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Açıklama (Opsiyonel)</label>
+                            <input type="text" id="docTypeDescription" placeholder="Kısa açıklama..." />
+                        </div>
+                        <div class="form-group">
+                            <label style="display:flex; align-items:center; gap:0.5rem;">
+                                <input type="checkbox" id="docTypeOCR" style="width:auto;" />
+                                OCR Kullan (Taramalı PDF'ler için)
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Kategoriler ve Puanlar -->
+                    <div class="form-section">
+                        <h4><i class="fa-solid fa-list"></i> Kategoriler ve Puanlar</h4>
+                        <div id="categoriesContainer">
+                            <!-- Dynamic categories here -->
+                        </div>
+                        <button type="button" class="btn-add-item" onclick="addCategory()">
+                            <i class="fa-solid fa-plus"></i> Kategori Ekle
+                        </button>
+                    </div>
+
+                    <!-- Extract Values -->
+                    <div class="form-section">
+                        <h4><i class="fa-solid fa-search"></i> Çıkarılacak Bilgiler</h4>
+                        <p class="form-help">Rapordan çıkarmak istediğiniz bilgileri yazın (Örn: rapor no, firma adı, tarih)</p>
+                        <div id="extractValuesContainer">
+                            <!-- Dynamic extract values here -->
+                        </div>
+                        <button type="button" class="btn-add-item" onclick="addExtractValue()">
+                            <i class="fa-solid fa-plus"></i> Alan Ekle
+                        </button>
+                    </div>
+
+                    <!-- Strong Keywords -->
+                    <div class="form-section">
+                        <h4><i class="fa-solid fa-key"></i> Özgü Kelimeler (Minimum 1)</h4>
+                        <p class="form-help">Bu rapora özgü kelimeleri yazın (virgül ile ayırın)</p>
+                        <textarea id="strongKeywords" rows="3" placeholder="yangın, söndürme, fire, extinguisher"></textarea>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="form-actions">
+                        <button type="button" class="btn-outline" onclick="closeAddDocTypeModal()">
+                            <i class="fa-solid fa-times"></i> İptal
+                        </button>
+                        <button type="submit" class="btn-primary">
+                            <i class="fa-solid fa-save"></i> Kaydet
+                        </button>
+                    </div>
+
+                    <!-- Loading -->
+                    <div id="docTypeLoading" class="loading" style="display:none;">
+                        <div class="spinner"></div>
+                        <h3 style="font-size:.9rem;">AI Pattern'leri Oluşturuyor...</h3>
+                        <p style="font-size:.65rem; color:var(--text-dim);">Bu işlem 1 dakika sürebilir</p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+    // =====================================================
+    // DÖKÜMAN TÜRÜ EKLEME MODAL FONKSİYONLARI
+    // =====================================================
+
+    let categoryCounter = 0;
+    let keywordCounter = 0;
+    let extractCounter = 0;
+
+    // Modal Aç
+    function openAddDocTypeModal() {
+        document.getElementById('addDocTypeModal').style.display = 'flex';
+        // İlk kategori otomatik ekle
+        if (categoryCounter === 0) {
+            addCategory();
+        }
+    }
+
+        // Modal Kapat
+    function closeAddDocTypeModal(event) {
+        // event undefined olabilir (X butonundan çağrılırsa)
+        if (!event || event.target.id === 'addDocTypeModal' || event.target.closest('.modal-close')) {
+            document.getElementById('addDocTypeModal').style.display = 'none';
+            // Formu resetle
+            document.getElementById('addDocTypeForm').reset();
+            document.getElementById('categoriesContainer').innerHTML = '';
+            document.getElementById('extractValuesContainer').innerHTML = '';
+            categoryCounter = 0;
+            keywordCounter = 0;
+            extractCounter = 0;
+            // Loading gizle
+            document.getElementById('docTypeLoading').style.display = 'none';
+        }
+    }
+
+    // Kategori Ekle
+    function addCategory() {
+        categoryCounter++;
+        const container = document.getElementById('categoriesContainer');
+        
+        const categoryDiv = document.createElement('div');
+        categoryDiv.className = 'category-item';
+        categoryDiv.id = `category-${categoryCounter}`;
+        categoryDiv.setAttribute('data-category-id', categoryCounter);
+        
+        categoryDiv.innerHTML = `
+            <div style="display: flex; gap: 0.8rem; align-items: flex-start; margin-bottom: 0.8rem;">
+                <div style="flex: 1;">
+                    <label>Kategori Adı</label>
+                    <input type="text" class="category-name" placeholder="Örn: Genel Bilgiler" required>
+                </div>
+                <div style="flex: 0 0 120px;">
+                    <label>Puan Ağırlığı</label>
+                    <input type="number" class="category-weight" min="1" max="100" placeholder="%" required>
+                </div>
+                <button type="button" class="btn-remove" onclick="removeCategory(${categoryCounter})" style="margin-top: 1.8rem;">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+            <div style="margin-left: 1.5rem; border-left: 2px solid var(--border-color); padding-left: 1rem;">
+                <div class="keywords-container" id="keywords-${categoryCounter}">
+                    <!-- Anahtar kelimeler buraya eklenecek -->
+                </div>
+                <button type="button" class="btn-add-item" onclick="addKeyword(${categoryCounter})">
+                    <i class="fa-solid fa-plus"></i> Anahtar Kelime Ekle
+                </button>
+            </div>
+        `;
+        
+        container.appendChild(categoryDiv);
+        // İlk keyword otomatik ekle
+        addKeyword(categoryCounter);
+    }
+
+    // Kategori Sil
+    function removeCategory(categoryId) {
+        const categoryDiv = document.getElementById(`category-${categoryId}`);
+        if (categoryDiv) {
+            categoryDiv.remove();
+        }
+    }
+
+    // Anahtar Kelime Ekle
+    function addKeyword(categoryId) {
+        keywordCounter++;
+        const container = document.getElementById(`keywords-${categoryId}`);
+        
+        const keywordDiv = document.createElement('div');
+        keywordDiv.className = 'keyword-item';
+        keywordDiv.id = `keyword-${keywordCounter}`;
+        keywordDiv.style.cssText = 'display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;';
+        
+        keywordDiv.innerHTML = `
+            <input type="text" class="keyword-input" placeholder="Örn: firma adı" style="flex: 1;" required>
+            <button type="button" class="btn-remove" onclick="removeKeyword(${keywordCounter})" style="padding: 0.4rem 0.6rem;">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        `;
+        
+        container.appendChild(keywordDiv);
+    }
+
+    // Anahtar Kelime Sil
+    function removeKeyword(keywordId) {
+        const keywordDiv = document.getElementById(`keyword-${keywordId}`);
+        if (keywordDiv) {
+            keywordDiv.remove();
+        }
+    }
+
+    // Çıkarılacak Bilgi Ekle
+    function addExtractValue() {
+        extractCounter++;
+        const container = document.getElementById('extractValuesContainer');
+        
+        const extractDiv = document.createElement('div');
+        extractDiv.className = 'extract-item';
+        extractDiv.id = `extract-${extractCounter}`;
+        extractDiv.style.cssText = 'display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;';
+        
+        extractDiv.innerHTML = `
+            <input type="text" class="extract-input" placeholder="Örn: test_tarihi" style="flex: 1;" required>
+            <button type="button" class="btn-remove" onclick="removeExtractValue(${extractCounter})" style="padding: 0.4rem 0.6rem;">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        `;
+        
+        container.appendChild(extractDiv);
+    }
+
+    // Çıkarılacak Bilgi Sil
+    function removeExtractValue(extractId) {
+        const extractDiv = document.getElementById(`extract-${extractId}`);
+        if (extractDiv) {
+            extractDiv.remove();
+        }
+    }
+
+    // Form Submit
+    document.getElementById('addDocTypeForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        // Loading göster
+        const loadingDiv = document.getElementById('docTypeLoading');
+        loadingDiv.style.display = 'flex';
+        
+        try {
+            // Form verilerini topla
+            const formData = {
+                name: document.getElementById('docTypeName').value.trim(),
+                icon: document.getElementById('docTypeIcon').value,
+                description: document.getElementById('docTypeDescription').value.trim(),
+                needs_ocr: document.getElementById('docTypeOCR').checked,
+                categories: [],
+                extract_values: [],
+                strong_keywords: []
+            };
+            
+            // Kategorileri topla (BACKEND FORMAT)
+            formData.criteria_weights = {};
+            formData.criteria_details = {};
+
+            const categories = document.querySelectorAll('.category-item');
+            categories.forEach(catDiv => {
+                const categoryName = catDiv.querySelector('.category-name').value.trim();
+                const categoryWeight = parseInt(catDiv.querySelector('.category-weight').value);
+                const keywords = [];
+                
+                catDiv.querySelectorAll('.keyword-input').forEach(input => {
+                    const keyword = input.value.trim();
+                    if (keyword) keywords.push(keyword);
+                });
+                
+                if (categoryName && categoryWeight && keywords.length > 0) {
+                    // Backend'in beklediği format
+                    formData.criteria_weights[categoryName] = categoryWeight;
+                    formData.criteria_details[categoryName] = keywords;
+                }
+            });
+
+            // Eski array'i sil
+            delete formData.categories;
+            
+            // Çıkarılacak bilgileri topla
+            document.querySelectorAll('.extract-input').forEach(input => {
+                const value = input.value.trim();
+                if (value) formData.extract_values.push(value);
+            });
+            
+            // Özgü kelimeleri topla (virgülle ayrılmış)
+            const strongKeywordsText = document.getElementById('strongKeywords').value.trim();
+            if (strongKeywordsText) {
+                formData.strong_keywords = strongKeywordsText.split(',').map(k => k.trim()).filter(k => k);
+            }
+            
+            // Validasyon
+            if (Object.keys(formData.criteria_weights).length === 0) {
+                alert('En az bir kategori eklemelisiniz!');
+                loadingDiv.style.display = 'none';
+                return;
+            }
+            
+            if (formData.strong_keywords.length === 0) {
+                alert('En az bir özgü kelime girmelisiniz!');
+                loadingDiv.style.display = 'none';
+                return;
+            }
+            
+            // API'ye gönder
+            const response = await fetch('/api/create-dynamic-type', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert(`✅ ${result.message}\n\nDöküman Kodu: ${result.code}`);
+                
+                // Dropdown'ı yenile
+                await loadDocumentTypes();
+                
+                // Modal'ı kapat
+                closeAddDocTypeModal({ target: { id: 'addDocTypeModal' } });
+            } else {
+                alert(`❌ Hata: ${result.error}`);
+            }
+            
+        } catch (error) {
+            console.error('Form gönderim hatası:', error);
+            alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+        } finally {
+            loadingDiv.style.display = 'none';
+        }
+    });
+
+    // Döküman türlerini yükle (dropdown güncellemesi için)
+    async function loadDocumentTypes() {
+        try {
+            const response = await fetch('/api/document-types');
+            const data = await response.json();  // 👈 data objesi
+            
+            if (data.success && data.document_types) {  // 👈 data.document_types array'i
+                const select = document.getElementById('documentType');
+                const currentValue = select.value;
+                
+                // Mevcut option'ları temizle (ilk "seçiniz" hariç)
+                while (select.options.length > 1) {
+                    select.remove(1);
+                }
+                
+                // Yeni option'ları ekle
+                data.document_types.forEach(type => {  // 👈 DOĞRU: data.document_types
+                    const option = document.createElement('option');
+                    option.value = type.code;
+                    option.textContent = `${type.icon || '📄'} ${type.name}`;
+                    select.appendChild(option);
+                });
+                
+                // Önceki seçimi koru (varsa)
+                if (currentValue) {
+                    select.value = currentValue;
+                }
+                
+                console.log('✅ Document types yüklendi:', data.document_types.length);
+            }
+            
+        } catch (error) {
+            console.error('❌ Döküman türleri yüklenemedi:', error);
+        }
+    }
+
+    // Sayfa yüklendiğinde döküman türlerini yükle
+    document.addEventListener('DOMContentLoaded', loadDocumentTypes);
+
     </script>
 </body>
 </html>

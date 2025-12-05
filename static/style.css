@@ -1066,3 +1066,262 @@ body:has(#ticketsView[style*="display: block"]) .result-actions:not(#analysisVie
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(255,202,2,.15);
 }
+
+/* ============================================
+   DYNAMIC DOCUMENT TYPE MODAL
+   ============================================ */
+
+/* Add Doc Type Button */
+.btn-add-doc-type {
+  background: var(--gradient); 
+  color: #fff;
+  border: none;
+  padding: 0.75rem 1.2rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 0 4px 12px rgba(255, 202, 2, 0.3);
+}
+
+.btn-add-doc-type:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 202, 2, 0.4);
+}
+
+/* Modal Large */
+.modal-large {
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Form Sections */
+.form-section {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.form-section h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-help {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-bottom: 0.8rem;
+  font-style: italic;
+}
+
+/* Form Groups */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.7rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  outline: none;
+  transition: var(--transition);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255,202,2,.15);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Category Item */
+.category-item {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.category-header {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+  margin-bottom: 0.8rem;
+}
+
+.category-header input {
+  flex: 1;
+}
+
+.category-header input[type="number"] {
+  width: 80px;
+  flex: 0 0 80px;
+}
+
+.btn-remove {
+  background: rgba(255,77,79,.15);
+  color: #ff4d4f;
+  border: 1px solid rgba(255,77,79,.3);
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.btn-remove:hover {
+  background: rgba(255,77,79,.25);
+}
+
+/* Keywords Container */
+.keywords-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-left: 1rem;
+}
+
+.keyword-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.keyword-item input {
+  flex: 1;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.5rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+
+.keyword-item button {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0.3rem;
+  transition: var(--transition);
+}
+
+.keyword-item button:hover {
+  color: var(--danger);
+}
+
+/* Extract Value Item */
+.extract-value-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.8rem;
+}
+
+.extract-value-item input {
+  flex: 1;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.7rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+}
+
+/* Add Item Button */
+.btn-add-item {
+  background: var(--bg-alt);
+  border: 1px dashed var(--border);
+  color: var(--text-dim);
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  justify-content: center;
+}
+
+.btn-add-item:hover {
+  background: var(--bg-soft);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* Form Actions */
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modal-large {
+    max-width: 95vw;
+    margin: 1rem;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .category-header {
+    flex-direction: column;
+  }
+  
+  .category-header input[type="number"] {
+    width: 100%;
+  }
+}

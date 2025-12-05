@@ -11,7 +11,8 @@ import atexit
 import time
 
 from database import db, init_db
-from models import DocumentType, Ticket, TicketComment
+from models import DocumentType, Ticket, TicketComment, CriteriaWeight, CriteriaDetail, PatternDefinition, ValidationKeyword, CategoryAction
+import anthropic
 
 # ============================================
 # LOGGING CONFIGURATION
@@ -38,22 +39,43 @@ def load_document_handlers():
         
         doc_types = DocumentType.query.filter_by(is_active=True).all()
         
+        # Dynamic service'i bir kere yükle
+        dynamic_app = None
+        
         for dt in doc_types:
             try:
-                # Database'den: service_file = "titresim_service.py"
-                module_name = dt.service_file.replace('.py', '')
-                
-                # Dinamik import
-                module = __import__(module_name, fromlist=['app'])
-                service_app = getattr(module, 'app')
-                
-                DOCUMENT_HANDLERS[dt.code] = {
-                    'app': service_app,
-                    'endpoint': dt.endpoint,
-                    'description': dt.description
-                }
-                
-                logger.info(f"✅ Loaded: {dt.code} → {module_name}")
+                # Dynamic service kontrolü
+                if dt.service_file == 'dynamic_service.py':
+                    # Dynamic service'i lazy load yap
+                    if dynamic_app is None:
+                        logger.info("🔄 Dynamic service yükleniyor...")
+                        dynamic_module = __import__('dynamic_service', fromlist=['app'])
+                        dynamic_app = getattr(dynamic_module, 'app')
+                        logger.info("✅ Dynamic service yüklendi")
+                    
+                    DOCUMENT_HANDLERS[dt.code] = {
+                        'app': dynamic_app,
+                        'endpoint': dt.endpoint,
+                        'description': dt.description,
+                        'is_dynamic': True  # Flag ekle
+                    }
+                    
+                    logger.info(f"✅ Loaded (dynamic): {dt.code} → {dt.name}")
+                    
+                else:
+                    # Normal servisler (eski)
+                    module_name = dt.service_file.replace('.py', '')
+                    module = __import__(module_name, fromlist=['app'])
+                    service_app = getattr(module, 'app')
+                    
+                    DOCUMENT_HANDLERS[dt.code] = {
+                        'app': service_app,
+                        'endpoint': dt.endpoint,
+                        'description': dt.description,
+                        'is_dynamic': False
+                    }
+                    
+                    logger.info(f"✅ Loaded: {dt.code} → {module_name}")
                 
             except Exception as e:
                 logger.error(f"❌ {dt.code} import hatası: {str(e)}")
@@ -176,18 +198,25 @@ def analyze_document():
         handler_info = DOCUMENT_HANDLERS[document_type]
         service_app = handler_info['app']
         service_endpoint = handler_info['endpoint']
-        
-        logger.info(f"Servis çağrılıyor: {service_endpoint}")
+        is_dynamic = handler_info.get('is_dynamic', False)
+
+        logger.info(f"Servis çağrılıyor: {service_endpoint} (Dynamic: {is_dynamic})")
         
         # Service app'in test client'ını kullan (internal routing)
         with service_app.test_client() as client:
             # Dosyayı ve diğer parametreleri servis'e gönder
+            form_data = {
+                'file': (file, filename),
+                **{key: value for key, value in request.form.items() if key != 'document_type'}
+            }
+
+            # Dynamic service ise document_code ekle
+            if is_dynamic:
+                form_data['document_code'] = document_type
+
             response = client.post(
                 service_endpoint,
-                data={
-                    'file': (file, filename),
-                    **{key: value for key, value in request.form.items() if key != 'document_type'}
-                },
+                data=form_data,
                 content_type='multipart/form-data'
             )
         
@@ -722,6 +751,333 @@ def get_document_types():
 # ============================================
 # Database'i başlat
 init_db(app)
+
+# ============================================
+# DYNAMIC DOCUMENT TYPE MANAGEMENT (YENİ)
+# ============================================
+@app.route('/api/create-dynamic-type', methods=['POST'])
+def create_dynamic_type():
+    """Yeni döküman türü oluştur - AI ile pattern generation"""
+    try:
+        data = request.get_json()
+        
+        # Validasyon
+        if not data.get('name'):
+            return jsonify({'success': False, 'message': 'Döküman adı gerekli'}), 400
+        
+        if not data.get('strong_keywords') or len(data['strong_keywords']) == 0:
+            return jsonify({'success': False, 'message': 'En az 1 strong keyword gerekli'}), 400
+        
+        # Code oluştur (normalize)
+        code = data['name'].lower().strip().replace(' ', '_').replace('ş', 's').replace('ğ', 'g').replace('ü', 'u').replace('ö', 'o').replace('ç', 'c').replace('ı', 'i')
+        
+        # Aynı code var mı kontrol
+        existing = DocumentType.query.filter_by(code=code).first()
+        if existing:
+            return jsonify({'success': False, 'message': f'Bu döküman türü zaten var: {code}'}), 400
+        
+        logger.info(f"🚀 Yeni döküman türü oluşturuluyor: {data['name']} ({code})")
+        logger.info(f"📊 AI pattern generation başlatılıyor...")
+        
+        # AI'ya gönder - Patterns oluştur
+        ai_result = generate_patterns_with_ai(data)
+        
+        if not ai_result['success']:
+            return jsonify({'success': False, 'message': f'AI pattern hatası: {ai_result["error"]}'}), 500
+        
+        logger.info(f"✅ AI patterns oluşturuldu")
+        
+        # Database'e kaydet
+        doc_type = DocumentType(
+            code=code,
+            name=data['name'],
+            description=data.get('description', f"{data['name']} analiz servisi"),
+            service_file='dynamic_service.py',
+            endpoint='/api/dynamic-report',
+            icon=data.get('icon', '📄'),
+            app_variable_name='dynamic_app',
+            is_active=True
+        )
+        
+        db.session.add(doc_type)
+        db.session.flush()
+        
+        # Criteria Weights ekle
+        for idx, (category_name, weight) in enumerate(data['criteria_weights'].items(), 1):
+            cw = CriteriaWeight(
+                document_type_id=doc_type.id,
+                category_name=category_name,
+                weight=weight,
+                display_order=idx
+            )
+            db.session.add(cw)
+            db.session.flush()
+            
+            # Criteria Details ekle (AI'dan gelen patterns ile)
+            if category_name in ai_result['criteria_patterns']:
+                for idx2, (criterion_name, criterion_data) in enumerate(ai_result['criteria_patterns'][category_name].items(), 1):
+                    cd = CriteriaDetail(
+                        criteria_weight_id=cw.id,
+                        criterion_name=criterion_name,
+                        pattern=criterion_data['pattern'],
+                        weight=criterion_data['weight'],
+                        display_order=idx2
+                    )
+                    db.session.add(cd)
+        
+        # Pattern Definitions ekle (extract_values - AI'dan gelen)
+        if ai_result.get('extract_patterns'):
+            for idx, (field_name, patterns_list) in enumerate(ai_result['extract_patterns'].items(), 1):
+                pd = PatternDefinition(
+                    document_type_id=doc_type.id,
+                    pattern_group='extract_values',
+                    field_name=field_name,
+                    patterns=patterns_list,
+                    display_order=idx
+                )
+                db.session.add(pd)
+        
+        # Validation Keywords - Critical Terms (AI'dan gelen)
+        if ai_result.get('critical_terms'):
+            for idx, keywords_list in enumerate(ai_result['critical_terms'], 1):
+                vk = ValidationKeyword(
+                    document_type_id=doc_type.id,
+                    keyword_type='critical_terms',
+                    category=f'category_{idx}',
+                    keywords=keywords_list
+                )
+                db.session.add(vk)
+        
+        # Strong Keywords
+        vk_strong = ValidationKeyword(
+            document_type_id=doc_type.id,
+            keyword_type='strong_keywords',
+            keywords=data['strong_keywords']
+        )
+        db.session.add(vk_strong)
+        
+        # Excluded Keywords - Mevcut pool'u çek + yeni strong keywords ekle
+        excluded_pool = get_excluded_keywords_pool()
+        excluded_pool.extend(data['strong_keywords'])
+        
+        vk_excluded = ValidationKeyword(
+            document_type_id=doc_type.id,
+            keyword_type='excluded_keywords',
+            keywords=list(set(excluded_pool))  # Duplicate'leri kaldır
+        )
+        db.session.add(vk_excluded)
+        
+        db.session.commit()
+        
+        logger.info(f"✅ Döküman türü kaydedildi: {code}")
+        logger.info(f"🔄 Document handlers yeniden yükleniyor...")
+        
+        # Handlers'ı yeniden yükle
+        load_document_handlers()
+        
+        return jsonify({
+            'success': True,
+            'message': f'✅ {data["name"]} başarıyla oluşturuldu!',
+            'code': code,
+            'document_type': {
+                'code': code,
+                'name': data['name'],
+                'icon': data.get('icon', '📄')
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Create dynamic type hatası: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/get-dynamic-types', methods=['GET'])
+def get_dynamic_types():
+    """Tüm dynamic döküman türlerini listele"""
+    try:
+        # is_dynamic flag'i yoksa service_file='dynamic_service.py' olanları al
+        dynamic_types = DocumentType.query.filter_by(
+            service_file='dynamic_service.py',
+            is_active=True
+        ).order_by(DocumentType.name).all()
+        
+        return jsonify({
+            'success': True,
+            'types': [
+                {
+                    'code': dt.code,
+                    'name': dt.name,
+                    'icon': dt.icon,
+                    'description': dt.description
+                }
+                for dt in dynamic_types
+            ]
+        })
+        
+    except Exception as e:
+        logger.error(f"Get dynamic types hatası: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+# ============================================
+# HELPER FUNCTIONS - AI & KEYWORDS
+# ============================================
+def generate_patterns_with_ai(data):
+    """
+    AI ile patterns oluştur
+    
+    Returns:
+    {
+        'success': True/False,
+        'criteria_patterns': {
+            'Kategori 1': {
+                'kelime_1': {'pattern': 'r"..."', 'weight': 2}
+            }
+        },
+        'extract_patterns': {
+            'field_name': ['pattern1', 'pattern2', ...]
+        },
+        'critical_terms': [
+            ['kelime1', 'kelime2'],
+            ['kelime3', 'kelime4']
+        ]
+    }
+    """
+    try:
+        import anthropic
+        
+        client = anthropic.Anthropic(api_key="")
+        
+        # Prompt hazırla
+        prompt = fr"""Sen bir regex pattern uzmanısın. Türkçe ve İngilizce dökümanlardan bilgi çıkarmak için regex pattern'leri oluşturuyorsun.
+
+GÖREV 1 - CRITERIA DETAILS PATTERNS (Tek uzun pattern):
+Aşağıdaki kategoriler ve kelimeler için TEK bir regex pattern oluştur. Pattern uzun ama doğru ve mantıklı olmalı.
+
+Kategoriler ve Kelimeler:
+{format_criteria_for_ai(data['criteria_weights'], data['criteria_details'])}
+
+Her kelime için:
+- TEK uzun regex pattern (case-insensitive)
+- Türkçe ve İngilizce alternatifleri içermeli
+- Örnek uzunluk: r"(?i)(?:test\s*yapan|tested\s*by|ölçüm\s*yapan|measured\s*by|kurum|institution|organization|şirket|company|firma|sorumlu|responsible)[\s\W]*[:=]?\s*([A-ZÇĞİÖŞÜa-züçğıöşü][A-Za-züçğıöşüÇĞİÖŞÜ\s\.\&\-]{3,50})"
+
+GÖREV 2 - EXTRACT VALUES PATTERNS (Array of patterns):
+Aşağıdaki alanlar için HER BİRİ İÇİN 2-3 FARKLI pattern oluştur:
+
+Alanlar:
+{format_extract_values_for_ai(data.get('extract_values', []))}
+
+Her alan için:
+- 2-3 farklı regex pattern (array)
+- Farklı format varyasyonları
+- Örnek: ["r\\"pattern1\\"", "r\\"pattern2\\""]
+- Örnek array pattern: [r"(?i)(?:Test\s*Tarih|Test\s*Date)\s*[:=]\s*(\d{1,2}[./]\d{1,2}[./]\d{2,4})",r"(\d{1,2}[./]\d{1,2}[./]\d{4})\s*(?:tarih|date)"]
+
+GÖREV 3 - CRITICAL TERMS:
+Strong keywords'leri kullanarak 3-4 kategori oluştur. Her kategoride benzer/ilgili kelimeleri grupla.
+
+Strong Keywords: {', '.join(data['strong_keywords'])}
+
+Kurallar:
+- Mevcut kelimeleri kullan
+- Türkçe/İngilizce alternatifleri ekle
+- Kategoriler mantıklı olmalı
+
+JSON formatında döndür:
+{{
+    "criteria_patterns": {{
+        "kategori_adı": {{
+            "kelime_adi": {{"pattern": "r\\"....\\"", "weight": 2}}
+        }}
+    }},
+    "extract_patterns": {{
+        "field_name": ["r\\"pattern1\\"", "r\\"pattern2\\""]
+    }},
+    "critical_terms": [
+        ["kelime1", "kelime2", "keyword1"],
+        ["kelime3", "kelime4"]
+    ]
+}}
+"""
+        
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=1500,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        
+        # Response'u parse et
+        response_text = message.content[0].text
+        
+        # JSON'u çıkar (markdown varsa temizle)
+        import json
+        if '```json' in response_text:
+            response_text = response_text.split('```json')[1].split('```')[0]
+        elif '```' in response_text:
+            response_text = response_text.split('```')[1].split('```')[0]
+        
+        result = json.loads(response_text.strip())
+        result['success'] = True
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"AI pattern generation hatası: {str(e)}")
+        return {'success': False, 'error': str(e)}
+
+
+def format_criteria_for_ai(criteria_weights, criteria_details):
+    """Criteria'ları AI için formatla"""
+    text = ""
+    for category, weight in criteria_weights.items():
+        text += f"\n{category} (Puan: {weight}):\n"
+        if category in criteria_details:
+            for keyword in criteria_details[category]:
+                text += f"  - {keyword}\n"
+    return text
+
+
+def format_extract_values_for_ai(extract_values):
+    """Extract values'ları AI için formatla"""
+    if not extract_values:
+        return "Yok"
+    return "\n".join([f"  - {field}" for field in extract_values])
+
+
+def get_excluded_keywords_pool():
+    """Mevcut excluded keywords pool'unu döndür"""
+    base_excluded = [
+        "hrc","cobot","robot","çarpışma","collaborative","kolaboratif","sd conta",
+        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm",
+        "espe",
+        "hidrolik", "hydraulic",
+        "gürültü", "noise", "ses", "sound", "decibel", "db",
+        "kullanma", "kılavuz", "manual", "instruction",
+        "loto",
+        "lvd", "topraklama",
+        "uygunluk", "beyan", "conformity", "declaration",
+        "isg", "periyodik", "kontrol", "periodic", "inspection",
+        "pnömatik", "pneumatic",
+        "montaj", "assembly",
+        "bakım", "maintenance", "servis",
+        "titreşim", "vibration", "mekanik",
+        "aydınlatma", "lighting", "lux", "lümen",
+        "AT TİP", "sertifika", "certificate"
+    ]
+    
+    # Database'deki diğer dynamic servislerin strong keywords'lerini ekle
+    try:
+        all_strong = ValidationKeyword.query.filter_by(keyword_type='strong_keywords').all()
+        for vk in all_strong:
+            base_excluded.extend(vk.keywords)
+    except:
+        pass
+    
+    return list(set(base_excluded))  # Unique yap
 
 with app.app_context():
     load_document_handlers()

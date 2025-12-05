@@ -20,12 +20,12 @@ init_db(app)
 # ============================================
 
 # Servis bilgileri
-DOCUMENT_TYPE_CODE = 'electric_circuit'  # TODO: Değiştir (örn: 'electric_circuit', 'espe_report')
-DOCUMENT_TYPE_NAME = 'Elektrik Devre Şeması Analizi'  # TODO: Değiştir
-DOCUMENT_TYPE_DESCRIPTION = 'Elektrik Devre Şeması Raporlarının Analizi'  # TODO: Değiştir
-SERVICE_FILE = 'elektrik_service.py'  # TODO: Değiştir
-ENDPOINT = '/api/elektrik-report'  # TODO: Değiştir
-ICON = '🔌'  # TODO: Değiştir
+DOCUMENT_TYPE_CODE = ''  # TODO: Değiştir (örn: 'electric_circuit', 'espe_report')
+DOCUMENT_TYPE_NAME = ''  # TODO: Değiştir
+DOCUMENT_TYPE_DESCRIPTION = ''  # TODO: Değiştir
+SERVICE_FILE = ''  # TODO: Değiştir
+ENDPOINT = ''  # TODO: Değiştir
+ICON = ''  # TODO: Değiştir
 # ============================================
 # TODO: CRITERIA WEIGHTS (Kategoriler + Puanlar)
 # ============================================
@@ -34,11 +34,7 @@ ICON = '🔌'  # TODO: Değiştir
 # Eğer yoksa: {}
 
 criteria_weights_data = {
-            "Semboller ve İşaretler": 30,
-            "Bağlantı Hatları": 25,
-            "Etiketleme ve Numara Sistemleri": 20,
-            "Kontrol Panosu / Makine Otomasyon Öğeleri": 15,
-            "Şematik Yerleşim": 10
+
 }
 
 # ============================================
@@ -52,40 +48,7 @@ criteria_weights_data = {
 # Eğer yoksa: {}
 
 criteria_details_data = {
-            "Semboller ve İşaretler": {
-                "direnc_sembol": {"pattern": r"(?i)(?:direnç|resistor|ohm|Ω|R\d+|[0-9]+[RKM][0-9]*|zigzag|potansiyometre|pot|trimmer|━+|─+)", "weight": 6},
-                "kondansator_sembol": {"pattern": r"(?i)(?:kondansatör|capacitor|C\d+|[0-9]+[µnpF]+|paralel\s*çizgi|elektrolitik|seramik|\|\||═+|◇.*?\|\||◇.*?═+|⬧.*?\|\||⬧.*?═+|⬥.*?\|\||⬥.*?═+|<>.*?\|\||<>.*?═+|[\u25C7\u25C8\u25C6].*?(?:\|\||═+))", "weight": 6},
-                "bobin_sembol": {"pattern": r"(?i)(?:bobin|inductor|L\d+|[0-9]+[mH]+|spiral|solenoid|trafo|transformatör|transformer|⤾|⟲|⥀)", "weight": 5},
-                "diyot_sembol": {"pattern": r"(?i)(?:diyot|diode|D\d+|LED|zener|köprü|bridge|rectifier|doğrultucu|▶|►|⊳)", "weight": 5},
-                "transistor_sembol": {"pattern": r"(?i)(?:transistör|transistor|Q\d+|NPN|PNP|FET|MOSFET|BJT|darlington|⊲|△)", "weight": 4},
-                "toprak_sembol": {"pattern": r"(?i)(?:toprak|ground|earth|GND|⏚|⊥|chassis|şasi|PE|↧|⌁)", "weight": 2},
-                "sigorta_sembol": {"pattern": r"(?i)(?:sigorta|fuse|F\d+|MCB|RCD|devre\s*kesici|circuit\s*breaker|termik|⚡|═+)", "weight": 2}
-            },
-            "Bağlantı Hatları": {
-                "iletken_baglanti": {"pattern": r"(?i)(?:kablo|wire|cable|hat|line|bağlantı|connection|conductor|iletken|NYA|NYM|H0[57]|━+|─+)", "weight": 8},
-                "kesisen_hatlar": {"pattern": r"(?i)(?:kesişen|crossing|köprü|bridge|junction|node|düğüm|bağlantı\s*noktası|●|⊏|⊐)", "weight": 6},
-                "baglanti_noktalari": {"pattern": r"(?i)(?:bağlantı\s*noktası|connection\s*point|terminal|node|klemens|terminal\s*block|X\d+|●|○|◯|⊙)", "weight": 6},
-                "elektriksel_yon": {"pattern": r"(?i)(?:yön|direction|ok|arrow|akış|flow|akım|current|→|←|↑|↓|⟶|⇾)", "weight": 5}
-            },
-            "Etiketleme ve Numara Sistemleri": {
-                "bilesenlerin_etiketlenmesi": {"pattern": r"(?i)(?:[RCL]\d+|[QDT]\d+|[MKF]\d+|[UIC]\d+|[+-]V(?:cc|dd|ss)|[+-]?\d+V|S[0-9]|K[0-9])", "weight": 6},
-                "elektriksel_degerler": {"pattern": r"(?i)(?:\d+(?:\.\d+)?.*?(?:[VvAaMmWwΩ]|volt|amp|watt|ohm|VA|kVA|mA|µA)|[~=]|\~|\∿)", "weight": 5},
-                "klemens_numaralari": {"pattern": r"(?i)(?:klemens|terminal|X\d+|TB\d+|[0-9]+\.[0-9]+|L[123N]|PE|[UVWN]\d*)", "weight": 5},
-                "kablo_etiketleri": {"pattern": r"(?i)(?:kablo|wire|H\d+|W\d+|[0-9]+[AWG]|NYA|NYM|H0[57]|[0-9xX]+mm²)", "weight": 4}
-            },
-            "Kontrol Panosu / Makine Otomasyon Öğeleri": {
-                "plc_giris_cikis": {"pattern": r"(?i)(?:PLC|I[0-9]+|Q[0-9]+|DI|DO|AI|AO|input|output|giriş|çıkış|[0-9]+[VI][0-9]+)", "weight": 4},
-                "kontaktor_rele": {"pattern": r"(?i)(?:kontaktör|contactor|röle|relay|K\d+|KM\d+|NO|NC|coil|bobin|⤾|⟲)", "weight": 4},
-                "motor_starter": {"pattern": r"(?i)(?:motor|starter|M\d+|drive|sürücü|inverter|softstarter|DOL|VFD|⊏⊐|▭M)", "weight": 3},
-                "buton_sensor": {"pattern": r"(?i)(?:buton|button|sensör|sensor|S\d+|B\d+|switch|anahtar|proximity|PNP|NPN|○|◯|⊙)", "weight": 2},
-                "ac_dc_guc": {"pattern": r"(?i)(?:AC|DC|güç|power|[0-9]+[VvAa]|~|⎓|[1-3]~|\+|-|N|PE|L[123]|\∿|=)", "weight": 2}
-            },
-            "Şematik Yerleşim": {
-                "bilgi_akisi": {"pattern": r"(?i)(?:giriş|input|çıkış|output|soldan|sağa|yukarı|aşağı|→|←|↑|↓|⟶|⇾)", "weight": 3},
-                "mantikli_dizilim": {"pattern": r"(?i)(?:işleme|process|dönüşüm|transformation|kontrol|control|güç|power|▭|⊏⊐)", "weight": 3},
-                "sayfa_basligi": {"pattern": r"(?i)(?:proje|project|tarih|date|çizim|drawing|revizyon|revision|ref|no)", "weight": 2},
-                "cerceve_frame": {"pattern": r"(?i)(?:çerçeve|frame|başlık|title|numara|number|sayfa|page|sheet|▭|□)", "weight": 2}
-            }
+           
 }
 
 # ============================================
@@ -98,52 +61,7 @@ criteria_details_data = {
 # }
 # Eğer yoksa: {}
 pattern_definitions_data = {
-        "electric": {
-                "resistor": ["R1", "R2", "R3", "RESISTOR", "DİRENÇ", "POT", "TRIMMER"],
-                "capacitor": ["C1", "C2", "C3", "CAPACITOR", "KONDANSATÖR", "ELKO"],
-                "inductor": ["L1", "L2", "L3", "INDUCTOR", "BOBİN", "TRAFO"],
-                "diode": ["D1", "D2", "D3", "DIODE", "DİYOT", "LED", "ZENER"],
-                "transistor": ["Q1", "Q2", "Q3", "TRANSISTOR", "TRANSİSTÖR", "FET", "MOSFET"],
-                "relay": ["K1", "K2", "K3", "RELAY", "RÖLE", "KONTAKTÖR"],
-                "motor": ["M1", "M2", "M3", "MOTOR", "STARTER", "SÜRÜCÜ"],
-                "fuse": ["F1", "F2", "F3", "FUSE", "SİGORTA", "MCB", "RCD"],
-                "switch": ["S1", "S2", "S3", "SWITCH", "ANAHTAR", "BUTON"],
-                "power": ["V1", "V2", "V3", "POWER", "GÜÇ", "AC", "DC"],
-                "ground": ["GND", "GROUND", "TOPRAK", "PE", "EARTH"],
-                "terminal": ["X1", "X2", "X3", "TERMINAL", "KLEMENS", "TB"]
-            },
-        "symbol_map" : {
-            'Ω': 'ohm', '∆': 'delta', '±': 'plusminus', '→': 'arrow', '←': 'arrow',
-            '↑': 'arrow', '↓': 'arrow', '⏚': 'ground', '⊥': 'ground', '~': 'ac',
-            '≈': 'ac', '⎓': 'dc', '⌁': 'dc', '∿': 'sine', '⚡': 'power'
-        },
-        
-        "unit_map" : {
-            r'([0-9]+)\s*[vV]\b':[r'\1 volt'],
-            r'([0-9]+)\s*[aA]\b':[r'\1 amp'],
-            r'([0-9]+)\s*[wW]\b': [r'\1 watt'],
-            r'([0-9]+)\s*[hH][zZ]\b': [r'\1 hertz'],
-            r'([0-9]+)\s*Ω': [r'\1 ohm'],
-            r'([0-9]+)\s*[kK][vV][aA]': [r'\1 kva'],
-            r'([0-9]+)\s*[mM][aA]': [r'\1 milliamp'],
-            r'([0-9]+)\s*[µuU][fF]': [r'\1 microfarad'],
-            r'([0-9]+)\s*[pP][fF]': [r'\1 picofarad'],
-            r'([0-9]+)\s*[mM][hH]': [r'\1 millihenry']
-        },
-
-        "extract_values": {
-            "proje_no": r"(?:30292390|PROJE\s*NO|PROJECT\s*NO)",
-            "sistem_tipi": r"(?i)(?:elektrik\s*şeması|electric\s*circuit|electrical\s*diagram)",
-            "tarih": r"(\d{2}\.\d{2}\.\d{4})",
-            "elektrik_paneli": r"(?i)(?:ELEKTRİK\s*PANELİ|ELECTRICAL\s*PANEL|CONTROL\s*PANEL)",
-            "voltaj": r"(?i)(?:(\d+)\s*V|(\d+)\s*volt)",
-            "akim": r"(?i)(?:(\d+)\s*A|(\d+)\s*amp)",
-            "guc": r"(?i)(?:(\d+)\s*W|(\d+)\s*watt|(\d+)\s*kW)",
-            "frekans": r"(?i)(?:(\d+)\s*Hz|(\d+)\s*hertz)",
-            "klemens_blogu": r"(?i)(?:KLEMENS|TERMINAL|TB\d+|X\d+)"
-
-        }
-
+    
 } 
 
 # ============================================
@@ -155,10 +73,7 @@ pattern_definitions_data = {
 # Eğer yoksa: {}
 
 critical_terms = [  
-        ["elektrik", "electrical", "circuit", "devre", "şema", "diagram", "voltage", "current"],
-        ["kontaktör", "contactor", "röle", "relay", "sigorta", "fuse", "mcb", "rcd", "switch"],
-        ["volt", "v", "amper", "a", "watt", "w", "ohm", "ω", "hz", "hertz"],
-        ["stop", "start", "emergency", "acil", "güvenlik", "safety", "control", "kontrol"]
+
 ]
 
 # ============================================
@@ -168,8 +83,7 @@ critical_terms = [
 # Eğer yoksa: []
 
 strong_keywords = [
-        "elektrik", "circuit", "electrical", "voltage", "amper", "ohm",
-        "enclosure", "wrp-", "light curtain", "contactors", "controller"
+
 ]
 
 # ============================================
@@ -179,22 +93,7 @@ strong_keywords = [
 # Eğer yoksa: []
 
 excluded_keywords = [
-        "topraklama direnci", "grounding", "earthing", "60204", "topraklama", "TOPRAKLAMA DİRENCİ",
-        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
-        "hrc", "cobot", "robot", "çarpışma", "collaborative", "kolaboratif", "sd conta",
-        "espe",
-        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim", "tasarım",
-        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
-        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
-        "loto",
-        "lvd", "TOPRAKLAMA SÜREKLİLİK", "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
-        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
-        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
-        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
-        "montaj", "assembly",
-        "bakım", "maintenance", "servis", "service", "bakim", "MAINTENCE",
-        "titreşim", "vibration", "mekanik",
-        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate"
+
 ]
 
 # ============================================
