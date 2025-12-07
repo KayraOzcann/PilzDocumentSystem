@@ -482,7 +482,7 @@ def check_strong_keywords_first_pages(filepath, validation_keywords):
         
         found_keywords = [kw for kw in strong_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
         logger.info(f"İlk sayfa kontrol: {len(found_keywords)} özgü kelime")
-        return len(found_keywords) >= 2
+        return len(found_keywords) >= 1
     except Exception as e:
         logger.warning(f"İlk sayfa kontrol hatası: {e}")
         return False

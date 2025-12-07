@@ -814,11 +814,19 @@ def create_dynamic_type():
             db.session.flush()
 
             logger.info(f"📊 Kategori eklendi: {category_name}") 
+
+            # 👇 CASE-INSENSITIVE EŞLEŞME
+            # AI'dan gelen kategori adını bul (büyük/küçük harf fark etmez)
+            matched_category = None
+            for ai_category in ai_result['criteria_patterns'].keys():
+                if ai_category.lower().replace('_', ' ') == category_name.lower().replace('_', ' '):
+                    matched_category = ai_category
+                    break
             
             # Criteria Details ekle (AI'dan gelen patterns ile)
-            if category_name in ai_result['criteria_patterns']:
-                logger.info(f"   ✅ AI patterns bulundu: {len(ai_result['criteria_patterns'][category_name])} kriter") 
-                for idx2, (criterion_name, criterion_data) in enumerate(ai_result['criteria_patterns'][category_name].items(), 1):
+            if matched_category:
+                logger.info(f"   ✅ AI patterns bulundu: {len(ai_result['criteria_patterns'][matched_category])} kriter")
+                for idx2, (criterion_name, criterion_data) in enumerate(ai_result['criteria_patterns'][matched_category].items(), 1):
                     logger.info(f"      - {criterion_name}: {criterion_data['weight']} puan")
                     cd = CriteriaDetail(
                         criteria_weight_id=cw.id,
@@ -830,7 +838,8 @@ def create_dynamic_type():
                     db.session.add(cd)
             else:
                 logger.warning(f"   ⚠️  AI patterns BULUNAMADI: {category_name}")  
-                logger.warning(f"   AI result keys: {ai_result['criteria_patterns'].keys()}")  
+                logger.warning(f"   AI result keys: {ai_result['criteria_patterns'].keys()}")
+                logger.warning(f"   AI keys: {list(ai_result['criteria_patterns'].keys())}")  
                 
         # Pattern Definitions ekle (extract_values - AI'dan gelen)
         if ai_result.get('extract_patterns'):
@@ -1015,56 +1024,91 @@ def generate_patterns_with_ai(data):
         client = anthropic.Anthropic(api_key="")
         
         # Prompt hazırla
-        prompt = fr"""Sen bir regex pattern uzmanısın. Türkçe ve İngilizce dökümanlardan bilgi çıkarmak için regex pattern'leri oluşturuyorsun.
+        prompt = f"""Sen bir regex pattern uzmanısın. Türkçe ve İngilizce dökümanlardan bilgi çıkarmak için regex pattern'leri oluşturuyorsun.
 
-GÖREV 1 - CRITERIA DETAILS PATTERNS (Tek uzun pattern):
-Aşağıdaki kategoriler ve kelimeler için TEK bir regex pattern oluştur. Pattern uzun ama doğru ve mantıklı olmalı.
+GÖREV 1 - CRITERIA DETAILS PATTERNS:
 
 Kategoriler ve Kelimeler:
 {format_criteria_for_ai(data['criteria_weights'], data['criteria_details'])}
 
-Her kelime için:
-- TEK uzun regex pattern (case-insensitive)
-- Türkçe ve İngilizce alternatifleri içermeli
-- Örnek uzunluk: r"(?i)(?:test\s*yapan|tested\s*by|ölçüm\s*yapan|measured\s*by|kurum|institution|organization|şirket|company|firma|sorumlu|responsible)[\s\W]*[:=]?\s*([A-ZÇĞİÖŞÜa-züçğıöşü][A-Za-züçğıöşüÇĞİÖŞÜ\s\.\&\-]{3,50})"
+PATTERN KURALLARI:
+1. Her kelime için TEK bir UZUN regex pattern oluştur
+2. Pattern case-insensitive olmalı: (?i) ile başla
+3. Non-capturing group kullan: (?:...)
+4. Türkçe ve İngilizce alternatifleri içermeli
+5. Boşluk toleranslı: \\s* veya \\s+
 
-GÖREV 2 - EXTRACT VALUES PATTERNS (Array of patterns):
-Aşağıdaki alanlar için HER BİRİ İÇİN 2-3 FARKLI pattern oluştur:
+ÖRNEK UZUN PATTERN:
+"(?i)(?:test\\s*yapan|tested\\s*by|ölçüm\\s*yapan|measured\\s*by|kurum|institution|organization|şirket|company|firma|sorumlu|responsible)[\\s\\W]*[:=]?\\s*([A-ZÇĞİÖŞÜa-züçğıöşü][A-Za-züçğıöşüÇĞİÖŞÜ\\s\\.\\&\\-]{{3,50}})"
+
+DOĞRU YAZIM:
+- "(?i)(?:yazar|author|writer)"
+- "(?i)(?:rapor\\s*no|report\\s*number)\\s*[:=]?\\s*([A-Z0-9-]+)"
+
+YANLIŞ YAZIM (YAPMA!):
+- "(?i)yazar|author" ❌ (non-capturing group yok)
+- "yazar|author" ❌ (case flag yok)
+
+GÖREV 2 - EXTRACT VALUES PATTERNS:
 
 Alanlar:
 {format_extract_values_for_ai(data.get('extract_values', []))}
 
-Her alan için:
-- 2-3 farklı regex pattern (array)
+PATTERN KURALLARI:
+- Her alan için 2-3 FARKLI pattern oluştur (array içinde)
 - Farklı format varyasyonları
-- Örnek: ["r\\"pattern1\\"", "r\\"pattern2\\""]
-- Örnek array pattern: [r"(?i)(?:Test\s*Tarih|Test\s*Date)\s*[:=]\s*(\d{1,2}[./]\d{1,2}[./]\d{2,4})",r"(\d{1,2}[./]\d{1,2}[./]\d{4})\s*(?:tarih|date)"]
+- Capture group kullan: (...)
+
+ÖRNEK ARRAY PATTERN:
+[
+    "(?i)(?:test\\s*tarih|test\\s*date)\\s*[:=]\\s*(\\d{{1,2}}[./]\\d{{1,2}}[./]\\d{{2,4}})",
+    "(\\d{{1,2}}[./]\\d{{1,2}}[./]\\d{{4}})\\s*(?:tarih|date)"
+]
 
 GÖREV 3 - CRITICAL TERMS:
-Strong keywords'leri kullanarak 3-4 kategori oluştur. Her kategoride benzer/ilgili kelimeleri grupla.
 
 Strong Keywords: {', '.join(data['strong_keywords'])}
 
 Kurallar:
 - Mevcut kelimeleri kullan
-- Türkçe/İngilizce alternatifleri ekle
+- Türkçe/İngilizce alternatifleri ekle  
 - Kategoriler mantıklı olmalı
+- 3-4 kategori oluştur
 
-JSON formatında döndür:
+Örnek:
+Input: ["termal", "konfor"]
+Output: 
+[
+    ["termal", "thermal", "ısı", "heat", "sıcaklık", "temperature"],
+    ["konfor", "comfort", "rahatlık"]
+]
+
+JSON formatında döndür (SADECE JSON, başka açıklama yok):
 {{
     "criteria_patterns": {{
-        "kategori_adı": {{
-            "kelime_adi": {{"pattern": "r\\"....\\"", "weight": 2}}
+        "kategori_ismi": {{
+            "kelime_adi": {{
+                "pattern": "(?i)(?:uzun_pattern_buraya)",
+                "weight": 2
+            }}
         }}
     }},
     "extract_patterns": {{
-        "field_name": ["r\\"pattern1\\"", "r\\"pattern2\\""]
+        "field_name": [
+            "(?i)pattern1",
+            "(?i)pattern2"
+        ]
     }},
     "critical_terms": [
-        ["kelime1", "kelime2", "keyword1"],
+        ["kelime1", "kelime2"],
         ["kelime3", "kelime4"]
     ]
 }}
+
+ÖNEMLİ: Kategori isimleri AYNEN şunlar olmalı (değiştirme!):
+{list(data['criteria_weights'].keys())}
+
+NOT: JSON içinde backslash'leri double yaz: \\s \\d \\w vb.
 """
         
         message = client.messages.create(
@@ -1117,21 +1161,22 @@ def get_excluded_keywords_pool(current_doc_type_id=None):
     """Mevcut excluded keywords pool'unu döndür"""
     base_pool = [
         "hrc","cobot","robot","çarpışma","collaborative","kolaboratif","sd conta",
-        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm",
+        "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm", "enclosure", "wrp-", "light curtain", "contactors", "controller",
         "espe",
-        "hidrolik", "hydraulic",
-        "gürültü", "noise", "ses", "sound", "decibel", "db",
-        "kullanma", "kılavuz", "manual", "instruction",
+        "hidrolik", "HİDROLİK", "hydraulic", "hidrolik yağ", "hydraulic oil", "iso 1219", "1219", "teknik resim",
+        "gürültü", "noise", "ses", "sound", "decibel", "db", "akustik", "acoustic",
+        "kullanma", "kılavuz", "manual", "instruction", "talimat", "guide", "kılavuzu",
         "loto",
-        "lvd", "topraklama",
-        "uygunluk", "beyan", "conformity", "declaration",
-        "isg", "periyodik", "kontrol", "periodic", "inspection",
-        "pnömatik", "pneumatic",
+        "lvd", "TOPRAKLAMA SÜREKLİLİK", "topraklama süreklilik", "TOPRAKLAMA İLETKENLERİ", "topraklama iletkenleri",
+        "uygunluk", "beyan", "muayene", "conformity", "declaration", "declare",
+        "isg", "periyodik", "kontrol", "periodic", "inspection", "denetim",
+        "pnömatik", "pnomatik", "pneumatic", "lubricator", "inflate", "psi", "bar", "regis", "r102", "regulator", "dump valve", "oil",
         "montaj", "assembly",
-        "bakım", "maintenance", "servis",
+        "topraklama direnci", "grounding", "earthing", "60204", "topraklama", "TOPRAKLAMA DİRENCİ",
+        "bakım", "maintenance", "servis", "service", "bakim", "MAINTENCE",
         "titreşim", "vibration", "mekanik",
-        "aydınlatma", "lighting", "lux", "lümen",
-        "AT TİP", "sertifika", "certificate"
+        "aydınlatma", "lighting", "illumination", "lux", "lümen", "lumen", "ts en 12464", "en 12464", "ışık", "ışık şiddeti",
+        "AT TİP", "at tip", "ec type", "SERTİFİKA", "sertifika", "certificate",
     ]
 
     logger.info(f"📦 Base pool: {len(base_pool)} kelime")
