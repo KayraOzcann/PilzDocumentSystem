@@ -66,6 +66,11 @@
                                 <i class="fa-solid fa-angle-down"></i>
                             </div>
 
+                            <!-- 👇 YENİ - YÖNET BUTONU 👇 -->
+                            <button type="button" class="btn-secondary" onclick="openManageDynamicTypesModal()" style="margin-top: 0.5rem; width: 100%;">
+                                <i class="fa-solid fa-cog"></i> Dynamic Türleri Yönet
+                            </button>
+
                             <div class="actions" style="display: flex; gap: 0.8rem;">
                                 <button id="analyzeBtn" class="btn-primary" type="submit" disabled>
                                     <i class="fa-solid fa-magnifying-glass"></i> Analiz Et
@@ -1850,6 +1855,22 @@
             </div>
         </div>
     </div>
+    <!-- Manage Dynamic Types Modal -->
+    <div id="manageDynamicModal" class="modal-overlay" style="display:none;" onclick="closeManageDynamicModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-cog"></i> Dynamic Döküman Türleri</h3>
+                <button onclick="closeManageDynamicModal()" class="modal-close">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="dynamicTypesList" style="display: grid; gap: 1rem;">
+                    <!-- Dynamic types buraya yüklenecek -->
+                </div>
+            </div>
+        </div>
+    </div>
     <script>
     // =====================================================
     // DÖKÜMAN TÜRÜ EKLEME MODAL FONKSİYONLARI
@@ -2105,10 +2126,21 @@
                 }
                 
                 // Yeni option'ları ekle
-                data.document_types.forEach(type => {  // 👈 DOĞRU: data.document_types
+                data.document_types.forEach(type => {
                     const option = document.createElement('option');
                     option.value = type.code;
-                    option.textContent = `${type.icon || '📄'} ${type.name}`;
+                    
+                    // Dynamic service mi kontrol et
+                    const isDynamic = type.endpoint === '/api/dynamic-report';
+                    
+                    if (isDynamic) {
+                        option.textContent = `${type.icon || '📄'} ${type.name} [🗑️]`;  // Sil ikonu ekle
+                        option.setAttribute('data-dynamic', 'true');
+                        option.setAttribute('data-code', type.code);
+                    } else {
+                        option.textContent = `${type.icon || '📄'} ${type.name}`;
+                    }
+                    
                     select.appendChild(option);
                 });
                 
@@ -2127,6 +2159,107 @@
 
     // Sayfa yüklendiğinde döküman türlerini yükle
     document.addEventListener('DOMContentLoaded', loadDocumentTypes);
+
+    // Dynamic Types Yönetimi
+    async function openManageDynamicTypesModal() {
+        document.getElementById('manageDynamicModal').style.display = 'flex';
+        await loadDynamicTypesList();
+    }
+
+    function closeManageDynamicModal(event) {
+        if (!event || event.target.id === 'manageDynamicModal' || event.target.closest('.modal-close')) {
+            document.getElementById('manageDynamicModal').style.display = 'none';
+        }
+    }
+
+    async function loadDynamicTypesList() {
+        try {
+            const response = await fetch('/api/document-types');
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error('Döküman türleri yüklenemedi');
+            }
+            
+            // Sadece dynamic olanları filtrele
+            const dynamicTypes = data.document_types.filter(type => 
+                type.endpoint === '/api/dynamic-report'
+            );
+            
+            const listDiv = document.getElementById('dynamicTypesList');
+            
+            if (dynamicTypes.length === 0) {
+                listDiv.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: var(--text-dim);">
+                        <i class="fa-solid fa-inbox" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                        <p>Henüz dynamic döküman türü yok</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            listDiv.innerHTML = dynamicTypes.map(type => `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary);">
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <span style="font-size: 2rem;">${type.icon || '📄'}</span>
+                        <div>
+                            <div style="font-weight: 600;">${type.name}</div>
+                            <div style="font-size: 0.85rem; color: var(--text-dim);">Code: ${type.code}</div>
+                        </div>
+                    </div>
+                    <button class="btn-danger" onclick="deleteDynamicType('${type.code}', '${type.name}')" style="padding: 0.5rem 1rem;">
+                        <i class="fa-solid fa-trash"></i> Sil
+                    </button>
+                </div>
+            `).join('');
+            
+        } catch (error) {
+            console.error('Dynamic types yükleme hatası:', error);
+            document.getElementById('dynamicTypesList').innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: var(--danger);">
+                    <i class="fa-solid fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                    <p>Yükleme hatası: ${error.message}</p>
+                </div>
+            `;
+        }
+    }
+
+    async function deleteDynamicType(code, name) {
+        // Onay dialog'u
+        const confirmed = confirm(
+            `"${name}" döküman türünü silmek istediğinize emin misiniz?\n\n` +
+            `⚠️ Bu işlem geri alınamaz!\n` +
+            `⚠️ Tüm ilişkili veriler (kategoriler, pattern'ler, vb.) silinecek!`
+        );
+        
+        if (!confirmed) return;
+        
+        try {
+            const response = await fetch('/api/delete-dynamic-type', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert(`✅ ${name} başarıyla silindi!`);
+                
+                // Listeyi yenile
+                await loadDynamicTypesList();
+                
+                // Dropdown'ı yenile
+                await loadDocumentTypes();
+            } else {
+                alert(`❌ Silme hatası: ${result.message}`);
+            }
+            
+        } catch (error) {
+            console.error('Silme hatası:', error);
+            alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+        }
+    }
 
     </script>
 </body>

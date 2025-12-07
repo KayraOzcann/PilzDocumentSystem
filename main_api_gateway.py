@@ -812,10 +812,14 @@ def create_dynamic_type():
             )
             db.session.add(cw)
             db.session.flush()
+
+            logger.info(f"📊 Kategori eklendi: {category_name}") 
             
             # Criteria Details ekle (AI'dan gelen patterns ile)
             if category_name in ai_result['criteria_patterns']:
+                logger.info(f"   ✅ AI patterns bulundu: {len(ai_result['criteria_patterns'][category_name])} kriter") 
                 for idx2, (criterion_name, criterion_data) in enumerate(ai_result['criteria_patterns'][category_name].items(), 1):
+                    logger.info(f"      - {criterion_name}: {criterion_data['weight']} puan")
                     cd = CriteriaDetail(
                         criteria_weight_id=cw.id,
                         criterion_name=criterion_name,
@@ -824,7 +828,10 @@ def create_dynamic_type():
                         display_order=idx2
                     )
                     db.session.add(cd)
-        
+            else:
+                logger.warning(f"   ⚠️  AI patterns BULUNAMADI: {category_name}")  
+                logger.warning(f"   AI result keys: {ai_result['criteria_patterns'].keys()}")  
+                
         # Pattern Definitions ekle (extract_values - AI'dan gelen)
         if ai_result.get('extract_patterns'):
             for idx, (field_name, patterns_list) in enumerate(ai_result['extract_patterns'].items(), 1):
@@ -855,10 +862,11 @@ def create_dynamic_type():
             keywords=data['strong_keywords']
         )
         db.session.add(vk_strong)
-        
+        db.session.flush()
+
         # Excluded Keywords - Mevcut pool'u çek + yeni strong keywords ekle
-        excluded_pool = get_excluded_keywords_pool()
-        excluded_pool.extend(data['strong_keywords'])
+        excluded_pool = get_excluded_keywords_pool(current_doc_type_id=doc_type.id) 
+        
         
         vk_excluded = ValidationKeyword(
             document_type_id=doc_type.id,
@@ -889,6 +897,63 @@ def create_dynamic_type():
     except Exception as e:
         db.session.rollback()
         logger.error(f"❌ Create dynamic type hatası: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/delete-dynamic-type', methods=['POST'])
+def delete_dynamic_type():
+    """Dynamic döküman türünü sil - Cascade ile tüm ilişkili veriler silinir"""
+    try:
+        data = request.get_json()
+        code = data.get('code')
+        
+        if not code:
+            return jsonify({'success': False, 'message': 'Döküman kodu gerekli'}), 400
+        
+        # Döküman türünü bul
+        doc_type = DocumentType.query.filter_by(code=code).first()
+        
+        if not doc_type:
+            return jsonify({'success': False, 'message': f'Döküman türü bulunamadı: {code}'}), 404
+        
+        # Dynamic service mi kontrol et
+        if doc_type.service_file != 'dynamic_service.py':
+            return jsonify({'success': False, 'message': 'Sadece dynamic döküman türleri silinebilir'}), 400
+        
+        doc_name = doc_type.name
+        
+        logger.info(f"🗑️ Döküman türü siliniyor: {doc_name} ({code})")
+        
+        # Strong keywords'leri excluded pool'dan çıkar
+        try:
+            strong_vk = ValidationKeyword.query.filter_by(
+                document_type_id=doc_type.id,
+                keyword_type='strong_keywords'
+            ).first()
+            
+            if strong_vk:
+                logger.info(f"   📤 Strong keywords excluded pool'dan çıkarılıyor: {strong_vk.keywords}")
+        except Exception as e:
+            logger.warning(f"Strong keywords çıkarma hatası: {e}")
+        
+        # Cascade delete (ilişkili tüm kayıtlar silinir)
+        db.session.delete(doc_type)
+        db.session.commit()
+        
+        logger.info(f"✅ {doc_name} başarıyla silindi")
+        logger.info(f"🔄 Document handlers yeniden yükleniyor...")
+        
+        # Handlers'ı yeniden yükle
+        load_document_handlers()
+        
+        return jsonify({
+            'success': True,
+            'message': f'✅ {doc_name} başarıyla silindi!',
+            'code': code
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Delete dynamic type hatası: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
@@ -1048,9 +1113,9 @@ def format_extract_values_for_ai(extract_values):
     return "\n".join([f"  - {field}" for field in extract_values])
 
 
-def get_excluded_keywords_pool():
+def get_excluded_keywords_pool(current_doc_type_id=None):
     """Mevcut excluded keywords pool'unu döndür"""
-    base_excluded = [
+    base_pool = [
         "hrc","cobot","robot","çarpışma","collaborative","kolaboratif","sd conta",
         "elektrik", "devre", "şema", "circuit", "electrical", "voltage", "amper", "ohm",
         "espe",
@@ -1068,16 +1133,39 @@ def get_excluded_keywords_pool():
         "aydınlatma", "lighting", "lux", "lümen",
         "AT TİP", "sertifika", "certificate"
     ]
-    
-    # Database'deki diğer dynamic servislerin strong keywords'lerini ekle
+
+    logger.info(f"📦 Base pool: {len(base_pool)} kelime")
+
+    # ============================================
+    # 2. DİĞER DYNAMIC SERVİSLERİN STRONG KEYWORDS'LERİ
+    # ============================================
     try:
-        all_strong = ValidationKeyword.query.filter_by(keyword_type='strong_keywords').all()
-        for vk in all_strong:
-            base_excluded.extend(vk.keywords)
-    except:
-        pass
+        # SADECE strong_keywords (critical_terms DEĞİL!)
+        query = db.session.query(ValidationKeyword).join(DocumentType, ValidationKeyword.document_type_id == DocumentType.id).filter(ValidationKeyword.keyword_type == 'strong_keywords',DocumentType.service_file == 'dynamic_service.py')
+        # Kendisini hariç tut
+        if current_doc_type_id:
+            query = query.filter(ValidationKeyword.document_type_id != current_doc_type_id)
+        
+        other_strong = query.all()
+        
+        # Diğer servislerin strong keywords'lerini ekle
+        for vk in other_strong:
+            base_pool.extend([kw.lower().strip() for kw in vk.keywords])
+        
+        logger.info(f"➕ Dynamic servisler: {len(other_strong)} servis, strong keywords eklendi")
+        
+    except Exception as e:
+        logger.error(f"❌ Dynamic keywords hatası: {e}")
     
-    return list(set(base_excluded))  # Unique yap
+    # ============================================
+    # 3. TEMİZLEME
+    # ============================================
+    # Unique + lowercase + boşluksuz
+    final_pool = list(set([kw.lower().strip() for kw in base_pool if kw.strip()]))
+    
+    logger.info(f"✅ FINAL excluded pool: {len(final_pool)} unique kelime")
+    
+    return final_pool
 
 with app.app_context():
     load_document_handlers()

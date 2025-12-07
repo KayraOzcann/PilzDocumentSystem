@@ -509,7 +509,7 @@ def check_excluded_keywords_first_pages(filepath, validation_keywords):
             all_text += text.lower() + " "
         
         found_excluded = [kw for kw in excluded_keywords if re.search(rf"\b{kw.lower()}\b", all_text)]
-        logger.info(f"İlk sayfa excluded kontrol: {len(found_excluded)} istenmeyen kelime")
+        logger.info(f"İlk sayfa excluded kontrol: {len(found_excluded)} istenmeyen kelime - Bulunanlar: {found_excluded}") 
         return len(found_excluded) >= 1
     except Exception as e:
         logger.warning(f"İlk sayfa excluded kontrol hatası: {e}")

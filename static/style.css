@@ -1325,3 +1325,24 @@ body:has(#ticketsView[style*="display: block"]) .result-actions:not(#analysisVie
     width: 100%;
   }
 }
+
+/* Dynamic Types Management */
+.btn-danger {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+}
+
+.btn-danger:active {
+    transform: translateY(0);
+}
