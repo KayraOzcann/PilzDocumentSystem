@@ -998,26 +998,6 @@ def get_dynamic_types():
 # HELPER FUNCTIONS - AI & KEYWORDS
 # ============================================
 def generate_patterns_with_ai(data):
-    """
-    AI ile patterns oluştur
-    
-    Returns:
-    {
-        'success': True/False,
-        'criteria_patterns': {
-            'Kategori 1': {
-                'kelime_1': {'pattern': 'r"..."', 'weight': 2}
-            }
-        },
-        'extract_patterns': {
-            'field_name': ['pattern1', 'pattern2', ...]
-        },
-        'critical_terms': [
-            ['kelime1', 'kelime2'],
-            ['kelime3', 'kelime4']
-        ]
-    }
-    """
     try:
         import anthropic
         
@@ -1033,7 +1013,7 @@ Kategoriler ve Kelimeler:
 
 PATTERN KURALLARI:
 1. Her kelime için TEK bir UZUN regex pattern oluştur
-2. Pattern case-insensitive olmalı: (?i) ile başla
+2. (?i) SADECE pattern'in EN BAŞINDA kullan! Pattern ORTASINDA veya SONUNDA (?i) ASLA kullanma!
 3. Non-capturing group kullan: (?:...)
 4. Türkçe ve İngilizce alternatifleri içermeli
 5. Boşluk toleranslı: \\s* veya \\s+
@@ -1049,15 +1029,64 @@ YANLIŞ YAZIM (YAPMA!):
 - "(?i)yazar|author" ❌ (non-capturing group yok)
 - "yazar|author" ❌ (case flag yok)
 
+WEIGHT HESAPLAMA KURALLARI:  
+Her kategori için weight'leri eşit dağıt:
+- weight = kategori_toplam_puanı / kelime_sayısı
+- Tam bölünmüyorsa kalanı son kelimeye ekle
+
+Örnek:
+Kategori: "genel bilgiler" (100 puan)
+Kelimeler: ["firma_adi", "rapor_no", "tarih"] (3 kelime)
+Hesaplama: 100 / 3 = 33.33
+Weight dağılımı:
+- firma_adi: 33
+- rapor_no: 33
+- tarih: 34 (kalan +1 puan)
+
+Örnek 2:
+Kategori: "teknik bilgiler" (50 puan)
+Kelimeler: ["voltaj", "akim"] (2 kelime)
+Hesaplama: 50 / 2 = 25
+Weight dağılımı:
+- voltaj: 25
+- akim: 25
+
 GÖREV 2 - EXTRACT VALUES PATTERNS:
 
 Alanlar:
 {format_extract_values_for_ai(data.get('extract_values', []))}
 
 PATTERN KURALLARI:
-- Her alan için 2-3 FARKLI pattern oluştur (array içinde)
-- Farklı format varyasyonları
-- Capture group kullan: (...)
+Her alan için 2-4 FARKLI pattern oluştur:
+
+KRİTİK UYARI - (?i) KULLANIMI:
+- (?i) SADECE pattern'in EN BAŞINDA kullan!
+- Pattern ORTASINDA veya SONUNDA (?i) ASLA kullanma!
+
+1. ALAN ADINI GENİŞLET:
+   - Türkçe + İngilizce alternatifleri
+   - Yaygın varyasyonları ekle
+   - Örnek: "test_tarihi" → "test\\s*tarih(?:i)?|test\\s*date|ölçüm\\s*tarih(?:i)?|measurement\\s*date"
+
+2. BOŞLUK TOLERANSsI:
+   - \\s* veya \\s+ veya [\\s\\W]* kullan
+   - İki nokta/eşittir opsiyonel: [:=]?
+
+3. DEĞER YAKALAMA (alan türüne göre):
+   - TARİH: (\\d{{1,2}}[./\\-]\\d{{1,2}}[./\\-]\\d{{2,4}}) veya (\\d{{1,2}}\\s+\\d{{1,2}}\\s+\\d{{2,4}})
+   - NUMARA/KOD: ([A-Z0-9\\-/]+) veya ([0-9]{{3,}})
+   - İSİM/FİRMA: ([A-ZÇĞİÖŞÜ][A-Za-züçğıöşüÇĞİÖŞÜ\\s\\.\\&\\-]{{3,80}})
+   - GENEL METİN: ([^\\n]{{5,100}})
+
+4. FARKLI FORMAT VARYASYONLARI:
+   - Alan adı ÖNCE, sonra değer: "(?i)(?:alan_adi)[\\s\\W]*[:=]?\\s*(değer_pattern)"
+   - Değer ÖNCE, sonra alan adı: "(değer_pattern)\\s*(?:alan_adi)"
+   - Boşluklu format: "(?i)(?:alan_adi)\\s+(değer_pattern)"
+
+5. HER PATTERN:
+   - (?i) ile başla (case-insensitive)
+   - Non-capturing group: (?:...)
+   - Capture group: (...) sadece değer için
 
 ÖRNEK ARRAY PATTERN:
 [
@@ -1088,16 +1117,13 @@ JSON formatında döndür (SADECE JSON, başka açıklama yok):
     "criteria_patterns": {{
         "kategori_ismi": {{
             "kelime_adi": {{
-                "pattern": "(?i)(?:uzun_pattern_buraya)",
-                "weight": 2
+                "pattern": "(?i)(?:pattern_buraya)",
+                "weight": 33 // ÖRNEK! Sen hesapla!
             }}
         }}
     }},
     "extract_patterns": {{
-        "field_name": [
-            "(?i)pattern1",
-            "(?i)pattern2"
-        ]
+        "field_name": ["(?i)pattern1","(?i)pattern2"]
     }},
     "critical_terms": [
         ["kelime1", "kelime2"],
@@ -1105,10 +1131,11 @@ JSON formatında döndür (SADECE JSON, başka açıklama yok):
     ]
 }}
 
-ÖNEMLİ: Kategori isimleri AYNEN şunlar olmalı (değiştirme!):
-{list(data['criteria_weights'].keys())}
-
-NOT: JSON içinde backslash'leri double yaz: \\s \\d \\w vb.
+ÖNEMLİ UYARILAR:
+1. Kategori isimleri AYNEN şunlar olmalı: {list(data['criteria_weights'].keys())}
+2. Weight'leri yukarıdaki "WEIGHT HESAPLAMA KURALLARI"na göre MUTLAKA HESAPLA!
+3. JSON örneğindeki "33" sadece örnek, gerçek değerleri sen hesapla!  
+4. JSON içinde backslash double: \\s \\d \\w
 """
         
         message = client.messages.create(
