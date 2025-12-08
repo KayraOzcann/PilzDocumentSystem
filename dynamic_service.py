@@ -161,7 +161,7 @@ class DynamicReportAnalyzer:
         
         # OCR kullanımı (service_file'a bakarak belirle - gelecekte config'e eklenebilir)
         # Şimdilik default: Varsa strong_keywords varsa OCR kullan
-        self.use_ocr = len(self.validation_keywords['strong_keywords']) > 0
+        self.use_ocr = self.doc_type.needs_ocr
     
     def detect_language(self, text: str) -> str:
         """Metin dilini tespit et"""
@@ -180,28 +180,57 @@ class DynamicReportAnalyzer:
             return 'tr'
     
     def extract_text_from_file(self, file_path: str) -> str:
-        """Dosyadan metin çıkar - OCR varsa kullan"""
-        file_ext = os.path.splitext(file_path)[1].lower()
-        
-        if file_ext == '.pdf':
-            # Önce PyPDF2 dene
-            text = self.extract_text_from_pdf(file_path)
+        """Dosyadan metin çıkar (OCR ayarına göre)"""
+        try:
+            text = ""
+            file_ext = os.path.splitext(file_path)[1].lower()
             
-            # Eğer OCR açıksa ve metin yetersizse OCR kullan
-            if self.use_ocr and len(text.strip()) < 100:
-                logger.info("PDF'den yeterli metin çıkmadı, OCR kullanılıyor...")
-                return self.extract_text_with_ocr(file_path)
+            if file_ext == '.pdf':
+                # OCR KONTROLÜ - ÖNCE KARAR VER! 👇
+                if self.doc_type.needs_ocr:
+                    # OCR İŞARETLİ → DİREKT OCR KULLAN!
+                    logger.info("✅ OCR etkin - Direkt OCR kullanılıyor (PyPDF2 atlanıyor)")
+                    return self.extract_text_with_ocr(file_path)
+                else:
+                    # OCR İŞARETSİZ → SADECE PyPDF2
+                    logger.info("📄 OCR devre dışı - Sadece PyPDF2 kullanılıyor")
+                    with open(file_path, 'rb') as file:
+                        reader = PyPDF2.PdfReader(file)
+                        for page in reader.pages:
+                            page_text = page.extract_text()
+                            if page_text:
+                                text += page_text + "\n"
+                    
+                    text = text.strip()
+                    
+                    if len(text) > 100:
+                        logger.info(f"✅ PyPDF2 başarılı - {len(text)} karakter")
+                        return text
+                    else:
+                        logger.error("❌ PyPDF2 yetersiz metin çıkardı - OCR devre dışı!")
+                        return ""
             
-            return text
-        
-        elif file_ext in ['.docx', '.doc']:
-            return self.extract_text_from_docx(file_path)
-        
-        elif file_ext == '.txt':
-            return self.extract_text_from_txt(file_path)
-        
-        else:
-            logger.error(f"Desteklenmeyen dosya formatı: {file_ext}")
+            elif file_ext in ['.jpg', '.jpeg', '.png']:
+                # Görsel dosyalar için OCR ZORUNLU!
+                if self.doc_type.needs_ocr:
+                    logger.info("📷 Görsel dosya - OCR kullanılıyor...")
+                    return self.extract_text_with_ocr(file_path)
+                else:
+                    logger.error("❌ OCR devre dışı - Görsel dosya işlenemez!")
+                    return ""
+            
+            elif file_ext in ['.docx', '.doc']:
+                return self.extract_text_from_docx(file_path)
+            
+            elif file_ext == '.txt':
+                return self.extract_text_from_txt(file_path)
+            
+            else:
+                logger.error(f"❌ Desteklenmeyen dosya formatı: {file_ext}")
+                return ""
+            
+        except Exception as e:
+            logger.error(f"❌ Metin çıkarma hatası: {e}")
             return ""
     
     def extract_text_from_pdf(self, pdf_path: str) -> str:
@@ -367,25 +396,58 @@ class DynamicReportAnalyzer:
         return values
     
     def generate_recommendations(self, analysis_results: Dict, scores: Dict) -> List[str]:
-        """Öneriler oluştur"""
+        """Detaylı öneriler oluştur - Eksik kriterleri göster"""
         recommendations = []
         
         total_percentage = scores["percentage"]
         
+        # Genel durum
         if total_percentage >= 70:
             recommendations.append(f"✅ {self.doc_type.name} GEÇERLİ (Toplam: %{total_percentage:.1f})")
         else:
             recommendations.append(f"❌ {self.doc_type.name} GEÇERSİZ (Toplam: %{total_percentage:.1f})")
         
+        # Kategori bazlı detaylı analiz
         for category, results in analysis_results.items():
             category_score = scores["category_scores"][category]["percentage"]
+            category_earned = scores["category_scores"][category]["earned"]
+            category_possible = scores["category_scores"][category]["possible"]
             
+            # Kategori durumu
             if category_score < 40:
-                recommendations.append(f"🔴 {category} bölümü yetersiz (%{category_score:.1f})")
+                status = "YETERSİZ"
             elif category_score < 70:
-                recommendations.append(f"🟡 {category} bölümü geliştirilmeli (%{category_score:.1f})")
+                status = "GELİŞTİRİLMELİ"
             else:
-                recommendations.append(f"🟢 {category} bölümü yeterli (%{category_score:.1f})")
+                status = "YETERLİ"
+            
+            # Eksik/Zayıf kriterleri topla
+            criteria_details = []
+            
+            for criterion_name, result in results.items():
+                if result.score == 0:
+                    # Hiç puan alamamış
+                    criteria_details.append(f"{criterion_name}: Bulunamadı (0/{result.max_score} puan)")
+                elif result.score < result.max_score * 0.5:
+                    # %50'den az puan almış
+                    criteria_details.append(f"{criterion_name}: Yetersiz ({result.score}/{result.max_score} puan)")
+                elif result.score < result.max_score:
+                    # Tam puan almamış ama %50'den fazla
+                    criteria_details.append(f"{criterion_name}: Geliştirilmeli ({result.score}/{result.max_score} puan)")
+            
+            # Kategori satırı - Emoji + Kategori + Puan + Kriterler
+            if criteria_details:
+                # Eksik kriterler varsa listele
+                emoji = "🔴" if category_score < 40 else "🟡" if category_score < 70 else "🟢"
+                criteria_str = ", ".join(criteria_details)
+                recommendations.append(
+                    f"{emoji} {category}: {criteria_str}"
+                )
+            else:
+                # Tüm kriterler tam puan
+                recommendations.append(
+                    f"🟢 {category}: Tüm kriterler yeterli (%{category_score:.1f})"
+                )
         
         return recommendations
     

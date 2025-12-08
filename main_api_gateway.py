@@ -796,7 +796,8 @@ def create_dynamic_type():
             endpoint='/api/dynamic-report',
             icon=data.get('icon', '📄'),
             app_variable_name='dynamic_app',
-            is_active=True
+            is_active=True,
+            needs_ocr=data.get('needs_ocr', True)
         )
         
         db.session.add(doc_type)
@@ -1066,7 +1067,6 @@ KRİTİK UYARI - (?i) KULLANIMI:
 1. ALAN ADINI GENİŞLET:
    - Türkçe + İngilizce alternatifleri
    - Yaygın varyasyonları ekle
-   - Örnek: "test_tarihi" → "test\\s*tarih(?:i)?|test\\s*date|ölçüm\\s*tarih(?:i)?|measurement\\s*date"
 
 2. BOŞLUK TOLERANSsI:
    - \\s* veya \\s+ veya [\\s\\W]* kullan
