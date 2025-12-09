@@ -73,8 +73,8 @@
                                 <button type="button" class="btn-add-doc-type" onclick="openAddDocTypeModal()" style="margin: 0;">
                                     <i class="fa-solid fa-plus-circle"></i> Döküman Türü Ekle
                                 </button>
-                                <button type="button" class="btn-secondary" onclick="openManageDynamicTypesModal()" style="margin-top: 0.5rem; width: 100%;">
-                                <i class="fa-solid fa-cog"></i> Dynamic Türleri Yönet
+                                <button type="button" class="btn-manage-types" onclick="openManageDynamicTypesModal()" style="margin: 0;">
+                                    <i class="fa-solid fa-plus-circle"></i> Dynamic Türleri Yönet
                                 </button>
                             </div>
                     </form>
@@ -1776,18 +1776,18 @@
                                 <label>Icon *</label>
                                 <select id="docTypeIcon" required>
                                     <option value="">Seçiniz</option>
-                                    <option value="🔥">🔥 Yangın</option>
-                                    <option value="💧">💧 Su/Hidrolik</option>
-                                    <option value="⚡">⚡ Elektrik</option>
-                                    <option value="🔧">🔧 Mekanik</option>
-                                    <option value="🔊">🔊 Ses/Gürültü</option>
-                                    <option value="💡">💡 Aydınlatma</option>
-                                    <option value="📋">📋 Genel Rapor</option>
-                                    <option value="🔒">🔒 Güvenlik</option>
-                                    <option value="🤖">🤖 Robot</option>
-                                    <option value="📄">📄 Döküman</option>
-                                    <option value="🔍">🔍 İnceleme</option>
-                                    <option value="✅">✅ Onay</option>
+                                    <option value="🔥">🔥</option>
+                                    <option value="💧">💧</option>
+                                    <option value="⚡">⚡</option>
+                                    <option value="🔧">🔧</option>
+                                    <option value="🔊">🔊</option>
+                                    <option value="💡">💡</option>
+                                    <option value="📋">📋</option>
+                                    <option value="🔒">🔒</option>
+                                    <option value="🤖">🤖</option>
+                                    <option value="📄">📄</option>
+                                    <option value="🔍">🔍</option>
+                                    <option value="✅">✅</option>
                                 </select>
                             </div>
                         </div>
@@ -1798,7 +1798,7 @@
                         <div class="form-group">
                             <label style="display:flex; align-items:center; gap:0.5rem;">
                                 <input type="checkbox" id="docTypeOCR" style="width:auto;" />
-                                OCR Kullan (Taramalı PDF'ler için)
+                                OCR Kullan
                             </label>
                         </div>
                     </div>
@@ -1817,7 +1817,7 @@
                     <!-- Extract Values -->
                     <div class="form-section">
                         <h4><i class="fa-solid fa-search"></i> Çıkarılacak Bilgiler</h4>
-                        <p class="form-help">Rapordan çıkarmak istediğiniz bilgileri yazın (Örn: rapor no, firma adı, tarih)</p>
+                        <p class="form-help">Rapordan çıkarmak istediğiniz bilgileri yazın (Örn: rapor no, firma adı, tarih), virgül ile ayırın</p>
                         <div id="extractValuesContainer">
                             <!-- Dynamic extract values here -->
                         </div>
@@ -1829,7 +1829,7 @@
                     <!-- Strong Keywords -->
                     <div class="form-section">
                         <h4><i class="fa-solid fa-key"></i> Özgü Kelimeler (Minimum 1)</h4>
-                        <p class="form-help">Bu rapora özgü kelimeleri yazın (virgül ile ayırın)</p>
+                        <p class="form-help">Bu rapora özgü kelimeleri yazın, virgül ile ayırın</p>
                         <textarea id="strongKeywords" rows="3" placeholder="yangın, söndürme, fire, extinguisher"></textarea>
                     </div>
 

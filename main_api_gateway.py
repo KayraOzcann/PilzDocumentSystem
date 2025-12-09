@@ -1001,8 +1001,18 @@ def get_dynamic_types():
 def generate_patterns_with_ai(data):
     try:
         import anthropic
+        import os
+
+        # API key kontrolü
+        api_key = os.getenv('ANTHROPIC_API_KEY')
+        if not api_key:
+            logger.error("❌ ANTHROPIC_API_KEY bulunamadı!")
+            return {
+                "success": False,
+                "error": "API key tanımlanmamış. Lütfen sistem yöneticisiyle iletişime geçin."
+            }
         
-        client = anthropic.Anthropic(api_key="")
+        client = anthropic.Anthropic(api_key=api_key)
         
         # Prompt hazırla
         prompt = f"""Sen bir regex pattern uzmanısın. Türkçe ve İngilizce dökümanlardan bilgi çıkarmak için regex pattern'leri oluşturuyorsun.
