@@ -337,11 +337,18 @@
             formData.append('document_type', documentType.value);
 
             try {
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 1800000);
+
                 const response = await fetch('/api/analyze', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    signal: controller.signal       
                 });
-
+                
+                clearTimeout(timeoutId);
+                
                 const result = await response.json();
 
                 if (response.ok) {
@@ -374,8 +381,15 @@
                     showError(errorMessage);
                 }
             } catch (error) {
-                showError('Bağlantı hatası. Lütfen tekrar deneyin.');
-                console.error('Error:', error);
+              
+                if (error.name === 'AbortError') {
+                    // Timeout oldu
+                    showInfo('⏳ İşlem uzun sürüyor. Sonuçları "Tickets" sayfasından kontrol edebilirsiniz.');
+                } else {
+                    // Gerçek network hatası
+                    showError('Bağlantı hatası. Lütfen tekrar deneyin.');
+                }
+        console.error('Error:', error);
             } finally {
                 hideLoading();
             }
@@ -395,6 +409,17 @@
             errorMessage.textContent = message;
             errorMessage.classList.add('show');
             // Otomatik gizleme kaldırıldı - yeni rapor yüklenene kadar kalacak
+        }
+
+        function showInfo(message) {
+            errorMessage.innerHTML = `
+                <i class="fa-solid fa-info-circle"></i> ${message}
+            `;
+            errorMessage.classList.add('show');
+            // Mavi bilgilendirme stili
+            errorMessage.style.backgroundColor = '#d1ecf1';
+            errorMessage.style.color = '#0c5460';
+            errorMessage.style.border = '2px solid #17a2b8';
         }
 
         function hideError() {
