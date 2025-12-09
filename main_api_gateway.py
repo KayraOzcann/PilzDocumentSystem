@@ -1,3 +1,8 @@
+from dotenv import load_dotenv
+
+# ✅ .env dosyasını yükle (EN ÖNCE!)
+load_dotenv()
+
 # ============================================
 # IMPORTS - STANDARD LIBRARIES
 # ============================================

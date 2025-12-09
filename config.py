@@ -4,15 +4,19 @@ from urllib.parse import quote_plus
 class Config:
     """Database configuration"""
     
-    # Azure PostgreSQL bağlantı bilgileri
-    POSTGRES_USER = 'nuvotekadmin'
-    POSTGRES_PASSWORD = 'nwe@2025'  
-    POSTGRES_HOST = 'nuvotekserver.postgres.database.azure.com'
-    POSTGRES_PORT = '5432'
-    POSTGRES_DB = 'pilz_reports'
+    # ✅ Environment variable'lardan al
+    POSTGRES_USER = os.getenv('POSTGRES_USER')
+    POSTGRES_PASSWORD = os.getenv('POSTGRES_PASSWORD')
+    POSTGRES_HOST = os.getenv('POSTGRES_HOST')
+    POSTGRES_PORT = os.getenv('POSTGRES_PORT')
+    POSTGRES_DB = os.getenv('POSTGRES_DB')
+    
+    # Kontrol: Kritik değerler boş mu?
+    if not POSTGRES_PASSWORD:
+        raise ValueError("❌ POSTGRES_PASSWORD environment variable bulunamadı!")
     
     # Şifreyi URL-safe hale getir
-    ENCODED_PASSWORD = quote_plus(POSTGRES_PASSWORD)
+    ENCODED_PASSWORD = quote_plus(POSTGRES_PASSWORD) if POSTGRES_PASSWORD else ''
     
     # SQLAlchemy connection string (Azure için SSL gerekli)
     SQLALCHEMY_DATABASE_URI = f'postgresql://{POSTGRES_USER}:{ENCODED_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}?sslmode=require'
