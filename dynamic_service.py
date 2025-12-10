@@ -317,6 +317,13 @@ class DynamicReportAnalyzer:
             
             matches = re.findall(pattern, text, re.IGNORECASE | re.MULTILINE)
             
+            # 👇 YENİ - DEBUG LOG
+            logger.info(f"   🔍 {criterion_name}:")
+            logger.info(f"      Pattern: {pattern[:150]}...")
+            logger.info(f"      Sonuç: {len(matches)} match bulundu")
+            if matches:
+                logger.info(f"      Örnek: {str(matches[:2])}")
+                
             if matches:
                 content = f"Bulunan: {str(matches[:3])}"
                 found = True

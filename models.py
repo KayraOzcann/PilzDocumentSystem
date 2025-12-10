@@ -18,8 +18,8 @@ class DocumentType(db.Model):
     app_variable_name = db.Column(db.String(100))  
     is_active = db.Column(db.Boolean, default=True, index=True)
     needs_ocr = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
     # Relationships
     criteria_weights = db.relationship('CriteriaWeight', backref='document_type', cascade='all, delete-orphan', lazy='dynamic')
@@ -41,7 +41,7 @@ class CriteriaWeight(db.Model):
     category_name = db.Column(db.String(200), nullable=False)
     weight = db.Column(db.Integer, nullable=False)
     display_order = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     
     # Relationships
     criteria_details = db.relationship('CriteriaDetail', backref='criteria_weight', cascade='all, delete-orphan', lazy='dynamic')
@@ -67,7 +67,7 @@ class CriteriaDetail(db.Model):
     pattern = db.Column(db.Text, nullable=False)
     weight = db.Column(db.Integer, nullable=False)
     display_order = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     
     def __repr__(self):
         return f'<CriteriaDetail {self.criterion_name}>'
@@ -85,7 +85,7 @@ class PatternDefinition(db.Model):
     field_name = db.Column(db.String(100), nullable=False)
     patterns = db.Column(JSONB, nullable=False)
     display_order = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     
     def __repr__(self):
         return f'<PatternDefinition {self.field_name}>'
@@ -102,7 +102,7 @@ class ValidationKeyword(db.Model):
     keyword_type = db.Column(db.String(50), nullable=False, index=True)
     category = db.Column(db.String(100))
     keywords = db.Column(JSONB, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     
     def __repr__(self):
         return f'<ValidationKeyword {self.keyword_type}>'
@@ -118,7 +118,7 @@ class CategoryAction(db.Model):
     criteria_weight_id = db.Column(db.Integer, db.ForeignKey('criteria_weights.id', ondelete='CASCADE'), nullable=False, index=True)
     action_text = db.Column(db.Text, nullable=False)
     display_order = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     
     def __repr__(self):
         return f'<CategoryAction {self.id}>'
@@ -143,7 +143,7 @@ class Ticket(db.Model):
     responsible = db.Column(db.String(100), default='Savaş Bey')
     analysis_result = db.Column(JSONB)
     inspector_comment = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     
     # Relationships
     comments = db.relationship('TicketComment', backref='ticket', cascade='all, delete-orphan', lazy='dynamic')
@@ -163,7 +163,7 @@ class TicketComment(db.Model):
     comment_id = db.Column(db.String(50), nullable=False)
     author = db.Column(db.String(200), nullable=False)
     text = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    timestamp = db.Column(db.DateTime, default=datetime.now, index=True)
     
     def __repr__(self):
         return f'<TicketComment {self.comment_id}>'
@@ -188,7 +188,7 @@ class AnalysisEvaluation(db.Model):
     overall_score = db.Column(JSONB)
     evaluation_notes = db.Column(db.Text)
     analysis_data = db.Column(JSONB)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     
     def __repr__(self):
         return f'<AnalysisEvaluation {self.analysis_id}>'

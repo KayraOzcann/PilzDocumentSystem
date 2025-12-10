@@ -1007,6 +1007,8 @@ def generate_patterns_with_ai(data):
     try:
         import anthropic
         import os
+        import json
+        import re
 
         # API key kontrolü
         api_key = os.getenv('ANTHROPIC_API_KEY')
@@ -1127,7 +1129,13 @@ Output:
     ["konfor", "comfort", "rahatlık"]
 ]
 
-JSON formatında döndür (SADECE JSON, başka açıklama yok):
+KRİTİK JSON KURALLARI:
+1. Regex pattern'lerinde backslash DÖRT KERE: \\\\s \\\\d \\\\w \\\\S
+2. String içinde çift tırnak varsa escape et: \\"
+3. Yeni satır kullanma, tek satır JSON döndür
+4. Türkçe karakterleri olduğu gibi bırak (escape etme)
+
+JSON formatında döndür - ÖNEMLİ: Regex pattern'lerinde backslash'leri DÖRT KERE yaz (\\\\s \\\\d \\\\w):
 {{
     "criteria_patterns": {{
         "kategori_ismi": {{
@@ -1150,12 +1158,12 @@ JSON formatında döndür (SADECE JSON, başka açıklama yok):
 1. Kategori isimleri AYNEN şunlar olmalı: {list(data['criteria_weights'].keys())}
 2. Weight'leri yukarıdaki "WEIGHT HESAPLAMA KURALLARI"na göre MUTLAKA HESAPLA!
 3. JSON örneğindeki "33" sadece örnek, gerçek değerleri sen hesapla!  
-4. JSON içinde backslash double: \\s \\d \\w
+4. JSON içinde backslash dört kere: \\\\s \\\\d \\\\w
 """
         
         message = client.messages.create(
             model="claude-sonnet-4-5-20250929",
-            max_tokens=1500,
+            max_tokens=3000,
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -1170,10 +1178,42 @@ JSON formatında döndür (SADECE JSON, başka açıklama yok):
             response_text = response_text.split('```json')[1].split('```')[0]
         elif '```' in response_text:
             response_text = response_text.split('```')[1].split('```')[0]
+
+        # Fazla boşlukları temizle
+        response_text = response_text.strip()
+
+        # 👇 YENİ: Backslash kontrolü
+        logger.info("📝 AI Response ilk 500 karakter:")
+        logger.info(response_text[:500])  
         
-        result = json.loads(response_text.strip())
+        # JSON parse dene
+        try:
+            result = json.loads(response_text)
+        except json.JSONDecodeError as je:
+            logger.error(f"❌ JSON Parse Hatası: {je}")
+            logger.error(f"Hatalı JSON (ilk 1000 karakter):")
+            logger.error(response_text[:1000])
+            
+            # 👇 YENİ: Otomatik düzeltme dene
+            logger.info("🔧 JSON düzeltme deneniyor...")
+            
+            # Tek backslash'leri double yap (sadece regex pattern'lerinde)
+            fixed_text = re.sub(
+                r'("pattern":\s*"[^"]*)(\\)([^\\"])',
+                r'\1\\\\\3',
+                response_text
+            )
+            
+            try:
+                result = json.loads(fixed_text)
+                logger.info("✅ JSON otomatik düzeltildi!")
+            except:
+                return {
+                    'success': False, 
+                    'error': f'AI JSON parse hatası: {str(je)}\n\nİlk 500 karakter:\n{response_text[:500]}'
+                }
+        
         result['success'] = True
-        
         return result
         
     except Exception as e:
