@@ -220,6 +220,8 @@
 
     <script>
         let selectedFile = null;
+        let currentTicketId = null;      // 👈 YENİ EKLE
+        let pollingInterval = null;
 
         // DOM Elements
         const fileInput = document.getElementById('fileInput');
@@ -330,69 +332,138 @@
             }
 
             showLoading();
-            hideError();  // Analiz başlamadan önceki hataları gizle
+            hideError();
 
             const formData = new FormData();
             formData.append('file', selectedFile);
             formData.append('document_type', documentType.value);
 
             try {
-
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 1800000);
-
+                // ASYNC: Hemen response dönecek
                 const response = await fetch('/api/analyze', {
                     method: 'POST',
-                    body: formData,
-                    signal: controller.signal       
+                    body: formData
                 });
-                
-                clearTimeout(timeoutId);
                 
                 const result = await response.json();
 
-                if (response.ok) {
-                    showResults(result);
+                if (response.ok && result.success) {
+                    // Ticket ID'yi sakla
+                    currentTicketId = result.ticket_id;
+
+                    hideLoading();
+                    
+                    showInfo(`⏳ Analiz başlatıldı (Ticket: ${result.ticket_no}). Sonuçlar hazırlanıyor...`);
+                    
+                    // POLLING BAŞLAT (5 saniyede bir kontrol et)
+                    startPolling(result.ticket_id);
+                    
                 } else {
-                    // Detaylı hata mesajı oluştur - HTTP status code'ını gösterme
-                    let errorMessage = '';
-                    
-                    // Service response varsa ekle
-                    if (result.service_response) {
-                        try {
-                            // JSON parse etmeye çalış
-                            const serviceError = JSON.parse(result.service_response);
-                            if (serviceError.message) {
-                                errorMessage = serviceError.message;
-                            } else if (serviceError.error) {
-                                errorMessage = serviceError.error;
-                            } else {
-                                errorMessage = result.service_response;
-                            }
-                        } catch (e) {
-                            // JSON parse edilemezse direkt metin olarak kullan
-                            errorMessage = result.service_response;
-                        }
-                    } else {
-                        // Fallback olarak result.message kullan ama status code'ını çıkar
-                        errorMessage = result.message ? result.message.replace(/The analysis service returned an error: \d+/, '').trim() : 'Analiz sırasında bir hata oluştu.';
-                    }
-                    
-                    showError(errorMessage);
+                    showError(result.message || 'Analiz başlatılamadı.');
+                    hideLoading();
                 }
             } catch (error) {
-              
-                if (error.name === 'AbortError') {
-                    // Timeout oldu
-                    showInfo('⏳ İşlem uzun sürüyor. Sonuçları "Tickets" sayfasından kontrol edebilirsiniz.');
-                } else {
-                    // Gerçek network hatası
-                    showError('Bağlantı hatası. Lütfen tekrar deneyin.');
-                }
-        console.error('Error:', error);
-            } finally {
+                console.error('Error:', error);
+                showError('Bağlantı hatası. Lütfen tekrar deneyin.');
                 hideLoading();
             }
+        }
+
+        function startPolling(ticketId) {
+            console.log('🔄 Polling başladı:', ticketId);
+            
+            // Eski polling varsa durdur
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
+            // İlk kontrolü hemen yap
+            checkTicketStatus(ticketId);
+            
+            // 5 saniyede bir kontrol et
+            pollingInterval = setInterval(() => {
+                checkTicketStatus(ticketId);
+            }, 5000);
+        }
+
+        async function checkTicketStatus(ticketId) {
+            try {
+                // Filtreyle ticket'ı çek
+                const response = await fetch(`/api/tickets?ticket_id=${ticketId}`);
+                const tickets = await response.json();
+                
+                if (!tickets || tickets.length === 0) {
+                    console.log('Ticket henüz bulunamadı, bekleniyor...');
+                    return;
+                }
+                
+                const ticket = tickets[0];
+                console.log('📊 Ticket status:', ticket.status);
+                
+                // Status kontrolü
+                if (ticket.status === 'İşleniyor') {
+                    // Hala işleniyor, bekle
+                    console.log('⏳ Analiz devam ediyor...');
+                    return;
+                }
+                
+                // Analiz tamamlandı (Kapalı, Hatalı, vb.)
+                console.log('✅ Analiz tamamlandı!');
+                stopPolling();
+                hideLoading();
+                
+                if (ticket.status === 'Hatalı') {
+                    // Hata durumu
+                    const errorMsg = ticket.analysis_result?.error || 'Analiz sırasında bir hata oluştu.';
+                    showError(errorMsg);
+                } else {
+                    // Başarılı - Sonuçları göster
+                    displayAnalysisResults(ticket);
+                }
+                
+            } catch (error) {
+                console.error('Polling hatası:', error);
+                // Hata olsa bile polling devam etsin (network sorunları için)
+            }
+        }
+
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+                console.log('⏹️ Polling durduruldu');
+            }
+        }
+
+        function displayAnalysisResults(ticket) {
+            // Mevcut showResults() fonksiyonunu kullan
+            // Ama önce data formatını düzenle
+            
+            const analysisData = ticket.analysis_result;
+            
+            // currentAnalysisData'yı güncelle (değerlendirme için)
+            currentAnalysisData = {
+                filename: ticket.document_name,
+                analysis_id: ticket.ticket_id,
+                file_type: ticket.document_type,
+                analysis_date: ticket.opening_date,
+                overall_score: analysisData.overall_score || {},
+                category_scores: analysisData.category_scores || {},
+                extracted_values: analysisData.extracted_values || {},
+                recommendations: analysisData.recommendations || [],
+                summary: analysisData.summary || ''
+            };
+            
+            // Mevcut showResults() fonksiyonuna uygun format
+            const result = {
+                success: true,
+                data: currentAnalysisData
+            };
+            
+            showResults(result);
+            
+            // Issue report section göster
+            document.getElementById('issueReportSection').style.display = 'block';
         }
 
         function showLoading() {

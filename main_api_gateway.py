@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 import logging
 import atexit
 import time
+import threading
 
 from database import db, init_db
 from models import DocumentType, Ticket, TicketComment, CriteriaWeight, CriteriaDetail, PatternDefinition, ValidationKeyword, CategoryAction
@@ -132,10 +133,103 @@ def generate_ticket_no():
 # ============================================
 # MAIN ANALYSIS ENDPOINT
 # ============================================
+def analyze_document_async(file_data, filename, document_type, handler_info, custom_document_url, initial_comment, comment_author, ticket_id):
+    """
+    Arka planda analiz yapan fonksiyon (thread içinde çalışır)
+    """
+    try:
+        logger.info(f"🔄 Async analiz başladı: {ticket_id}")
+        
+        # Dosyayı geçici olarak kaydet
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        with open(filepath, 'wb') as f:
+            f.write(file_data)
+        
+        # Service'e gönder
+        service_app = handler_info['app']
+        service_endpoint = handler_info['endpoint']
+        is_dynamic = handler_info.get('is_dynamic', False)
+        
+        with service_app.test_client() as client:
+            with open(filepath, 'rb') as file_to_send:
+                form_data = {
+                    'file': (file_to_send, filename),
+                }
+                
+                if is_dynamic:
+                    form_data['document_code'] = document_type
+                
+                response = client.post(
+                    service_endpoint,
+                    data=form_data,
+                    content_type='multipart/form-data'
+                )
+        
+        # Geçici dosyayı sil
+        try:
+            os.remove(filepath)
+        except:
+            pass
+        
+        result = response.get_json()
+        
+        # Ticket'ı güncelle
+        with app.app_context():
+            ticket = Ticket.query.filter_by(ticket_id=ticket_id).first()
+            
+            if ticket and result and 'data' in result:
+                analysis_data = result['data']
+                
+                # Analiz sonucunu kaydet
+                ticket.analysis_result = {
+                    'overall_score': analysis_data.get('overall_score', {}),
+                    'category_scores': analysis_data.get('category_scores', {}),
+                    'extracted_values': analysis_data.get('extracted_values', {}),
+                    'recommendations': analysis_data.get('recommendations', []),
+                    'summary': analysis_data.get('summary', '')
+                }
+                
+                # Status güncelle
+                if initial_comment:
+                    ticket.status = 'İnceleniyor'
+                    # İlk yorumu ekle
+                    first_comment = TicketComment(
+                        ticket_id=ticket.id,
+                        comment_id='comment_1',
+                        author=comment_author if comment_author else 'Anonim Kullanıcı',
+                        text=initial_comment,
+                        timestamp=datetime.now()
+                    )
+                    db.session.add(first_comment)
+                else:
+                    ticket.status = 'Kapalı'
+                    ticket.closing_date = datetime.now()
+                
+                ticket.last_updated = datetime.now()
+                
+                db.session.commit()
+                
+                logger.info(f"✅ Async analiz tamamlandı: {ticket_id} - Status: {ticket.status}")
+            
+    except Exception as e:
+        logger.error(f"❌ Async analiz hatası ({ticket_id}): {str(e)}")
+        
+        # Hata durumunda ticket'ı güncelle
+        try:
+            with app.app_context():
+                ticket = Ticket.query.filter_by(ticket_id=ticket_id).first()
+                if ticket:
+                    ticket.status = 'Hatalı'
+                    ticket.analysis_result = {'error': str(e)}
+                    ticket.last_updated = datetime.now()
+                    db.session.commit()
+        except:
+            pass
+
 @app.route('/api/analyze', methods=['POST'])
 def analyze_document():
     """
-    Ana analiz endpoint'i - PostgreSQL ile
+    Ana analiz endpoint'i - ASYNC (PostgreSQL ile)
     
     POST /api/analyze
     {
@@ -189,111 +283,52 @@ def analyze_document():
         initial_comment = request.form.get('initial_comment', '').strip()
         comment_author = request.form.get('comment_author', '').strip()
         
-        logger.info(f"Analiz isteği - Tip: {document_type}, Dosya: {file.filename}")
-        if custom_document_url:
-            logger.info(f"Custom document_url: {custom_document_url}")
-        if initial_comment:
-            logger.info(f"İlk yorum var - Yazar: {comment_author if comment_author else 'Anonim'}")
+        logger.info(f"Analiz isteği (ASYNC) - Tip: {document_type}, Dosya: {file.filename}")
 
-        # 4. DOSYAYI KAYDETME - Direkt servise forward et
+        # 4. DOSYAYI MEMORY'YE AL
         filename = secure_filename(file.filename)
-        file.seek(0)  # Reset file pointer
+        file_data = file.read()  # Dosyayı memory'ye oku
         
-        # 5. İLGİLİ SERVİS APP'İNE YÖNLENDİR
+        # 5. HANDLER BİLGİSİ
         handler_info = DOCUMENT_HANDLERS[document_type]
-        service_app = handler_info['app']
-        service_endpoint = handler_info['endpoint']
-        is_dynamic = handler_info.get('is_dynamic', False)
 
-        logger.info(f"Servis çağrılıyor: {service_endpoint} (Dynamic: {is_dynamic})")
+        # 6. TİCKET OLUŞTUR (İŞLENİYOR STATUS)
+        analysis_id = f"{document_type}_{int(datetime.now().timestamp())}"
+        ticket_no = generate_ticket_no()
         
-        # Service app'in test client'ını kullan (internal routing)
-        with service_app.test_client() as client:
-            # Dosyayı ve diğer parametreleri servis'e gönder
-            form_data = {
-                'file': (file, filename),
-                **{key: value for key, value in request.form.items() if key != 'document_type'}
-            }
-
-            # Dynamic service ise document_code ekle
-            if is_dynamic:
-                form_data['document_code'] = document_type
-
-            response = client.post(
-                service_endpoint,
-                data=form_data,
-                content_type='multipart/form-data'
-            )
+        new_ticket = Ticket(
+            ticket_no=ticket_no,
+            ticket_id=analysis_id,
+            document_name=filename,
+            document_type=document_type,
+            document_url=custom_document_url if custom_document_url else f"{FILE_BASE_URL}{filename}",
+            opening_date=datetime.now(),
+            status='İşleniyor',  # ASYNC: İşleniyor
+            responsible='Savaş Bey',
+            analysis_result={}  # Boş başlar
+        )
         
-        # Servis'ten gelen cevabı al
-        result = response.get_json()
+        db.session.add(new_ticket)
+        db.session.commit()
         
-        # 6. OTOMATIK TICKET OLUŞTUR (PostgreSQL)
-        if result and 'data' in result:
-            try:
-                analysis_data = result['data']
-                analysis_id = analysis_data.get('analysis_id')
-                
-                # Mevcut ticket var mı kontrol et
-                existing_ticket = Ticket.query.filter_by(ticket_id=analysis_id).first()
-                
-                if not existing_ticket:
-                    # Yeni ticket oluştur
-                    ticket_no = generate_ticket_no()
-                    
-                    new_ticket = Ticket(
-                        ticket_no=ticket_no,
-                        ticket_id=analysis_id,
-                        document_name=analysis_data.get('filename', filename),
-                        document_type=analysis_data.get('file_type', 'Bilinmiyor'),
-                        document_url=custom_document_url if custom_document_url else f"{FILE_BASE_URL}{analysis_data.get('filename', filename)}",
-                        opening_date=datetime.now(),
-                        status='İnceleniyor' if initial_comment else 'Kapalı',
-                        responsible='Savaş Bey',
-                        analysis_result={
-                            'overall_score': analysis_data.get('overall_score', {}),
-                            'category_scores': analysis_data.get('category_scores', {}),
-                            'extracted_values': analysis_data.get('extracted_values', {}),
-                            'recommendations': analysis_data.get('recommendations', []),
-                            'summary': analysis_data.get('summary', '')
-                        }
-                    )
-                    
-                    db.session.add(new_ticket)
-                    db.session.flush()  # ID'yi al
-                    
-                    # İlk yorum varsa ekle
-                    if initial_comment:
-                        first_comment = TicketComment(
-                            ticket_id=new_ticket.id,
-                            comment_id='comment_1',
-                            author=comment_author if comment_author else 'Anonim Kullanıcı',
-                            text=initial_comment,
-                            timestamp=datetime.now()
-                        )
-                        db.session.add(first_comment)
-                        new_ticket.last_updated = datetime.now()
-                    
-                    db.session.commit()
-                    
-                    logger.info(f"Otomatik ticket oluşturuldu: {ticket_no} (ID: {analysis_id})")
-                    
-                    result['ticket_created'] = True
-                    result['ticket_no'] = ticket_no
-                    result['ticket_id'] = analysis_id
-                else:
-                    logger.info(f"Bu analiz için ticket zaten var: {existing_ticket.ticket_no}")
-                    result['ticket_created'] = False
-                    result['ticket_no'] = existing_ticket.ticket_no
-                    result['ticket_id'] = existing_ticket.ticket_id
-                    
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"Otomatik ticket oluşturma hatası: {str(e)}")
-                result['ticket_error'] = str(e)
+        logger.info(f"Ticket oluşturuldu (ASYNC): {ticket_no} (ID: {analysis_id})")
         
-        # 7. SONUCU DÖNDÜR
-        return jsonify(result), response.status_code
+        # 7. ARKA PLANDA ANALİZ BAŞLAT (THREAD)
+        thread = threading.Thread(
+            target=analyze_document_async,
+            args=(file_data, filename, document_type, handler_info, custom_document_url, initial_comment, comment_author, analysis_id)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        # 8. HEMEN RESPONSE DÖN
+        return jsonify({
+            'success': True,
+            'message': 'Analiz başlatıldı',
+            'ticket_id': analysis_id,
+            'ticket_no': ticket_no,
+            'status': 'İşleniyor'
+        }), 200
 
     except Exception as e:
         logger.error(f"Error in analyze_document: {str(e)}")
@@ -345,12 +380,16 @@ def get_tickets():
         query = Ticket.query
         
         # Filtreleme parametreleri
+        ticket_id_filter = request.args.get('ticket_id', '')  # YENİ: ticket_id filtresi
         status_filter = request.args.get('status', '')
         date_from = request.args.get('date_from', '')
         date_to = request.args.get('date_to', '')
         responsible_filter = request.args.get('responsible', '')
         
         # Filtrele
+        if ticket_id_filter:  # YENİ: ticket_id ile filtrele
+            query = query.filter(Ticket.ticket_id == ticket_id_filter)
+        
         if status_filter:
             query = query.filter(Ticket.status == status_filter)
         
