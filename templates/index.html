@@ -219,6 +219,73 @@
     <footer>© 2025 PILZ Report Checker • <a href="/api/services" target="_blank">Servisler</a></footer>
 
     <script>
+
+        // =====================================================
+        // TOAST NOTIFICATION SYSTEM
+        // =====================================================
+
+        const AUTHORIZED_USERS = ["Savaş", "Kayra", "Can", "Utku"];
+
+        // Toast container oluştur
+        function initToastContainer() {
+            if (!document.querySelector('.toast-container')) {
+                const container = document.createElement('div');
+                container.className = 'toast-container';
+                document.body.appendChild(container);
+            }
+        }
+
+        // Toast göster
+        function showToast(message, type = 'info', duration = 3000) {
+            initToastContainer();
+            
+            const container = document.querySelector('.toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            // Icon seç
+            let icon = '🤖';
+            if (type === 'success') icon = '✅';
+            else if (type === 'error') icon = '❌';
+            else if (type === 'info') icon = 'ℹ️';
+            
+            toast.innerHTML = `
+                <div class="toast-icon">${icon}</div>
+                <div class="toast-message">${message}</div>
+                <button class="toast-close" onclick="closeToast(this)">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Auto close (duration = 0 ise sonsuz)
+            if (duration > 0) {
+                setTimeout(() => {
+                    closeToast(toast.querySelector('.toast-close'));
+                }, duration);
+            }
+            
+            return toast;
+        }
+
+        // Toast kapat
+        function closeToast(button) {
+            const toast = button.closest('.toast');
+            if (toast) {
+                toast.classList.add('hiding');
+                setTimeout(() => toast.remove(), 300);
+            }
+        }
+
+        // Tüm toast'ları kapat
+        function closeAllToasts() {
+            document.querySelectorAll('.toast').forEach(toast => {
+                toast.classList.add('hiding');
+                setTimeout(() => toast.remove(), 300);
+            });
+        }
+
         let selectedFile = null;
         let currentTicketId = null;      // 👈 YENİ EKLE
         let pollingInterval = null;
@@ -851,8 +918,12 @@
                 return;
             }
 
+            let activeToast = null;
+            if (AUTHORIZED_USERS.includes(inspectorName)) {
+                activeToast = showToast('🤖 AI pattern analizi yapılıyor...', 'info', 0);
+            }
+
             try {
-                // Bu ticket_id için ticket var mı bul
                 const ticketsResponse = await fetch('/api/tickets');
                 const tickets = await ticketsResponse.json();
                 
@@ -861,7 +932,6 @@
                 );
                 
                 if (existingTicket) {
-                    // Ticket varsa yorum ekle
                     const commentResponse = await fetch('/api/add-comment', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -874,8 +944,11 @@
                     
                     const commentResult = await commentResponse.json();
                     
+                    if (activeToast) {
+                        closeToast(activeToast.querySelector('.toast-close'));
+                    }
+                    
                     if (commentResponse.ok && commentResult.success) {
-                        // Yorum eklendikten sonra status'ü güncelle
                         const statusResponse = await fetch('/api/update-ticket', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -886,7 +959,7 @@
                         });
                         
                         if (statusResponse.ok) {
-                            alert(`✓ Ticket güncellendi!\n\nTicket No: ${existingTicket.ticket_no}\nYeni yorum eklendi.`);
+                            showToast(commentResult.message, 'success', 5000);
                             document.getElementById('inspectorName').value = '';
                             document.getElementById('inspectorComment').value = '';
                             document.getElementById('issueReportSection').style.display = 'none';
@@ -895,7 +968,6 @@
                         throw new Error(commentResult.message || 'Yorum eklenemedi');
                     }
                 } else {
-                    // Ticket yoksa yeni oluştur
                     const issueData = {
                         inspector_name: inspectorName,
                         inspector_comment: inspectorComment,
@@ -911,8 +983,12 @@
                     
                     const result = await response.json();
                     
+                    if (activeToast) {
+                        closeToast(activeToast.querySelector('.toast-close'));
+                    }
+                    
                     if (response.ok && result.success) {
-                        alert(`✓ Ticket oluşturuldu!\n\nTicket No: ${result.ticket_no}`);
+                        showToast(`✅ Ticket oluşturuldu! (${result.ticket_no})`, 'success', 5000);
                         document.getElementById('inspectorName').value = '';
                         document.getElementById('inspectorComment').value = '';
                         document.getElementById('issueReportSection').style.display = 'none';
@@ -921,8 +997,11 @@
                     }
                 }
             } catch (error) {
+                if (activeToast) {
+                    closeToast(activeToast.querySelector('.toast-close'));
+                }
                 console.error('Hata:', error);
-                alert('İşlem başarısız: ' + error.message);
+                showToast('❌ İşlem başarısız: ' + error.message, 'error', 5000);
             }
         }
 
@@ -1411,6 +1490,11 @@
                 return;
             }
             
+            let activeToast = null;
+            if (AUTHORIZED_USERS.includes(author)) {
+                activeToast = showToast('🤖 AI pattern analizi yapılıyor...', 'info', 0);
+            }
+            
             try {
                 const response = await fetch('/api/add-comment', {
                     method: 'POST',
@@ -1424,21 +1508,23 @@
                 
                 const result = await response.json();
                 
+                if (activeToast) {
+                    closeToast(activeToast.querySelector('.toast-close'));
+                }
+                
                 if (response.ok && result.success) {
-                    // Form'u temizle
+                    showToast(result.message, 'success', 5000);
+                    
                     document.getElementById('commentAuthor').value = '';
                     document.getElementById('commentText').value = '';
                     
-                    // Tickets'ı yenile
                     await loadTickets();
                     
-                    // Modal'ı yeniden aç (güncel yorumlarla)
                     const ticketsResponse = await fetch('/api/tickets');
                     const tickets = await ticketsResponse.json();
                     const updatedTicket = tickets.find(t => t.ticket_no === ticketNo);
                     
                     if (updatedTicket) {
-                        // Modal içeriğini güncelle
                         const commentsContainer = document.getElementById('commentsContainer');
                         if (updatedTicket.comments && updatedTicket.comments.length > 0) {
                             commentsContainer.innerHTML = updatedTicket.comments.map(comment => `
@@ -1455,11 +1541,14 @@
                         }
                     }
                 } else {
-                    alert('Yorum eklenemedi: ' + result.message);
+                    showToast('❌ Yorum eklenemedi: ' + result.message, 'error', 5000);
                 }
             } catch (error) {
+                if (activeToast) {
+                    closeToast(activeToast.querySelector('.toast-close'));
+                }
                 console.error('Yorum ekleme hatası:', error);
-                alert('Yorum eklenirken hata oluştu');
+                showToast('❌ Yorum eklenirken hata oluştu', 'error', 5000);
             }
         }
 

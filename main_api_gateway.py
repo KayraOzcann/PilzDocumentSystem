@@ -15,10 +15,16 @@ import logging
 import atexit
 import time
 import threading
+from typing import Dict, List, Any 
 
 from database import db, init_db
 from models import DocumentType, Ticket, TicketComment, CriteriaWeight, CriteriaDetail, PatternDefinition, ValidationKeyword, CategoryAction
 import anthropic
+
+# ============================================
+# AI-POWERED PATTERN UPDATE CONFIGURATION
+# ============================================
+AUTHORIZED_USERS = ["Savaş", "Kayra", "Can", "Utku"]
 
 # ============================================
 # LOGGING CONFIGURATION
@@ -515,7 +521,7 @@ def update_ticket():
 
 @app.route('/api/add-comment', methods=['POST'])
 def add_comment():
-    """Ticket'a yeni yorum ekle - PostgreSQL"""
+    """Ticket'a yeni yorum ekle - AI Pattern Update desteği ile"""
     try:
         data = request.get_json()
         
@@ -565,13 +571,54 @@ def add_comment():
         # Ticket'ın last_updated'ini güncelle
         ticket.last_updated = datetime.now()
         
+        # ============================================
+        # 🤖 AI PATTERN UPDATE - YETKİLİ KULLANICI KONTROLÜ
+        # ============================================
+        ai_message = ""
+        
+        if author in AUTHORIZED_USERS:
+            logger.info(f"🤖 Yetkili kullanıcı yorumu: {author}")
+
+            # Dynamic kontrolü
+            doc_type = DocumentType.query.filter_by(code=ticket.document_type).first()
+            if not doc_type or doc_type.service_file != 'dynamic_service.py':
+                logger.info(f"ℹ️ Static servis ({ticket.document_type}), AI atlandı")
+                db.session.commit()
+                return jsonify({"success": True, "message": "Yorum eklendi"})
+            
+            logger.info(f"🚀 Dynamic servis ({doc_type.name}), AI başlatılıyor...")
+            
+            try:
+                # AI ile pattern güncelleme yap
+                ai_result = analyze_comment_and_update_patterns(
+                    comment=text,
+                    ticket=ticket
+                )
+                
+                if ai_result['success']:
+                    updated_count = len(ai_result.get('updates', []))
+                    if updated_count > 0:
+                        ai_message = f" (AI: {updated_count} pattern iyileştirildi)"
+                        logger.info(f"✅ AI güncelleme başarılı: {updated_count} pattern")
+                    else:
+                        ai_message = " (AI: Güncelleme gerekmedi)"
+                        logger.info("ℹ️ AI güncelleme gerekmedi")
+                else:
+                    ai_message = f" (AI hatası: {ai_result.get('error', 'Bilinmeyen hata')})"
+                    logger.error(f"❌ AI hatası: {ai_result.get('error')}")
+                    
+            except Exception as e:
+                ai_message = f" (AI hatası: {str(e)})"
+                logger.error(f"❌ AI güncelleme exception: {str(e)}")
+        
+        # Database commit
         db.session.commit()
         
-        logger.info(f"Yorum eklendi: {ticket.ticket_no} - {author}")
+        logger.info(f"Yorum eklendi: {ticket.ticket_no} - {author}{ai_message}")
         
         return jsonify({
             'success': True,
-            'message': 'Yorum başarıyla eklendi',
+            'message': f'Yorum başarıyla eklendi{ai_message}',
             'comment': {
                 'comment_id': comment_id,
                 'author': author,
@@ -1332,6 +1379,319 @@ def get_excluded_keywords_pool(current_doc_type_id=None):
     logger.info(f"✅ FINAL excluded pool: {len(final_pool)} unique kelime")
     
     return final_pool
+
+# ============================================
+# AI-POWERED PATTERN UPDATE FUNCTIONS
+# ============================================
+def analyze_comment_and_update_patterns(comment: str, ticket: Ticket) -> Dict[str, Any]:
+    """
+    Kullanıcı yorumunu AI ile analiz et ve pattern'leri güncelle
+    
+    Args:
+        comment: Kullanıcının yorumu
+        ticket: Ticket objesi
+        
+    Returns:
+        {
+            'success': bool,
+            'updates': [...],
+            'error': str (optional)
+        }
+    """
+    try:
+        # 1. Document type'ı al
+        doc_type = DocumentType.query.filter_by(
+            code=ticket.document_type,
+            is_active=True
+        ).first()
+        
+        if not doc_type:
+            return {'success': False, 'error': f'Document type bulunamadı: {ticket.document_type}'}
+        
+        logger.info(f"📋 Document type: {doc_type.name} ({doc_type.code})")
+        
+        # 2. Mevcut config'i topla
+        current_config = collect_current_patterns(doc_type)
+        
+        # 3. Analiz sonuçlarını formatla
+        analysis_summary = format_analysis_results(ticket)
+        
+        # 4. AI'ya gönder
+        logger.info("🤖 AI'ya istek gönderiliyor...")
+        ai_response = call_ai_for_pattern_update(
+            comment=comment,
+            doc_type_name=doc_type.name,
+            current_config=current_config,
+            analysis_summary=analysis_summary
+        )
+        
+        if not ai_response['success']:
+            return ai_response
+        
+        # 5. AI'dan gelen güncellemeleri uygula
+        updates = ai_response.get('updates', [])
+        
+        if not updates or len(updates) == 0:
+            logger.info("ℹ️ AI güncelleme önermedi")
+            return {'success': True, 'updates': []}
+        
+        logger.info(f"📝 {len(updates)} güncelleme uygulanacak...")
+        
+        applied_updates = []
+        for update in updates:
+            try:
+                apply_pattern_update(doc_type, update)
+                applied_updates.append(update)
+                logger.info(f"✅ Güncellendi: {update.get('field_name', 'N/A')}")
+            except Exception as e:
+                logger.error(f"❌ Güncelleme hatası: {e}")
+        
+        db.session.commit()
+        
+        return {
+            'success': True,
+            'updates': applied_updates
+        }
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ AI pattern update hatası: {str(e)}")
+        return {'success': False, 'error': str(e)}
+
+
+def collect_current_patterns(doc_type: DocumentType) -> Dict[str, Any]:
+    """Mevcut pattern'leri topla"""
+    config = {
+        'extract_values': {},
+        'criteria_details': {}
+    }
+    
+    # Extract values patterns
+    extract_patterns = PatternDefinition.query.filter_by(
+        document_type_id=doc_type.id,
+        pattern_group='extract_values'
+    ).all()
+    
+    for pattern in extract_patterns:
+        config['extract_values'][pattern.field_name] = {
+            'patterns': pattern.patterns,
+            'id': pattern.id
+        }
+    
+    # Criteria details patterns
+    criteria_weights = CriteriaWeight.query.filter_by(
+        document_type_id=doc_type.id
+    ).all()
+    
+    for cw in criteria_weights:
+        config['criteria_details'][cw.category_name] = {}
+        
+        criteria_details = CriteriaDetail.query.filter_by(
+            criteria_weight_id=cw.id
+        ).all()
+        
+        for cd in criteria_details:
+            config['criteria_details'][cw.category_name][cd.criterion_name] = {
+                'pattern': cd.pattern,
+                'weight': cd.weight,
+                'id': cd.id
+            }
+    
+    return config
+
+
+def format_analysis_results(ticket: Ticket) -> Dict[str, Any]:
+    """Analiz sonuçlarını AI için formatla"""
+    analysis_result = ticket.analysis_result or {}
+    
+    summary = {
+        'extracted_values': {},
+        'category_scores': {}
+    }
+    
+    # Extracted values (hangileri bulunamadı)
+    extracted = analysis_result.get('extracted_values', {})
+    for field, value in extracted.items():
+        status = 'found' if value and value not in ['Bulunamadı', 'N/A', ''] else 'not_found'
+        summary['extracted_values'][field] = {
+            'value': value,
+            'status': status
+        }
+    
+    # Category scores (hangi kriterler başarısız/zayıf)
+    category_scores = analysis_result.get('category_scores', {})
+    
+    # ⚠️ SORUN: category_scores formatı bilinmiyor, dinamik parse gerekli
+    # Frontend'den gelen format: {"Genel Bilgiler": {"percentage": 45, ...}}
+    # Ama kriter bazlı detay yok! 
+    
+    # Geçici çözüm: Sadece kategori seviyesinde bilgi ver
+    for category, score_data in category_scores.items():
+        if isinstance(score_data, dict):
+            percentage = score_data.get('percentage', 0)
+            summary['category_scores'][category] = {
+                'percentage': percentage,
+                'status': 'good' if percentage >= 70 else 'needs_improvement' if percentage >= 40 else 'failed'
+            }
+    
+    return summary
+
+
+def call_ai_for_pattern_update(comment: str, doc_type_name: str, current_config: Dict, analysis_summary: Dict) -> Dict[str, Any]:
+    """AI'ya pattern güncelleme isteği gönder"""
+    try:
+        api_key = os.getenv('ANTHROPIC_API_KEY')
+        if not api_key:
+            return {'success': False, 'error': 'ANTHROPIC_API_KEY tanımlı değil'}
+        
+        client = anthropic.Anthropic(api_key=api_key)
+        
+        # Prompt oluştur
+        prompt = f"""Sen bir regex pattern uzmanısın. Kullanıcının yorumuna göre döküman analiz pattern'lerini iyileştiriyorsun.
+
+DÖKÜMAN TÜRÜ: {doc_type_name}
+
+KULLANICI YORUMU:
+"{comment}"
+
+MEVCUT PATTERN'LER:
+{json.dumps(current_config, indent=2, ensure_ascii=False)}
+
+ANALİZ DURUMU:
+{json.dumps(analysis_summary, indent=2, ensure_ascii=False)}
+
+GÖREV:
+Kullanıcının yorumunu analiz et ve SADECE ilgili pattern'leri iyileştir.
+
+ÖNEMLİ KURALLAR:
+1. SADECE kullanıcının bahsettiği field'ları güncelle
+2. "Firma adı bulunamadı" → SADECE "firma_adi" pattern'ini güçlendir
+3. "Kategori X zayıf" → O kategoride SADECE başarısız/geliştirmeli kriterleri güncelle
+4. Başarılı kriterleri DOKUNMA (percentage >= 70)
+5. Regex'te backslash DÖRT KERE: \\\\s \\\\d \\\\w
+6. (?i) SADECE pattern'in EN BAŞINDA
+
+PATTERN GÜÇLENDIRME TAKTİKLERİ:
+- Türkçe + İngilizce alternatifleri ekle
+- Boşluk toleransı artır: \\\\s* veya [\\\\s\\\\W]*
+- Alternatif yazımlar ekle: (?:tarih|date|tarihi)
+- Yakalama grubunu genişlet
+
+ÇIKTI FORMATI (JSON):
+{{
+    "updates": [
+        {{
+            "field_type": "extract_values",
+            "field_name": "rapor_tarihi",
+            "category": null,
+            "new_pattern": "(?i)(?:rapor\\\\s*tarih|test\\\\s*date)[\\\\s\\\\W]*[:=]?\\\\s*(\\\\d{{1,2}}[./]\\\\d{{1,2}}[./]\\\\d{{2,4}})",
+            "reason": "Kullanıcı 'tarih bulunamadı' dedi, pattern'e 'test date' alternatifi eklendi"
+        }},
+        {{
+            "field_type": "criteria_details",
+            "field_name": "firma_adi",
+            "category": "Genel Bilgiler",
+            "new_pattern": "(?i)(?:firma|company|şirket|organization)[\\\\s\\\\W]*[:=]?\\\\s*([A-ZÇĞİÖŞÜ][A-Za-züçğıöşüÇĞİÖŞÜ\\\\s\\\\.\\\\&\\\\-]{{3,80}})",
+            "reason": "Kategori zayıf, 'organization' alternatifi eklendi"
+        }}
+    ]
+}}
+
+ÖNEMLİ:
+- Eğer yorum pattern ile ilgili DEĞİLSE → "updates": [] döndür
+- Genel şikayet ise (ör: "kötü analiz") → "updates": [] döndür
+- SADECE spesifik field/kategori bahsedilirse güncelle
+"""
+        
+        # AI'ya gönder
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=3000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        response_text = message.content[0].text.strip()
+        
+        # JSON parse
+        if '```json' in response_text:
+            response_text = response_text.split('```json')[1].split('```')[0]
+        elif '```' in response_text:
+            response_text = response_text.split('```')[1].split('```')[0]
+        
+        response_text = response_text.strip()
+        
+        try:
+            result = json.loads(response_text)
+        except json.JSONDecodeError as je:
+            logger.error(f"❌ AI JSON parse hatası: {je}")
+            logger.error(f"Response: {response_text[:500]}")
+            return {'success': False, 'error': f'AI response JSON hatası: {str(je)}'}
+        
+        return {
+            'success': True,
+            'updates': result.get('updates', [])
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ AI call hatası: {str(e)}")
+        return {'success': False, 'error': str(e)}
+
+
+def apply_pattern_update(doc_type: DocumentType, update: Dict[str, Any]):
+    """Pattern güncelleme uygula"""
+    field_type = update.get('field_type')
+    field_name = update.get('field_name')
+    new_pattern = update.get('new_pattern')
+    category = update.get('category')
+    
+    if not field_type or not field_name or not new_pattern:
+        raise ValueError("Eksik update bilgisi")
+    
+    if field_type == 'extract_values':
+        # Extract values pattern güncelle
+        pattern_def = PatternDefinition.query.filter_by(
+            document_type_id=doc_type.id,
+            pattern_group='extract_values',
+            field_name=field_name
+        ).first()
+        
+        if pattern_def:
+            # Mevcut pattern'lere yeni pattern ekle (başa ekle - öncelikli)
+            if new_pattern not in pattern_def.patterns:
+                pattern_def.patterns.insert(0, new_pattern)
+                logger.info(f"  ✏️ Extract value güncellendi: {field_name}")
+        else:
+            logger.warning(f"  ⚠️ Extract value bulunamadı: {field_name}")
+    
+    elif field_type == 'criteria_details':
+        # Criteria details pattern güncelle
+        if not category:
+            raise ValueError("Criteria update için category gerekli")
+        
+        # Kategoriyi bul
+        cw = CriteriaWeight.query.filter_by(
+            document_type_id=doc_type.id,
+            category_name=category
+        ).first()
+        
+        if not cw:
+            raise ValueError(f"Kategori bulunamadı: {category}")
+        
+        # Kriteri bul
+        cd = CriteriaDetail.query.filter_by(
+            criteria_weight_id=cw.id,
+            criterion_name=field_name
+        ).first()
+        
+        if cd:
+            cd.pattern = new_pattern
+            logger.info(f"  ✏️ Criteria detail güncellendi: {category} → {field_name}")
+        else:
+            logger.warning(f"  ⚠️ Criteria detail bulunamadı: {category} → {field_name}")
+    
+    else:
+        raise ValueError(f"Bilinmeyen field_type: {field_type}")
+
 
 with app.app_context():
     load_document_handlers()
